@@ -1,4 +1,5 @@
 astroid>=2.2.0
+cached-property>=1.5.1
 dataslots>=1.0.1
 entrypoints>=0.3
 filelock>=3.0.10

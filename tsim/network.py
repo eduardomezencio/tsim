@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from itertools import chain
 from typing import Tuple
 
+from cached_property import cached_property
 from dataslots import with_slots
 
 from tsim.entity import Entity
@@ -40,22 +41,18 @@ class Way(Entity):
     start: Node
     end: Node
     waypoints: Tuple[Point] = field(default_factory=tuple)
-    length: float = field(init=False)
 
-    def __post_init__(self):
-        """Dataclass post-init."""
-        super(Way, self).__post_init__()
-        object.__setattr__(self, 'length', sum(
-            distance(p, q) for p, q in
-            zip(chain((self.start.position,), self.waypoints),
-                chain(self.waypoints, (self.end.position,)))))
+    @cached_property
+    def length(self) -> float:
+        """Total length of the Way."""
+        print(f'calculating length of Way {self.id}')
+        return sum(distance(p, q) for p, q in
+                   zip(chain((self.start.position,), self.waypoints),
+                       chain(self.waypoints, (self.end.position,))))
 
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
         """Calculate the bounding rect of the node."""
-        accumulated = self.start.calc_bounding_rect(accumulated)
-        # pylint: disable=not-an-iterable
-        for point in self.waypoints:
+        for point in chain((self.start,), self.waypoints, (self.end,)):
             accumulated = point.calc_bounding_rect(accumulated)
-        # pylint: enable=not-an-iterable
-        return self.end.calc_bounding_rect(accumulated)
+        return accumulated
