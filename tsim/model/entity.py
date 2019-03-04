@@ -12,8 +12,8 @@ from cached_property import cached_property
 from dataslots import with_slots
 from rtree.index import Rtree
 
-from tsim.geometry import BoundingRect
-import tsim.pickling
+from tsim.model.geometry import BoundingRect
+from tsim.utils import pickling
 
 
 @with_slots(add_dict=True)
@@ -34,8 +34,8 @@ class Entity(ABC):
         """Calculate the bounding rectangle of the entity."""
         ...
 
-    __getstate__ = tsim.pickling.getstate
-    __setstate__ = tsim.pickling.setstate
+    __getstate__ = pickling.getstate
+    __setstate__ = pickling.setstate
 
 
 class EntityIndex:

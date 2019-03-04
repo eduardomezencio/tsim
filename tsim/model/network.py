@@ -9,8 +9,8 @@ from typing import Tuple
 from cached_property import cached_property
 from dataslots import with_slots
 
-from tsim.entity import Entity
-from tsim.geometry import BoundingRect, distance, Point
+from tsim.model.entity import Entity
+from tsim.model.geometry import BoundingRect, distance, Point
 
 
 @with_slots
