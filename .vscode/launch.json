@@ -9,10 +9,10 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Python: [debug] test.py",
+            "name": "Python: [debug] _test.py",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/test.py",
+            "program": "${workspaceFolder}/_test.py",
             "console": "integratedTerminal"
         },
         {
