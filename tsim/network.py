@@ -14,7 +14,7 @@ from tsim.geometry import BoundingRect, distance, Point
 
 
 @with_slots
-@dataclass(frozen=False)
+@dataclass
 class Node(Entity):
     """A node of the network.
 
@@ -30,7 +30,7 @@ class Node(Entity):
 
 
 @with_slots
-@dataclass(frozen=False)
+@dataclass
 class Way(Entity):
     """A connection between two Nodes.
 
@@ -45,7 +45,6 @@ class Way(Entity):
     @cached_property
     def length(self) -> float:
         """Total length of the Way."""
-        print(f'calculating length of Way {self.id}')
         return sum(distance(p, q) for p, q in
                    zip(chain((self.start.position,), self.waypoints),
                        chain(self.waypoints, (self.end.position,))))

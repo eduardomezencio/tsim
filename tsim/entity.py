@@ -4,29 +4,24 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from itertools import chain, count
-from typing import ClassVar, Dict
+from itertools import count
+from typing import ClassVar, Dict, Tuple
 import shelve
 
 from cached_property import cached_property
 from dataslots import with_slots
+from rtree.index import Rtree
 
 from tsim.geometry import BoundingRect
+import tsim.pickling
 
 
 @with_slots(add_dict=True)
-@dataclass(frozen=False)
+@dataclass
 class Entity(ABC):
-    """Base class with automatic unique id."""
+    """Base class for spatial entities."""
 
-    id_count: ClassVar[count] = count()
-    index: ClassVar[Dict[int, 'Entity']] = {}
-
-    id: int = field(init=False, default_factory=id_count.__next__)
-
-    def __post_init__(self):
-        """Dataclass post-init."""
-        Entity.index[self.id] = self
+    id: int = field(init=False, default_factory=type(None))
 
     @cached_property
     def bounding_rect(self) -> BoundingRect:
@@ -39,39 +34,70 @@ class Entity(ABC):
         """Calculate the bounding rectangle of the entity."""
         ...
 
-    @classmethod
-    def load(cls, filename):
-        """Load entities from file."""
-        with shelve.open(filename) as data:
-            id_count = data.get('id_count', None)
-            index = data.get('index', None)
-            if id_count:
-                cls.id_count = id_count
-            if index:
-                cls.index = index
+    __getstate__ = tsim.pickling.getstate
+    __setstate__ = tsim.pickling.setstate
 
-    @classmethod
-    def save(cls, filename):
-        """Save entities to file."""
-        with shelve.open(filename) as data:
-            data['id_count'] = cls.id_count
-            data['index'] = cls.index
 
-    def __getstate__(self):
-        """Remove cached properties for use with pickle/shelve."""
-        dict_copy = self.__dict__.copy()
-        for key in self.__dict__:
-            if hasattr(self.__class__, key):
-                if isinstance(getattr(self.__class__, key), cached_property):
-                    del dict_copy[key]
-        slots = chain.from_iterable(
-            getattr(c, '__slots__', ()) for c in self.__class__.__mro__)
-        slots_dict = {s: getattr(self, s) for s in slots if s != '__dict__'}
-        return dict_copy, slots_dict
+class EntityIndex:
+    """Index of spatial entities.
 
-    def __setstate__(self, state):
-        """Restore state for pickle/shelve."""
-        dict_copy, slots = state
-        self.__dict__.update(dict_copy)
-        for key, value in slots.items():
-            setattr(self, key, value)
+    When an entity is added to the index, it gets an unique id and is kept in
+    a way than can be queried by id or by spatial coordinates.
+    """
+
+    __slots__ = ('name', 'id_count', 'entities', 'rtree')
+
+    extension: ClassVar[str] = 'shelf'
+    storage_fields: ClassVar[Tuple[str]] = ('id_count', 'entities')
+
+    name: str
+    id_count: count
+    entities: Dict[int, Entity]
+    rtree: Rtree
+
+    def __init__(self, name: str):
+        self.name = name
+        self.id_count = count()
+        self.entities = {}
+        self.rtree = Rtree()
+
+    @property
+    def filename(self) -> str:
+        """Name with extension added."""
+        if self.name.endswith('.' + EntityIndex.extension):
+            return self.name
+        return '.'.join((self.name, EntityIndex.extension))
+
+    def add(self, entity: Entity):
+        """Add entity to index."""
+        if entity.id is None:
+            entity.id = next(self.id_count)
+            self.entities[entity.id] = entity
+            self.rtree.insert(entity.id, entity.bounding_rect)
+
+    def delete(self, entity: Entity):
+        """Delete entity from index."""
+        assert self.entities[entity.id] is entity
+        del self.entities[entity.id]
+        self.rtree.delete(entity.id, entity.bounding_rect)
+
+    def generate_rtree_from_entities(self):
+        """Create empty rtree and add all entities to it."""
+        self.rtree = Rtree()
+        for id_, entity in self.entities.items():
+            self.rtree.add(id_, entity.bounding_rect)
+
+    def load(self):
+        """Load entities from shelf."""
+        with shelve.open(self.filename) as data:
+            for key in EntityIndex.storage_fields:
+                value = data.get(key, None)
+                if value:
+                    setattr(self, key, value)
+        self.generate_rtree_from_entities()
+
+    def save(self):
+        """Save entities to shelf."""
+        with shelve.open(self.filename) as data:
+            for key in EntityIndex.storage_fields:
+                data[key] = getattr(self, key)

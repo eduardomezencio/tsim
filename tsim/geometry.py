@@ -27,7 +27,7 @@ def manhattan_distance(point_a: Point, point_b: Point) -> float:
 
 
 @with_slots
-@dataclass(frozen=False)
+@dataclass
 class Point:
     """A point in space."""
 
