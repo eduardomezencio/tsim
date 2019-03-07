@@ -28,8 +28,8 @@ def manhattan_distance(point_a: Point, point_b: Point) -> float:
 
 @with_slots
 @dataclass
-class Point:
-    """A point in space."""
+class Vector:
+    """A vector in space, that doubles as a point."""
 
     x: float
     y: float
@@ -47,6 +47,40 @@ class Point:
         return (min(self.x, accumulated[0]), min(self.y, accumulated[1]),
                 max(self.x, accumulated[2]), max(self.y, accumulated[3]))
 
+    def norm(self) -> float:
+        """Calculate norm of the vector."""
+        return (self.x ** 2 + self.y ** 2) ** 0.5
+
+    def normalized(self) -> Vector:
+        """Get this vector normalized."""
+        norm = self.norm()
+        return Vector(self.x / norm, self.y / norm)
+
+    def add(self, other: Vector) -> Vector:
+        """Sum of this vector and another."""
+        return Vector(self.x + other.x, self.y + other.y)
+
+    def subtract(self, other: Vector) -> Vector:
+        """Difference of this vector by another."""
+        return Vector(self.x - other.x, self.y - other.y)
+
+    def multiply(self, other: float) -> Vector:
+        """Multiplication by scalar."""
+        return Vector(self.x * other, self.y * other)
+
+    def rotated_right(self) -> Vector:
+        """This vector rotated clockwise by 90 degrees."""
+        return Vector(-self.y, self.x)
+
     bounding_rect = property(calc_bounding_rect)
     distance = distance
     distance_squared = distance_squared
+
+    __abs__ = norm
+    __add__ = add
+    __mul__ = multiply
+    __rmul__ = multiply
+    __sub__ = subtract
+
+
+Point = Vector

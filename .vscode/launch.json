@@ -6,14 +6,17 @@
             "type": "python",
             "request": "launch",
             "module": "tsim",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "args": ["data/custom_test"]
         },
         {
-            "name": "Python: [debug] _test.py",
+            "name": "Python: custom_reader",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/_test.py",
-            "console": "integratedTerminal"
+            "program": "${workspaceFolder}/scripts/custom_reader.py",
+            "console": "integratedTerminal",
+            "args": ["data/custom_test"],
+            "env": {"PYTHONPATH": "${workspaceFolder}"}
         },
         {
             "name": "Python: Current File (Integrated Terminal)",

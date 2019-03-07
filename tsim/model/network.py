@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from itertools import chain
-from typing import Tuple
+from itertools import chain, islice
+from typing import Generator, Tuple
 
 from cached_property import cached_property
 from dataslots import with_slots
 
 from tsim.model.entity import Entity
-from tsim.model.geometry import BoundingRect, distance, Point
+from tsim.model.geometry import BoundingRect, distance, Point, Vector
 
 
 @with_slots
@@ -46,12 +46,34 @@ class Way(Entity):
     def length(self) -> float:
         """Total length of the Way."""
         return sum(distance(p, q) for p, q in
-                   zip(chain((self.start.position,), self.waypoints),
-                       chain(self.waypoints, (self.end.position,))))
+                   zip(self.points(), self.points(skip=1)))
 
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
         """Calculate the bounding rect of the node."""
-        for point in chain((self.start,), self.waypoints, (self.end,)):
+        for point in self.points():
             accumulated = point.calc_bounding_rect(accumulated)
         return accumulated
+
+    def points(self, skip=0) -> Generator[Point]:
+        """Generator for points in order, including nodes and waypoints."""
+        yield from islice(chain((self.start.position,), self.waypoints,
+                                (self.end.position,)),
+                          skip, None)
+
+    def normals(self) -> Generator[Vector]:
+        """Get the 'normals' of this way.
+
+        Normal here is used for the lack of a better term, meaning a unit
+        vector pointing to the right side of the road. One is returned for each
+        node or waypoint on the way.
+        """
+        other = self.waypoints[0] if self.waypoints else self.end.position
+        yield (other - self.start.position).rotated_right().normalized()
+
+        window = zip(self.points(), self.points(skip=1), self.points(skip=2))
+        yield from (((q - p) + (r - q)).rotated_right().normalized()
+                    for p, q, r in window)
+
+        other = self.waypoints[-1] if self.waypoints else self.start.position
+        yield (self.end.position - other).rotated_right().normalized()
