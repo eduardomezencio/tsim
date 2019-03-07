@@ -40,7 +40,7 @@ class App:
         self.create_and_add_nodes()
         self.create_and_add_ways()
 
-        self.grid = Grid(10.0, 3000.0)
+        self.grid = Grid(100.0, 15000.0)
         self.grid.attach_node('grid', self.base.render)
         self.grid.node_path.set_z(-0.1)
 

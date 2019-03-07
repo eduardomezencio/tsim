@@ -7,7 +7,16 @@
             "request": "launch",
             "module": "tsim",
             "console": "integratedTerminal",
-            "args": ["data/custom_test"]
+            "args": ["data/formiga.osm"]
+        },
+        {
+            "name": "Python: osm_reader",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/osm_reader.py",
+            "console": "integratedTerminal",
+            "args": ["data/formiga.osm"],
+            "env": {"PYTHONPATH": "${workspaceFolder}"}
         },
         {
             "name": "Python: custom_reader",
