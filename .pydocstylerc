@@ -1,3 +1,3 @@
 [pydocstyle]
 convention = pep257
-ignore = D107
+add-ignore = D105, D107

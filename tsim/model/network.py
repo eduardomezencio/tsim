@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import chain, islice
-from typing import Generator, Tuple
+from typing import Generator, List, Tuple
 
 from cached_property import cached_property
 from dataslots import with_slots
 
-from tsim.model.entity import Entity
+from tsim.model.entity import Entity, EntityRef
 from tsim.model.geometry import BoundingRect, distance, Point, Vector
 
 
@@ -22,6 +22,7 @@ class Node(Entity):
     """
 
     position: Point
+    ways: List[EntityRef[Way]] = field(default_factory=list)
 
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
@@ -42,6 +43,11 @@ class Way(Entity):
     end: Node
     waypoints: Tuple[Point] = field(default_factory=tuple)
 
+    def __post_init__(self):
+        self.start.ways.append(EntityRef(self))
+        if self.end is not self.start:
+            self.end.ways.append(EntityRef(self))
+
     @cached_property
     def length(self) -> float:
         """Total length of the Way."""
@@ -56,7 +62,7 @@ class Way(Entity):
         return accumulated
 
     def points(self, skip=0) -> Generator[Point]:
-        """Generator for points in order, including nodes and waypoints."""
+        """Get generator for points in order, including nodes and waypoints."""
         yield from islice(chain((self.start.position,), self.waypoints,
                                 (self.end.position,)),
                           skip, None)

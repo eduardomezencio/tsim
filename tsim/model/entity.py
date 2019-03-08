@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from itertools import count
-from typing import ClassVar, Dict, Tuple
+from typing import ClassVar, Dict, Generic, Tuple, TypeVar, Union
 import shelve
 
 from cached_property import cached_property
@@ -101,3 +101,45 @@ class EntityIndex:
         with shelve.open(self.filename) as data:
             for key in EntityIndex.storage_fields:
                 data[key] = getattr(self, key)
+
+
+T = TypeVar('T', bound=Entity)  # pylint: disable=invalid-name
+
+
+class EntityRef(Generic[T]):
+    """Reference for an entity.
+
+    This class exists to avoid deep recursion in pickling. It pickles itself
+    including only the id and not the reference to the entity.
+    """
+
+    __slots__ = ('_id', '_value')
+
+    index: ClassVar[EntityIndex]
+
+    _id: int
+    _value: T
+
+    def __init__(self, entity: Union[Entity, int]):
+        if isinstance(entity, Entity):
+            self._id = None
+            self._value = entity
+        else:
+            self._id = int(entity)
+            self._value = entity.id
+
+    @property
+    def value(self):
+        """Get entity from reference."""
+        if not self._value:
+            self._value = EntityRef.index.entities[self._id]
+        return self._value
+
+    def __getstate__(self):
+        if self._id is None:
+            self._id = self._value.id
+        return self._id
+
+    def __setstate__(self, state):
+        self._id = state
+        self._value = None

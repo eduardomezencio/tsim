@@ -13,7 +13,7 @@ class Camera:
     DEFAULT_PITCH = 60.0
     DEFAULT_ROTATION = 30.0
     DISTANCE_MIN = 5.0
-    DISTANCE_MAX = 5000.0
+    DISTANCE_MAX = 4000.0
     FOCUS_HEIGHT = 2.0
     PITCH_MIN = 0.0
     PITCH_MAX = 90.0
@@ -24,6 +24,8 @@ class Camera:
     def __init__(self, base: ShowBase):
         self.base = base
         self.camera = self.base.camera
+        self.lens = self.base.cam.node().get_lens()
+        self.lens.set_far(5000.0)
 
         self.focus = NodePath(PandaNode('focus'))
         self.focus.reparent_to(self.base.render)
