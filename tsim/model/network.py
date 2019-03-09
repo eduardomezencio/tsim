@@ -22,8 +22,8 @@ class Node(Entity):
     """
 
     position: Point
-    starts: List[EntityRef[Way]] = field(default_factory=list)
-    ends: List[EntityRef[Way]] = field(default_factory=list)
+    starts: List[EntityRef['Way']] = field(default_factory=list)
+    ends: List[EntityRef['Way']] = field(default_factory=list)
 
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
@@ -80,22 +80,38 @@ class Way(Entity):
                                 (self.end.position,)),
                           skip, None)
 
-    def normals(self) -> Generator[Vector]:
-        """Get the 'normals' of this way.
+    def waypoint_normals(self) -> Generator[Vector]:
+        """Get the 'normals' of this way's waypoints.
 
         Normal here is used for the lack of a better term, meaning a unit
         vector pointing to the right side of the road. One is returned for each
         node or waypoint on the way.
         """
+        # pylint: disable=unsubscriptable-object
         other = self.waypoints[0] if self.waypoints else self.end.position
         yield (other - self.start.position).rotated_right().normalized()
 
         window = zip(self.points(), self.points(skip=1), self.points(skip=2))
-        yield from (((q - p) + (r - q)).rotated_right().normalized()
+        yield from (((q - p).normalized() + (r - q).normalized())
+                    .rotated_right().normalized()
                     for p, q, r in window)
 
         other = self.waypoints[-1] if self.waypoints else self.start.position
         yield (self.end.position - other).rotated_right().normalized()
+        # pylint: enable=unsubscriptable-object
+
+    def edge_normals(self) -> Generator[Vector]:
+        """Get the 'normals' of this way's edges.
+
+        Get a unit vector pointing right from each edge on the way.
+        """
+        yield from ((p - q).rotated_right().normalized()
+                    for p, q in zip(self.points(), self.points(skip=1)))
+
+    def vectors(self) -> Generator[Vector]:
+        """Get vectors for each edge on the way."""
+        yield from ((p - q) for p, q in
+                    zip(self.points(), self.points(skip=1)))
 
     def disconnect(self):
         """Disconnect this way from the network.

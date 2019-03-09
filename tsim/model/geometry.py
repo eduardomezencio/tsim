@@ -26,6 +26,12 @@ def manhattan_distance(point_a: Point, point_b: Point) -> float:
     return abs(point_b.x - point_a.x + point_b.y - point_a.y)
 
 
+def sec(vector_a: Vector, vector_b: Vector) -> float:
+    """Get secant of angle between vectors."""
+    return ((vector_a.norm() * vector_b.norm())
+            / (vector_a.dot_product(vector_b)))
+
+
 @with_slots
 @dataclass
 class Vector:
@@ -64,17 +70,22 @@ class Vector:
         """Difference of this vector by another."""
         return Vector(self.x - other.x, self.y - other.y)
 
-    def multiply(self, other: float) -> Vector:
+    def multiply(self, scalar: float) -> Vector:
         """Multiplication by scalar."""
-        return Vector(self.x * other, self.y * other)
+        return Vector(self.x * scalar, self.y * scalar)
+
+    def dot_product(self, other: Vector) -> float:
+        """Dot product of this vector by another."""
+        return self.x * other.x + self.y * other.y
 
     def rotated_right(self) -> Vector:
-        """This vector rotated clockwise by 90 degrees."""
+        """Get vector rotated clockwise by 90 degrees."""
         return Vector(-self.y, self.x)
 
     bounding_rect = property(calc_bounding_rect)
     distance = distance
     distance_squared = distance_squared
+    sec = sec
 
     __abs__ = norm
     __add__ = add
