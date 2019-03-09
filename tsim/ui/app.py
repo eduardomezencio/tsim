@@ -76,9 +76,9 @@ class App:
             levels = [(250.0, 0.0), (1000.0, 250.0)]
             for bounds, node_path in zip(levels, node_paths):
                 lod.add_switch(*bounds)
-                node_path.set_color(1, 0, 0, 1.0)
+                node_path.set_color(0.15, 0.7, 0.95, 1.0)
                 node_path.reparent_to(lod_np)
-            lod_np.set_pos(*astuple(node.position), 0.1)
+            lod_np.set_pos(*astuple(node.position), 0.0)
 
     def create_and_add_ways(self):
         """Create and add network ways to the scene."""
