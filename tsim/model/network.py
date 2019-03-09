@@ -22,12 +22,22 @@ class Node(Entity):
     """
 
     position: Point
-    ways: List[EntityRef[Way]] = field(default_factory=list)
+    starts: List[EntityRef[Way]] = field(default_factory=list)
+    ends: List[EntityRef[Way]] = field(default_factory=list)
 
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
         """Calculate the bounding rect of the node."""
         return self.position.calc_bounding_rect(accumulated)
+
+    def disconnect(self):
+        """Disconnect this node from the network.
+
+        Returns the ways that must be disconnected to free this node.
+        """
+        return [r.value for r in set(chain(self.starts, self.ends))]
+
+    on_delete = disconnect
 
 
 @with_slots
@@ -44,9 +54,8 @@ class Way(Entity):
     waypoints: Tuple[Point] = field(default_factory=tuple)
 
     def __post_init__(self):
-        self.start.ways.append(EntityRef(self))
-        if self.end is not self.start:
-            self.end.ways.append(EntityRef(self))
+        self.start.starts.append(EntityRef(self))
+        self.end.ends.append(EntityRef(self))
 
     @cached_property
     def length(self) -> float:
@@ -60,6 +69,10 @@ class Way(Entity):
         for point in self.points():
             accumulated = point.calc_bounding_rect(accumulated)
         return accumulated
+
+    def other(self, node: Node):
+        """Get the other endpoint of the way, opposite to node."""
+        return self.start if self.end is node else self.end
 
     def points(self, skip=0) -> Generator[Point]:
         """Get generator for points in order, including nodes and waypoints."""
@@ -83,3 +96,20 @@ class Way(Entity):
 
         other = self.waypoints[-1] if self.waypoints else self.start.position
         yield (self.end.position - other).rotated_right().normalized()
+
+    def disconnect(self):
+        """Disconnect this way from the network.
+
+        Removes the connections from this way to nodes and also the references
+        from the nodes to this way.
+        """
+        start_index = next(i for i, v in enumerate(self.start.starts)
+                           if v.id == self.id)
+        end_index = next(i for i, v in enumerate(self.end.ends)
+                         if v.id == self.id)
+        del self.start.starts[start_index]
+        del self.end.ends[end_index]
+        self.start = None
+        self.end = None
+
+    on_delete = disconnect

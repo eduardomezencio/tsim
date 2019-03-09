@@ -32,7 +32,13 @@ class Entity(ABC):
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
         """Calculate the bounding rectangle of the entity."""
-        ...
+
+    def on_delete(self):
+        """Cleanup when deleting entity.
+
+        Will be called by the index when deleting. Must return an iterable with
+        other entities to cascade delete or None.
+        """
 
     __getstate__ = pickling.getstate
     __setstate__ = pickling.setstate
@@ -77,9 +83,13 @@ class EntityIndex:
 
     def delete(self, entity: Entity):
         """Delete entity from index."""
-        assert self.entities[entity.id] is entity
-        del self.entities[entity.id]
-        self.rtree.delete(entity.id, entity.bounding_rect)
+        stack = [entity]
+        while stack:
+            entity = stack.pop()
+            assert self.entities[entity.id] is entity
+            del self.entities[entity.id]
+            self.rtree.delete(entity.id, entity.bounding_rect)
+            stack.extend(entity.on_delete() or ())
 
     def generate_rtree_from_entities(self):
         """Create empty rtree and add all entities to it."""
@@ -129,6 +139,13 @@ class EntityRef(Generic[T]):
             self._value = entity.id
 
     @property
+    def id(self):
+        """Get entity id."""
+        if self._id is None and self._value:
+            self._id = self._value.id
+        return self._id
+
+    @property
     def value(self):
         """Get entity from reference."""
         if not self._value:
@@ -143,3 +160,9 @@ class EntityRef(Generic[T]):
     def __setstate__(self, state):
         self._id = state
         self._value = None
+
+    def __repr__(self):
+        return f'{EntityRef.__name__}(id={self.id})'
+
+    def __str__(self):
+        return repr(self)

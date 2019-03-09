@@ -24,7 +24,6 @@ def is_down(action: str):
 
 def init_input(base: ShowBase):
     """Initialize the input module."""
-
     def set_key(key: str, value: bool):
         KEYS[key] = value
 

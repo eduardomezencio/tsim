@@ -8,6 +8,7 @@ import sys
 from tsim.model.entity import EntityIndex
 from tsim.model.geometry import Point
 from tsim.model.network import Node, Way
+from tsim.model.network_extra import dissolve_node
 
 
 def main():
@@ -33,6 +34,8 @@ def main():
             index.add(nodes[start])
             index.add(nodes[end])
             index.add(Way(nodes[start], nodes[end]))
+
+    optimize_network(index)
     index.save()
 
 
@@ -53,6 +56,16 @@ def distance_meters(lat1, lon1, lat2, lon2):
     dlon, dlat = lon2 - lon1, lat2 - lat1
     return 12742000 * asin(sqrt(sin(dlat / 2) ** 2 +
                                 sin(dlon / 2) ** 2 * cos(lat1) * cos(lat2)))
+
+
+def optimize_network(index: EntityIndex):
+    """Dissolve all possible nodes on the network."""
+    node_ids = [k for k, v in index.entities.items() if isinstance(v, Node)]
+    for node in map(index.entities.get, node_ids):
+        try:
+            dissolve_node(index, node)
+        except ValueError:
+            pass
 
 
 if __name__ == '__main__':
