@@ -1,4 +1,4 @@
-background-color         0.1 0.1 0.1 0.0
+background-color         0.9 0.9 0.9 0.0
 cursor-hidden            false
 framebuffer-multisample  false
 show-frame-rate-meter    true
@@ -10,4 +10,5 @@ want-directtools         false
 want-pstats              false
 want-tk                  false
 
-grid-color               0.2 0.2 0.2 1.0
+grid-color               0.8 0.8 0.8 1.0
+way-color                0.15 0.7 0.95 1.0
