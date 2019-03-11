@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: tsim module",
+            "name": "Python: tsim module [formiga]",
             "type": "python",
             "request": "launch",
             "module": "tsim",
@@ -10,12 +10,29 @@
             "args": ["data/formiga.osm"]
         },
         {
-            "name": "Python: osm_reader",
+            "name": "Python: tsim module [bh]",
+            "type": "python",
+            "request": "launch",
+            "module": "tsim",
+            "console": "integratedTerminal",
+            "args": ["data/bh.osm"]
+        },
+        {
+            "name": "Python: osm_reader [formiga]",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/osm_reader.py",
             "console": "integratedTerminal",
             "args": ["data/formiga.osm"],
+            "env": {"PYTHONPATH": "${workspaceFolder}"}
+        },
+        {
+            "name": "Python: osm_reader [bh]",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/osm_reader.py",
+            "console": "integratedTerminal",
+            "args": ["data/bh.osm"],
             "env": {"PYTHONPATH": "${workspaceFolder}"}
         },
         {

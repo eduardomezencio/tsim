@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Reader for openstreetmap xml files."""
 
 from itertools import islice
