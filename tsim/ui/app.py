@@ -13,7 +13,7 @@ from tsim.model.network import Node, Way
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
-from tsim.ui.input import init_input
+from tsim.ui.input import clear_input, init_input
 from tsim.ui.network import build_node_geom, build_way_geom_node
 
 load_prc_file('config.prc')
@@ -59,6 +59,7 @@ class App:
         self.camera.update()
         self.cursor.update()
         self.grid.update()
+        clear_input()
         return Task.cont
 
     def init_lights(self):
