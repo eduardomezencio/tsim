@@ -3,9 +3,9 @@
 from itertools import product
 from math import floor
 
-from panda3d.core import (AmbientLight, ConfigVariableColor, Geom,
-                          GeomLinestrips, GeomNode, GeomVertexData,
-                          GeomVertexFormat, GeomVertexWriter, NodePath)
+from panda3d.core import (ConfigVariableColor, Geom, GeomLinestrips, GeomNode,
+                          GeomVertexData, GeomVertexFormat, GeomVertexWriter,
+                          NodePath)
 
 from tsim.model.geometry import Vector
 
@@ -27,15 +27,8 @@ class Grid:
 
         node = GeomNode('grid')
         node.add_geom(self.geom)
-        node_path = parent.attach_new_node(node)
-        node_path.set_z(-0.1)
-
-        light = AmbientLight('grid_light')
-        light.set_color((0.8, 0.8, 0.8, 1.0))
-        light_np = parent.attach_new_node(light)
-        node_path.set_light(light_np)
-
-        self.node_path = node_path
+        self.node_path = parent.attach_new_node(node)
+        self.node_path.set_z(-0.1)
 
     def update(self):
         """Update callback."""
@@ -44,7 +37,7 @@ class Grid:
         self.node_path.set_y(y - y % self.spacing)
 
     def _create_geom(self):
-        color = ConfigVariableColor('background-color')
+        color = ConfigVariableColor('grid-color')
 
         radius = floor(self.size / (2 * self.spacing))
         diameter = (2 * radius + 1)

@@ -1,15 +1,49 @@
 """Visualization of network objects."""
 
+from dataclasses import astuple
 from itertools import zip_longest
 from math import cos, pi, sin
 
-from panda3d.core import (Geom, GeomNode, GeomTristrips, GeomVertexData,
-                          GeomVertexFormat, GeomVertexWriter)
+from panda3d.core import (ConfigVariableColor, Geom, GeomNode, GeomTristrips,
+                          GeomVertexData, GeomVertexFormat, GeomVertexWriter,
+                          LODNode, NodePath)
 
+from tsim.model.entity import EntityIndex
 from tsim.model.geometry import sec
-from tsim.model.network import Way
+from tsim.model.network import Node, Way
 
+LEVEL_HEIGHT = 5.0
 WAY_WIDTH = 2.0
+
+
+def create_and_attach_nodes(index: EntityIndex, parent: NodePath):
+    """Create and add network nodes to the scene."""
+    geoms = (build_node_geom(16), build_node_geom(8))
+    nodes = (v for v in index.entities.values() if isinstance(v, Node))
+    for node in nodes:
+        geom_nodes = [GeomNode('node{node.id}_{i}_node') for i in range(2)]
+        for geom, geom_node in zip(geoms, geom_nodes):
+            geom_node.add_geom(geom)
+        node_paths = [NodePath(g) for g in geom_nodes]
+        lod = LODNode(f'node{node.id}_lod')
+        lod_np = NodePath(lod)
+        lod_np.reparent_to(parent)
+        levels = [(250.0, 0.0), (1000.0, 250.0)]
+        for bounds, node_path in zip(levels, node_paths):
+            lod.add_switch(*bounds)
+            node_path.set_color(ConfigVariableColor('way-color'))
+            node_path.reparent_to(lod_np)
+        lod_np.set_pos(*astuple(node.position), LEVEL_HEIGHT * node.level)
+
+
+def create_and_attach_ways(index: EntityIndex, parent: NodePath):
+    """Create and add network ways to the scene."""
+    ways = ((f'way_{k}', v) for k, v in index.entities.items()
+            if isinstance(v, Way))
+    for name, way in ways:
+        node = build_way_geom_node(name, way)
+        node_path = parent.attach_new_node(node)
+        node_path.set_color(ConfigVariableColor('way-color'))
 
 
 def build_node_geom(vertex_count: int = 16) -> Geom:
@@ -43,6 +77,11 @@ def build_way_geom_node(name: str, way: Way) -> GeomNode:
     vertex_data.set_num_rows(4 + 2 * len(way.waypoints))
     vertex_writer = GeomVertexWriter(vertex_data, 'vertex')
 
+    total = way.length
+    start_z = way.start.level * LEVEL_HEIGHT
+    delta_z = way.end.level * LEVEL_HEIGHT - start_z
+
+    acc_len = 0.0
     last_vector = next(way.vectors())
     for point, vector in zip_longest(way.points(), way.vectors()):
         if vector is None:
@@ -50,9 +89,12 @@ def build_way_geom_node(name: str, way: Way) -> GeomNode:
         bisector = last_vector.normalized() + vector.normalized()
         normal = bisector.rotated_right().normalized()
         width_vector = sec(bisector, vector) * WAY_WIDTH * normal
+        height = start_z + delta_z * acc_len / total
         for vertex in (point - width_vector, point + width_vector):
-            vertex_writer.add_data3f(vertex.x, vertex.y, 0.0)
+            vertex_writer.add_data3f(vertex.x, vertex.y, height)
+        acc_len += abs(vector)
         last_vector = vector
+
     primitive = GeomTristrips(Geom.UH_static)
     primitive.add_consecutive_vertices(0, 4 + 2 * len(way.waypoints))
     primitive.close_primitive()

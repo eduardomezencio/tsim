@@ -19,6 +19,9 @@ def dissolve_node(index: EntityIndex, node: Node):
     assert len(ways) == 2
     start, end = (w.other(node) for w in ways)
 
+    if not node.level == start.level == end.level:
+        raise ValueError('Can only dissolve nodes in different levels.')
+
     waypoints = []
     waypoints.extend(ways[0].waypoints if ways[0].end is node
                      else reversed(ways[0].waypoints))

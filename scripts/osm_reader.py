@@ -24,14 +24,18 @@ def main():
              Node(Point(*coord_meters(*center, float(n.get('lat')),
                                       float(n.get('lon')))))
              for n in root.iterfind('node')}
-    highways = {w.get('id'): [int(n.get('ref')) for n in w.iterfind('nd')]
+    highways = {w.get('id'): ([int(n.get('ref')) for n in w.iterfind('nd')],
+                              any(t.get('k') == 'bridge'
+                                  for t in w.iterfind('tag')))
                 for w in root.iterfind('way')
                 if any(t.get('k') == 'highway' and t.get('v') != 'footway'
                        for t in w.iterfind('tag'))}
 
     index = EntityIndex(sys.argv[1])
-    for way in highways.values():
+    for way, level in highways.values():
         for start, end in zip(way, islice(way, 1, None)):
+            if level != 0:
+                nodes[start].level = nodes[end].level = level
             index.add(nodes[start])
             index.add(nodes[end])
             index.add(Way(nodes[start], nodes[end]))

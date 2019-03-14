@@ -54,7 +54,7 @@ def init_input(base: ShowBase):
 
     base.disable_mouse()
 
-    # self.base.messenger.toggleVerbose()  # to print all events
+    # base.messenger.toggleVerbose()  # to print all events
     base.accept('escape', sys.exit)
     for suffix, is_pressed in (('', True), ('-up', False)):
         for key, action in MAPPING.items():

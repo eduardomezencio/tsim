@@ -1,3 +1,5 @@
+"""Cursor object for the UI."""
+
 import os
 
 from direct.actor.Actor import Actor
@@ -6,6 +8,8 @@ from panda3d.core import NodePath, PandaNode
 
 
 class Cursor:
+    """Cursor object for the UI."""
+
     def __init__(self, base: ShowBase, parent: NodePath):
         self.base = base
         self.camera = self.base.camera

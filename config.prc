@@ -2,9 +2,9 @@ background-color         0.9 0.9 0.9 0.0
 cursor-hidden            false
 framebuffer-multisample  false
 show-frame-rate-meter    true
+threading-model          Cull/Draw 
 win-size                 960 540
 window-title             tsim
-threading-model          Cull/Draw 
 
 want-directtools         false
 want-pstats              false

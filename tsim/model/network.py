@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from itertools import chain, islice
+from itertools import accumulate, chain, islice
 from typing import Generator, List, Tuple
 
 from cached_property import cached_property
@@ -22,6 +22,7 @@ class Node(Entity):
     """
 
     position: Point
+    level: int = field(default_factory=int)
     starts: List[EntityRef['Way']] = field(default_factory=list)
     ends: List[EntityRef['Way']] = field(default_factory=list)
 
@@ -60,8 +61,7 @@ class Way(Entity):
     @cached_property
     def length(self) -> float:
         """Total length of the Way."""
-        return sum(distance(p, q) for p, q in
-                   zip(self.points(), self.points(skip=1)))
+        return sum(self.distances())
 
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
@@ -79,6 +79,16 @@ class Way(Entity):
         yield from islice(chain((self.start.position,), self.waypoints,
                                 (self.end.position,)),
                           skip, None)
+
+    def distances(self) -> Generator[float]:
+        """Get generator for the distance between all consecutive points."""
+        yield from (distance(p, q) for p, q in
+                    zip(self.points(), self.points(skip=1)))
+
+    def accumulated_length(self) -> Generator[float]:
+        """Get generator for the accumulated length up to each point."""
+        yield 0.0
+        yield from accumulate(self.distances())
 
     def waypoint_normals(self) -> Generator[Vector]:
         """Get the 'normals' of this way's waypoints.
