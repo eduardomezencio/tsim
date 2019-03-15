@@ -40,6 +40,10 @@ def clean_ways(root, used_nodes):
             attribs = [a for a in way.attrib if a not in GOOD_ATTRIBS]
             for attrib in attribs:
                 del way.attrib[attrib]
+            tag_trash = [t for t in way.iterfind('tag')
+                         if t.get('k').startswith('source')]
+            for tag in tag_trash:
+                way.remove(tag)
     for item in trash:
         root.remove(item)
 
