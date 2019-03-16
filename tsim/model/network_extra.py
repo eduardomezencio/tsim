@@ -20,7 +20,10 @@ def dissolve_node(index: EntityIndex, node: Node):
     start, end = (w.other(node) for w in ways)
 
     if not node.level == start.level == end.level:
-        raise ValueError('Can only dissolve nodes in different levels.')
+        raise ValueError('Can not dissolve nodes in different levels.')
+
+    if not ways[0].lanes == ways[1].lanes:
+        raise ValueError('Can not dissolve nodes with lane changes.')
 
     waypoints = []
     waypoints.extend(ways[0].waypoints if ways[0].end is node
@@ -31,5 +34,5 @@ def dissolve_node(index: EntityIndex, node: Node):
 
     index.delete(node)
 
-    way = Way(start, end, tuple(waypoints))
+    way = Way(start, end, lanes=ways[0].lanes, waypoints=tuple(waypoints))
     index.add(way)

@@ -36,12 +36,12 @@
             "env": {"PYTHONPATH": "${workspaceFolder}"}
         },
         {
-            "name": "Python: custom_reader",
+            "name": "Python: osm_cleaner [bh]",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/custom_reader.py",
+            "program": "${workspaceFolder}/scripts/osm_cleaner.py",
             "console": "integratedTerminal",
-            "args": ["data/custom_test"],
+            "args": ["data/bh.osm", "data/bh.osm"],
             "env": {"PYTHONPATH": "${workspaceFolder}"}
         },
         {

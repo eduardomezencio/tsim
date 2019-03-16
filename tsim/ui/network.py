@@ -13,7 +13,7 @@ from tsim.model.geometry import sec
 from tsim.model.network import Node, Way
 
 LEVEL_HEIGHT = 5.0
-WAY_WIDTH = 2.0
+LANE_WIDTH = 2.5
 
 
 def create_and_attach_nodes(index: EntityIndex, parent: NodePath):
@@ -42,8 +42,9 @@ def create_and_attach_ways(index: EntityIndex, parent: NodePath):
             if isinstance(v, Way))
     for name, way in ways:
         node = build_way_geom_node(name, way)
-        node_path = parent.attach_new_node(node)
-        node_path.set_color(ConfigVariableColor('way-color'))
+        if node is not None:
+            node_path = parent.attach_new_node(node)
+            node_path.set_color(ConfigVariableColor('way-color'))
 
 
 def build_node_geom(vertex_count: int = 16) -> Geom:
@@ -59,8 +60,8 @@ def build_node_geom(vertex_count: int = 16) -> Geom:
     vertex_writer = GeomVertexWriter(vertex_data, 'vertex')
     for i in range(vertex_count):
         angle = i * 2 * pi / vertex_count
-        vertex_writer.add_data3f(WAY_WIDTH * cos(angle),
-                                 WAY_WIDTH * sin(angle), 0.0)
+        vertex_writer.add_data3f(LANE_WIDTH * cos(angle),
+                                 LANE_WIDTH * sin(angle), 0.0)
     primitive = GeomTristrips(Geom.UH_static)
     for i in vertex_order(vertex_count):
         primitive.add_vertex(i)
@@ -81,6 +82,9 @@ def build_way_geom_node(name: str, way: Way) -> GeomNode:
     start_z = way.start.level * LEVEL_HEIGHT
     delta_z = way.end.level * LEVEL_HEIGHT - start_z
 
+    if total <= 0.0:
+        return None
+
     acc_len = 0.0
     last_vector = next(way.vectors())
     for point, vector in zip_longest(way.points(), way.vectors()):
@@ -88,7 +92,8 @@ def build_way_geom_node(name: str, way: Way) -> GeomNode:
             vector = last_vector
         bisector = last_vector.normalized() + vector.normalized()
         normal = bisector.rotated_right().normalized()
-        width_vector = sec(bisector, vector) * WAY_WIDTH * normal
+        width_vector = (sec(bisector, vector) * LANE_WIDTH * normal
+                        * way.total_lanes)
         height = start_z + delta_z * acc_len / total
         for vertex in (point - width_vector, point + width_vector):
             vertex_writer.add_data3f(vertex.x, vertex.y, height)

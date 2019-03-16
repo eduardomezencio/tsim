@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Reader for openstreetmap xml files."""
 
+from collections import namedtuple
 from itertools import islice
 from math import cos, sin, asin, sqrt, radians
 from xml.etree import ElementTree
@@ -13,7 +14,7 @@ from tsim.model.network_extra import dissolve_node
 
 
 def main():
-    """Osm reader main function."""
+    """Run the osm reader."""
     tree = ElementTree.parse(sys.argv[1])
     root = tree.getroot()
     bounds = {k: float(v) for k, v in root.find('bounds').attrib.items()}
@@ -24,21 +25,33 @@ def main():
              Node(Point(*coord_meters(*center, float(n.get('lat')),
                                       float(n.get('lon')))))
              for n in root.iterfind('node')}
-    highways = {w.get('id'): ([int(n.get('ref')) for n in w.iterfind('nd')],
-                              any(t.get('k') == 'bridge'
-                                  for t in w.iterfind('tag')))
+
+    Highway = namedtuple('Highway', ('nodes', 'level', 'one_way', 'lanes'))
+    highways = [Highway(nodes=[int(n.get('ref')) for n in w.iterfind('nd')],
+                        level=1 if any(t.get('k') == 'bridge'
+                                       for t in w.iterfind('tag')) else 0,
+                        one_way=any(t.get('k') == 'oneway'
+                                    and t.get('v') in ('yes', 'true', '1')
+                                    for t in w.iterfind('tag')),
+                        lanes=next((int(t.get('v')) for t in w.iterfind('tag')
+                                    if t.get('k') == 'lanes'), None))
                 for w in root.iterfind('way')
                 if any(t.get('k') == 'highway' and t.get('v') != 'footway'
-                       for t in w.iterfind('tag'))}
+                       for t in w.iterfind('tag'))]
 
     index = EntityIndex(sys.argv[1])
-    for way, level in highways.values():
-        for start, end in zip(way, islice(way, 1, None)):
-            if level != 0:
-                nodes[start].level = nodes[end].level = level
+    for way in highways:
+        for start, end in zip(way.nodes, islice(way.nodes, 1, None)):
+            if way.level != 0:
+                nodes[start].level = nodes[end].level = way.level
+            if way.one_way:
+                lanes = (way.lanes, 0) if way.lanes is not None else (1, 0)
+            else:
+                lanes = ((way.lanes % 2, way.lanes - way.lanes % 2)
+                         if way.lanes is not None else (1, 1))
             index.add(nodes[start])
             index.add(nodes[end])
-            index.add(Way(nodes[start], nodes[end]))
+            index.add(Way(nodes[start], nodes[end], lanes))
 
     optimize_network(index)
     index.save()

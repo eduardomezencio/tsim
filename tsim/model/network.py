@@ -52,6 +52,7 @@ class Way(Entity):
 
     start: Node
     end: Node
+    lanes: Tuple[int, int]
     waypoints: Tuple[Point] = field(default_factory=tuple)
 
     def __post_init__(self):
@@ -62,6 +63,20 @@ class Way(Entity):
     def length(self) -> float:
         """Total length of the Way."""
         return sum(self.distances())
+
+    @property
+    def one_way(self) -> bool:
+        """Whether the way accepts traffic in only one direction.
+
+        The direction of traffic is always from start to end, if one_way is
+        true.
+        """
+        return not self.lanes[1]
+
+    @property
+    def total_lanes(self):
+        """Total number of lanes."""
+        return sum(self.lanes)
 
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:

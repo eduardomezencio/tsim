@@ -15,19 +15,19 @@ NODE_GOOD_TAGS = {'highway'}
 RELATION_GOOD_TAGS = {'restriction', 'type'}
 
 
-def main():
-    """Osm cleaner main function."""
-    tree = ElementTree.parse(sys.argv[1])
+def main(*argv):
+    """Run the osm cleaner."""
+    tree = ElementTree.parse(argv[1])
     root = tree.getroot()
     used_nodes = set()
     clean_ways(root, used_nodes)
     clean_relations(root, used_nodes)
     clean_nodes(root, used_nodes)
     remove_invalid_nodes(root)
-    tree.write(f'{sys.argv[2]}', 'UTF-8', xml_declaration=True)
+    tree.write(argv[2], 'UTF-8', xml_declaration=True)
 
 
-def clean_ways(root, used_nodes):
+def clean_ways(root: ElementTree.Element, used_nodes: set):
     """Remove unwanted ways and way attribs."""
     trash = []
     for way in root.iterfind('way'):
@@ -48,7 +48,7 @@ def clean_ways(root, used_nodes):
         root.remove(item)
 
 
-def clean_relations(root, used_nodes):
+def clean_relations(root: ElementTree.Element, used_nodes: set):
     """Remove unwanted relations and relation attribs."""
     trash = []
     for rel in root.iterfind('relation'):
@@ -68,7 +68,7 @@ def clean_relations(root, used_nodes):
         root.remove(item)
 
 
-def clean_nodes(root, used_nodes):
+def clean_nodes(root: ElementTree.Element, used_nodes: set):
     """Remove unwanted or unused nodes and node attribs."""
     trash = [n for n in root.iterfind('node') if n.get('id') not in used_nodes]
     for item in trash:
@@ -84,7 +84,7 @@ def clean_nodes(root, used_nodes):
             node.remove(tag)
 
 
-def remove_invalid_nodes(root):
+def remove_invalid_nodes(root: ElementTree.Element):
     """Remove invalid node references from ways and relations."""
     nodes = {n.get('id') for n in root.iterfind('node')}
     for thing in chain(root.iterfind('way'), root.iterfind('relation')):
@@ -94,4 +94,4 @@ def remove_invalid_nodes(root):
 
 
 if __name__ == '__main__':
-    main()
+    main(*sys.argv)
