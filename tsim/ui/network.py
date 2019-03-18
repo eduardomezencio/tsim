@@ -91,7 +91,7 @@ def build_way_geom_node(name: str, way: Way) -> GeomNode:
         if vector is None:
             vector = last_vector
         bisector = last_vector.normalized() + vector.normalized()
-        normal = bisector.rotated_right().normalized()
+        normal = bisector.rotated_left().normalized()
         width_vector = (sec(bisector, vector) * LANE_WIDTH * normal
                         * way.total_lanes)
         height = start_z + delta_z * acc_len / total

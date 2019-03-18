@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import sqrt
+from math import copysign, sqrt
 from typing import Tuple
 
 from dataslots import with_slots
@@ -49,6 +49,28 @@ def sec(vector_a: Vector, vector_b: Vector) -> float:
     """Get secant of angle between vectors."""
     return ((vector_a.norm() * vector_b.norm())
             / (vector_a.dot_product(vector_b)))
+
+
+def line_intersection(point1: Point, vector1: Vector,
+                      point2: Point, vector2: Vector) -> Point:
+    """Calculate the intersection of two lines."""
+    if vector1.x != 0.0:
+        slope1 = vector1.y / vector1.x
+        if vector2.x != 0.0:
+            slope2 = vector2.y / vector2.x
+            x = ((-slope2 * point2.x + point2.y + slope1 * point1.x - point1.y)
+                 / (slope1 - slope2))
+        else:
+            x = point2.x
+        y = slope1 * (x - point1.x) + point1.y
+    else:
+        if vector2.y != 0.0:
+            slope2 = vector2.x / vector2.y
+            y = (slope2 * point2.y - point2.x + point1.x) / slope2
+        else:
+            y = point2.y
+        x = point1.x
+    return Point(x, y)
 
 
 sec3 = sec  # pylint: disable=invalid-name
@@ -100,9 +122,17 @@ class Vector:
         """Dot product of this vector by another."""
         return self.x * other.x + self.y * other.y
 
+    def rotated_left(self) -> Vector:
+        """Get vector rotated counterclockwise by 90 degrees."""
+        return Vector(-self.y, self.x)
+
     def rotated_right(self) -> Vector:
         """Get vector rotated clockwise by 90 degrees."""
-        return Vector(-self.y, self.x)
+        return Vector(self.y, -self.x)
+
+    def sorting_key(self) -> float:
+        """Calculate a key for sorting vectors by angle (by direction)."""
+        return copysign(1.0 - self.x / (abs(self.x) + abs(self.y)), self.y)
 
     bounding_rect = property(calc_bounding_rect)
     distance = distance
@@ -151,9 +181,13 @@ class Vector3(Vector):
         """Dot product of this vector by another."""
         return self.x * other.x + self.y * other.y + self.z * other.z
 
+    def rotated_left(self) -> Vector3:
+        """Get vector rotated counterclockwise by 90 degrees."""
+        return Vector3(-self.y, self.x, self.z)
+
     def rotated_right(self) -> Vector3:
         """Get vector rotated clockwise by 90 degrees."""
-        raise NotImplementedError()
+        return Vector3(self.y, -self.x, self.z)
 
     distance = distance3
     distance_squared = distance_squared3

@@ -89,11 +89,17 @@ class Way(Entity):
         """Get the other endpoint of the way, opposite to node."""
         return self.start if self.end is node else self.end
 
-    def points(self, skip=0) -> Generator[Point]:
+    def points(self, skip=0, reverse=False) -> Generator[Point]:
         """Get generator for points in order, including nodes and waypoints."""
-        yield from islice(chain((self.start.position,), self.waypoints,
-                                (self.end.position,)),
-                          skip, None)
+        if reverse:
+            # pylint: disable=bad-reversed-sequence
+            iterator = chain((self.end.position,), reversed(self.waypoints),
+                             (self.start.position,))
+            # pylint: enable=bad-reversed-sequence
+        else:
+            iterator = chain((self.start.position,), self.waypoints,
+                             (self.end.position,))
+        yield from islice(iterator, skip, None)
 
     def distances(self) -> Generator[float]:
         """Get generator for the distance between all consecutive points."""
@@ -114,15 +120,15 @@ class Way(Entity):
         """
         # pylint: disable=unsubscriptable-object
         other = self.waypoints[0] if self.waypoints else self.end.position
-        yield (other - self.start.position).rotated_right().normalized()
+        yield (other - self.start.position).rotated_left().normalized()
 
         window = zip(self.points(), self.points(skip=1), self.points(skip=2))
         yield from (((q - p).normalized() + (r - q).normalized())
-                    .rotated_right().normalized()
+                    .rotated_left().normalized()
                     for p, q, r in window)
 
         other = self.waypoints[-1] if self.waypoints else self.start.position
-        yield (self.end.position - other).rotated_right().normalized()
+        yield (self.end.position - other).rotated_left().normalized()
         # pylint: enable=unsubscriptable-object
 
     def edge_normals(self) -> Generator[Vector]:
@@ -130,13 +136,25 @@ class Way(Entity):
 
         Get a unit vector pointing right from each edge on the way.
         """
-        yield from ((p - q).rotated_right().normalized()
+        yield from ((p - q).rotated_left().normalized()
                     for p, q in zip(self.points(), self.points(skip=1)))
 
     def vectors(self) -> Generator[Vector]:
         """Get vectors for each edge on the way."""
         yield from ((p - q) for p, q in
                     zip(self.points(), self.points(skip=1)))
+
+    def direction_from_node(self, node: Node) -> Vector:
+        """Get vector in the direction from the node to this way.
+
+        Get a vector pointing to the direction that this way touches the given
+        node. The node must be one of the endpoints of this way.
+        """
+        reverse = node is self.end
+        if not reverse and node is not self.start:
+            raise ValueError('Node is not endpoint of the way.')
+        point1, point2 = islice(self.points(reverse=reverse), 2)
+        return point2 - point1
 
     def disconnect(self):
         """Disconnect this way from the network.

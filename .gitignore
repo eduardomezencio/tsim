@@ -1,5 +1,7 @@
 .mypy_cache
+.tox
 .vscode/.ropeproject
 __pycache__
 _test*
+*.egg-info
 *.shelf
