@@ -130,6 +130,15 @@ class Vector:
         """Dot product of this vector by another."""
         return self.x * other.x + self.y * other.y
 
+    def scalar_projection_on(self, other: Vector) -> float:
+        """Calculate scalar projection of this vector onto another."""
+        return self.dot_product(other.normalized())
+
+    def projection_on(self, other: Vector) -> Vector:
+        """Calculate the projection of this vector onto another."""
+        other_hat = other.normalized()
+        return other_hat * self.dot_product(other_hat)
+
     def rotated_left(self) -> Vector:
         """Get vector rotated counterclockwise by 90 degrees."""
         return Vector(-self.y, self.x)
