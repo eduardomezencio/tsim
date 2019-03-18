@@ -1,11 +1,19 @@
 """Unit test for geometry."""
 import unittest
 
-from tsim.model.geometry import line_intersection, Point, Vector
+from tsim.model.geometry import line_intersection, midpoint, Point, Vector
 
 
 class GeometryTest(unittest.TestCase):
     """Unit test for geometry."""
+
+    def test_midpoint(self):
+        """Unit test for midpoint."""
+        tests = (((-1, 2), (1, -2), (0, 0)),
+                 ((1, 1), (1, 1), (1, 1)))
+        for test in tests:
+            result = midpoint(Point(*test[0]), Point(*test[1]))
+            self.assertAlmostEqual(result, Point(*test[2]))
 
     def test_line_intersection(self):
         """Unit test for line_intersection."""

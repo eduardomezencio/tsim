@@ -45,6 +45,11 @@ def manhattan_distance3(point_a: Point3, point_b: Point3) -> float:
                + point_b.z - point_a.z)
 
 
+def midpoint(point_a: Point, point_b: Point) -> Point:
+    """Get the midpoint of two points."""
+    return point_a + (point_b - point_a) * 0.5
+
+
 def sec(vector_a: Vector, vector_b: Vector) -> float:
     """Get secant of angle between vectors."""
     return ((vector_a.norm() * vector_b.norm())
@@ -73,7 +78,10 @@ def line_intersection(point1: Point, vector1: Vector,
     return Point(x, y)
 
 
-sec3 = sec  # pylint: disable=invalid-name
+# pylint: disable=invalid-name
+midpoint3 = midpoint
+sec3 = sec
+# pylint: enable=invalid-name
 
 
 @with_slots
@@ -137,6 +145,7 @@ class Vector:
     bounding_rect = property(calc_bounding_rect)
     distance = distance
     distance_squared = distance_squared
+    midpoint = midpoint
     sec = sec
 
     __abs__ = norm
@@ -191,7 +200,6 @@ class Vector3(Vector):
 
     distance = distance3
     distance_squared = distance_squared3
-    sec = sec3
 
     __abs__ = norm
     __add__ = add
