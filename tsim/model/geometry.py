@@ -139,6 +139,15 @@ class Vector:
         other_hat = other.normalized()
         return other_hat * self.dot_product(other_hat)
 
+    def reflection_over(self, axis: Vector) -> Vector:
+        """Calculate vector reflected over an axis."""
+        return self + (self.projection_on(axis) - self) * 2.0
+
+    def projection_reflection(self, axis: Vector) -> Tuple[Vector, Vector]:
+        """Calculate both projection and reflection over an axis."""
+        projection = self.projection_on(axis)
+        return projection, self + (projection - self) * 2.0
+
     def rotated_left(self) -> Vector:
         """Get vector rotated counterclockwise by 90 degrees."""
         return Vector(-self.y, self.x)

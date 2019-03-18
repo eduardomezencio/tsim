@@ -11,6 +11,7 @@ from dataslots import with_slots
 
 from tsim.model.entity import Entity, EntityRef
 from tsim.model.geometry import BoundingRect, distance, Point, Vector
+from tsim.model.network_extra import NodeGeometry
 
 
 @with_slots
@@ -25,6 +26,10 @@ class Node(Entity):
     level: int = field(default_factory=int)
     starts: List[EntityRef['Way']] = field(default_factory=list)
     ends: List[EntityRef['Way']] = field(default_factory=list)
+
+    @cached_property
+    def geometry(self) -> NodeGeometry:
+        """Get the geometry info of the node."""
 
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
