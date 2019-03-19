@@ -45,7 +45,7 @@ def main():
             if way.level != 0:
                 nodes[start].level = nodes[end].level = way.level
             if way.one_way:
-                lanes = (way.lanes, 0) if way.lanes is not None else (1, 0)
+                lanes = (way.lanes, 0) if way.lanes is not None else (2, 0)
             else:
                 lanes = ((way.lanes % 2, way.lanes - way.lanes % 2)
                          if way.lanes is not None else (1, 1))
