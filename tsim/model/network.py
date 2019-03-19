@@ -30,6 +30,7 @@ class Node(Entity):
     @cached_property
     def geometry(self) -> NodeGeometry:
         """Get the geometry info of the node."""
+        return NodeGeometry(self)
 
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:

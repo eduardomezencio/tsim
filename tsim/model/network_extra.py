@@ -5,12 +5,12 @@ from typing import List
 
 from tsim.model.entity import EntityIndex
 from tsim.model.geometry import line_intersection, midpoint
-from tsim.model.network import Node, Way
+import tsim.model.network as network
 
 LANE_WIDTH = 2.5
 
 
-def dissolve_node(index: EntityIndex, node: Node):
+def dissolve_node(index: EntityIndex, node: 'network.Node'):
     """Remove a node joining the two ways it connects."""
     two_ways = len(node.starts) + len(node.ends) == 2
     loops = (node.starts and node.ends and
@@ -38,7 +38,8 @@ def dissolve_node(index: EntityIndex, node: Node):
 
     index.delete(node)
 
-    way = Way(start, end, lanes=ways[0].lanes, waypoints=tuple(waypoints))
+    way = network.Way(start, end, lanes=ways[0].lanes,
+                      waypoints=tuple(waypoints))
     index.add(way)
 
 
@@ -51,7 +52,7 @@ class NodeGeometry:
 
     __slots__ = ('node', 'way_indexes', 'way_distances', 'points')
 
-    def __init__(self, node: Node):
+    def __init__(self, node: 'network.Node'):
         self.node = node
         ways = sorted((r.value for r in chain(node.starts, node.ends)),
                       key=lambda w: w.direction_from_node(node))
@@ -60,7 +61,7 @@ class NodeGeometry:
         self.points = self.way_distances * 2
         self._calc_points(ways)
 
-    def _calc_points(self, ways: List[Way]):
+    def _calc_points(self, ways: List['network.Way']):
         directions = tuple(w.direction_from_node(self.node).normalized()
                            for w in ways)
         for i, way in enumerate(ways):
