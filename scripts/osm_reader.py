@@ -3,8 +3,11 @@
 
 from collections import namedtuple
 from itertools import islice
-from math import cos, sin, asin, sqrt, radians
+from math import asin, cos, radians, sin, sqrt
+from textwrap import wrap
+from typing import Dict
 from xml.etree import ElementTree
+import logging as log
 import sys
 
 from tsim.model.entity import EntityIndex
@@ -15,9 +18,15 @@ from tsim.model.network_extra import dissolve_node
 
 def main():
     """Run the osm reader."""
+    log_config()
+
     tree = ElementTree.parse(sys.argv[1])
     root = tree.getroot()
-    bounds = {k: float(v) for k, v in root.find('bounds').attrib.items()}
+    try:
+        bounds = {k: float(v) for k, v in root.find('bounds').attrib.items()
+                  if k in ('maxlat', 'maxlon', 'minlat', 'minlon')}
+    except AttributeError:
+        bounds = calculate_bounds(root)
     center = ((bounds['maxlat'] - bounds['minlat']) / 2 + bounds['minlat'],
               (bounds['maxlon'] - bounds['minlon']) / 2 + bounds['minlon'])
 
@@ -25,6 +34,7 @@ def main():
              Node(Point(*coord_meters(*center, float(n.get('lat')),
                                       float(n.get('lon')))))
              for n in root.iterfind('node')}
+    nodes_inv = {node: osm_id for osm_id, node in nodes.items()}
 
     Highway = namedtuple('Highway', ('nodes', 'level', 'one_way', 'lanes'))
     highways = [Highway(nodes=[int(n.get('ref')) for n in w.iterfind('nd')],
@@ -53,8 +63,22 @@ def main():
             index.add(nodes[end])
             index.add(Way(nodes[start], nodes[end], lanes))
 
-    optimize_network(index)
+    dissolve_nodes(index, nodes_inv)
     index.save()
+
+
+def calculate_bounds(root) -> Dict[str, float]:
+    """Calculate map bounds from node coordinates."""
+    bounds = {'minlon': 180.0, 'minlat': 90.0,
+              'maxlon': -180.0, 'maxlat': -90.0}
+    for node in root.iterfind('node'):
+        for node_key, bounds_key in zip(('lon', 'lat'), ('minlon', 'minlat')):
+            if float(node.get(node_key)) < bounds[bounds_key]:
+                bounds[bounds_key] = float(node.get(node_key))
+        for node_key, bounds_key in zip(('lon', 'lat'), ('maxlon', 'maxlat')):
+            if float(node.get(node_key)) > bounds[bounds_key]:
+                bounds[bounds_key] = float(node.get(node_key))
+    return bounds
 
 
 def coord_meters(center_lat, center_lon, lat, lon):
@@ -76,14 +100,23 @@ def distance_meters(lat1, lon1, lat2, lon2):
                                 sin(dlon / 2) ** 2 * cos(lat1) * cos(lat2)))
 
 
-def optimize_network(index: EntityIndex):
+def dissolve_nodes(index: EntityIndex, nodes_inv: Dict[int, int]):
     """Dissolve all possible nodes on the network."""
     node_ids = [k for k, v in index.entities.items() if isinstance(v, Node)]
+    dissolved = []
     for node in map(index.entities.get, node_ids):
         try:
             dissolve_node(index, node)
+            dissolved.append(nodes_inv[node])
         except ValueError:
             pass
+    log.info('Nodes dissolved:\n%s.',
+             '\n'.join(wrap(', '.join(map(str, dissolved)), 79)))
+
+
+def log_config():
+    """Configure logging."""
+    log.basicConfig(level=log.INFO)
 
 
 if __name__ == '__main__':
