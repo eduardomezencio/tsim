@@ -126,6 +126,11 @@ class Vector:
         """Multiplication by scalar."""
         return Vector(self.x * scalar, self.y * scalar)
 
+    def close_to(self, other: Vector, threshold: float = 0.001) -> bool:
+        """Test for proximity to another point."""
+        return (abs(self.x - other.x) < threshold and
+                abs(self.y - other.y) < threshold)
+
     def dot_product(self, other: Vector) -> float:
         """Dot product of this vector by another."""
         return self.x * other.x + self.y * other.y
@@ -203,6 +208,12 @@ class Vector3(Vector):
     def multiply(self, scalar: float) -> Vector3:
         """Multiplication by scalar."""
         return Vector3(self.x * scalar, self.y * scalar, self.z * scalar)
+
+    def close_to(self, other: Vector3, threshold: float = 0.001) -> bool:
+        """Test for proximity to another point."""
+        return (abs(self.x - other.x) < threshold and
+                abs(self.y - other.y) < threshold and
+                abs(self.z - other.z) < threshold)
 
     def dot_product(self, other: Vector3) -> float:
         """Dot product of this vector by another."""
