@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: tsim module [formiga]",
+            "name": "Python: tsim [formiga]",
             "type": "python",
             "request": "launch",
             "module": "tsim",
@@ -10,12 +10,20 @@
             "args": ["data/formiga.osm"]
         },
         {
-            "name": "Python: tsim module [bh]",
+            "name": "Python: tsim [bh]",
             "type": "python",
             "request": "launch",
             "module": "tsim",
             "console": "integratedTerminal",
             "args": ["data/bh.osm"]
+        },
+        {
+            "name": "Python: tsim [custom]",
+            "type": "python",
+            "request": "launch",
+            "module": "tsim",
+            "console": "integratedTerminal",
+            "args": ["data/custom.osm"]
         },
         {
             "name": "Python: osm_reader [formiga]",
@@ -36,12 +44,30 @@
             "env": {"PYTHONPATH": "${workspaceFolder}"}
         },
         {
+            "name": "Python: osm_reader [custom]",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/osm_reader.py",
+            "console": "integratedTerminal",
+            "args": ["data/custom.osm"],
+            "env": {"PYTHONPATH": "${workspaceFolder}"}
+        },
+        {
             "name": "Python: osm_cleaner [bh]",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/osm_cleaner.py",
             "console": "integratedTerminal",
             "args": ["data/bh.osm", "data/bh.osm"],
+            "env": {"PYTHONPATH": "${workspaceFolder}"}
+        },
+        {
+            "name": "Python: osm_cleaner [formiga]",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/osm_cleaner.py",
+            "console": "integratedTerminal",
+            "args": ["data/formiga.osm", "data/formiga.osm"],
             "env": {"PYTHONPATH": "${workspaceFolder}"}
         },
         {
