@@ -17,7 +17,7 @@ from tsim.utils import pickling
 
 
 @with_slots(add_dict=True)
-@dataclass
+@dataclass(eq=False)
 class Entity(ABC):
     """Base class for spatial entities."""
 

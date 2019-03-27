@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from itertools import accumulate, chain, islice
+from enum import Enum
+from itertools import accumulate, chain, islice, repeat
 from typing import Generator, List, Tuple
 
 from cached_property import cached_property
@@ -15,7 +16,7 @@ from tsim.model.network_extra import NodeGeometry
 
 
 @with_slots
-@dataclass
+@dataclass(eq=False)
 class Node(Entity):
     """A node of the network.
 
@@ -32,10 +33,43 @@ class Node(Entity):
         """Get the geometry info of the node."""
         return NodeGeometry(self)
 
+    @property
+    def max_lanes(self) -> int:
+        """Maximum number of lanes in incident ways."""
+        return max(e.value.total_lanes for e in chain(self.starts, self.ends))
+
+    @property
+    def oriented_ways(self) -> Generator[Way.Oriented]:
+        """Get incident ways with orentation (endpoint)."""
+        return ((r.value, e) for r, e in chain(
+            zip(self.starts, repeat(Way.Endpoint.START)),
+            zip(self.ends, repeat(Way.Endpoint.END))))
+
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
         """Calculate the bounding rect of the node."""
         return self.position.calc_bounding_rect(accumulated)
+
+    def sorted_ways(self) -> List[Way.Oriented]:
+        """Get incident ways sorted in counterclockwise order."""
+        return sorted(
+            self.oriented_ways,
+            key=lambda t: t[0].direction_from_node(self, t[1]).sorting_key())
+
+    def ways_closest_to(self, oriented_way: Way.Oriented
+                        ) -> Tuple[Way.Oriented, Way.Oriented]:
+        """Get incident way closest to given way in each direction.
+
+        Returns a tuple where the first value is the closest way in the
+        clockwise direction and the second in the counterclockwise direction.
+        If the way passed is the only way incident to the node, it will be
+        returned as both values in the tuple. If there is only one other way,
+        it will likewise be on both values.
+        """
+        sorted_ways = self.sorted_ways()
+        index = sorted_ways.index(oriented_way)
+        return (sorted_ways[index - 1],
+                sorted_ways[(index + 1) % len(sorted_ways)])
 
     def disconnect(self):
         """Disconnect this node from the network.
@@ -48,13 +82,16 @@ class Node(Entity):
 
 
 @with_slots
-@dataclass
+@dataclass(eq=False)
 class Way(Entity):
     """A connection between two Nodes.
 
     A Way connects two Nodes and can have a list of intermediary points, called
     waypoints.
     """
+
+    Endpoint = Enum('Endpoint', 'START END')
+    Oriented = Tuple['Way', 'Endpoint']
 
     start: Node
     end: Node
@@ -150,15 +187,23 @@ class Way(Entity):
         yield from ((p - q) for p, q in
                     zip(self.points(), self.points(skip=1)))
 
-    def direction_from_node(self, node: Node) -> Vector:
+    def direction_from_node(self, node: Node,
+                            priority: Endpoint = Endpoint.START) -> Vector:
         """Get vector in the direction from the node to this way.
 
         Get a vector pointing to the direction that this way touches the given
-        node. The node must be one of the endpoints of this way.
+        node. The node must be one of the endpoints of this way. The priority
+        argument is used in case of a loop, where the start and end nodes are
+        the same. The direction given in this case will be the direction to the
+        first way point if direction is START or to the last waypoint if
+        direction is END.
         """
-        reverse = node is self.end
-        if not reverse and node is not self.start:
-            raise ValueError('Node is not endpoint of the way.')
+        if priority is Way.Endpoint.START and node is self.start:
+            reverse = False
+        else:
+            reverse = node is self.end
+            if not reverse and node is not self.start:
+                raise ValueError('Node is not endpoint of this way.')
         point1, point2 = islice(self.points(reverse=reverse), 2)
         return point2 - point1
 
