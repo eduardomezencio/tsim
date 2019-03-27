@@ -38,7 +38,8 @@ def main():
 
     Highway = namedtuple('Highway', ('nodes', 'level', 'one_way', 'lanes'))
     highways = [Highway(nodes=[int(n.get('ref')) for n in w.iterfind('nd')],
-                        level=1 if any(t.get('k') == 'bridge'
+                        level=1 if any(t.get('k') == 'bridge' and
+                                       t.get('v') == 'viaduct'
                                        for t in w.iterfind('tag')) else 0,
                         one_way=any(t.get('k') == 'oneway'
                                     and t.get('v') in ('yes', 'true', '1')
@@ -110,7 +111,7 @@ def dissolve_nodes(index: EntityIndex, nodes_inv: Dict[int, int]):
             dissolved.append(nodes_inv[node])
         except ValueError:
             pass
-    log.info('Nodes dissolved:\n%s.',
+    log.info('Nodes dissolved:\n%s',
              '\n'.join(wrap(', '.join(map(str, dissolved)), 79)))
 
 
