@@ -29,7 +29,7 @@ class Cursor:
 
     def update(self):
         """Update callback."""
-        self.cursor.set_scale(self.camera.get_z() ** 0.6 / 4)
+        self.cursor.set_scale(self.camera.get_z() ** 0.6 / 10)
 
         if self.mouse_watcher_node.has_mouse():
             film = self.lens.get_film_size() * 0.5

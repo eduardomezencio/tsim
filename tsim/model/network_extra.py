@@ -7,7 +7,7 @@ from tsim.model.entity import EntityIndex
 from tsim.model.geometry import line_intersection, midpoint
 import tsim.model.network as network
 
-LANE_WIDTH = 2.5
+LANE_WIDTH = 3.6
 
 
 def dissolve_node(index: EntityIndex, node: 'network.Node'):

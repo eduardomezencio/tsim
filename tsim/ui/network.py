@@ -13,9 +13,10 @@ from tsim.model.network import Node, Way
 from tsim.model.network_extra import LANE_WIDTH
 
 LEVEL_HEIGHT = 5.0
+WAY_COLOR = ConfigVariableColor('way-color')
 
 
-def create_and_attach_nodes(index: EntityIndex, parent: NodePath):
+def create_and_attach_nodes(index: EntityIndex, parent: NodePath, texture):
     """Create and add network nodes to the scene."""
     nodes = ((f'node_{k}', v) for k, v in index.entities.items()
              if isinstance(v, Node))
@@ -23,12 +24,13 @@ def create_and_attach_nodes(index: EntityIndex, parent: NodePath):
         node_ = build_node_geom_node(name, node)
         if node_ is not None:
             node_path = parent.attach_new_node(node_)
-            node_path.set_color(ConfigVariableColor('way-color'))
+            node_path.set_texture(texture)
+            # node_path.set_color(WAY_COLOR)
             node_path.set_pos(*astuple(node.position),
                               LEVEL_HEIGHT * node.level)
 
 
-def create_and_attach_ways(index: EntityIndex, parent: NodePath):
+def create_and_attach_ways(index: EntityIndex, parent: NodePath, texture):
     """Create and add network ways to the scene."""
     ways = ((f'way_{k}', v) for k, v in index.entities.items()
             if isinstance(v, Way))
@@ -36,16 +38,18 @@ def create_and_attach_ways(index: EntityIndex, parent: NodePath):
         node = build_way_geom_node(name, way)
         if node is not None:
             node_path = parent.attach_new_node(node)
-            node_path.set_color(ConfigVariableColor('way-color'))
+            node_path.set_texture(texture, 1)
+            # node_path.set_color(WAY_COLOR)
 
 
 def build_node_geom_node(name: str, node: Node) -> GeomNode:
     """Build a GeomNode for a network Node object."""
     size = len(node.geometry.points)
-    vertex_format = GeomVertexFormat.get_v3()
+    vertex_format = GeomVertexFormat.get_v3t2()
     vertex_data = GeomVertexData(name, vertex_format, Geom.UH_static)
     vertex_data.set_num_rows(size)
     vertex_writer = GeomVertexWriter(vertex_data, 'vertex')
+    texcoord_writer = GeomVertexWriter(vertex_data, 'texcoord')
 
     indexes = [[j for j in range(i - 1, i + 2)]
                for i in range(0, size, 2)]
@@ -53,6 +57,7 @@ def build_node_geom_node(name: str, node: Node) -> GeomNode:
 
     for point in node.geometry.points:
         vertex_writer.add_data3f(point.x, point.y, 0.0)
+        texcoord_writer.add_data2f(point.x / LANE_WIDTH, point.y / LANE_WIDTH)
 
     indexes = [i for i, t in zip(indexes, triangles)
                if not t[0].close_to(t[1]) and not t[1].close_to(t[2])]
@@ -79,10 +84,11 @@ def build_node_geom_node(name: str, node: Node) -> GeomNode:
 
 def build_way_geom_node(name: str, way: Way) -> GeomNode:
     """Build a GeomNode for a network Way object."""
-    vertex_format = GeomVertexFormat.get_v3()
+    vertex_format = GeomVertexFormat.get_v3t2()
     vertex_data = GeomVertexData(name, vertex_format, Geom.UH_static)
     vertex_data.set_num_rows(4 + 2 * len(way.waypoints))
     vertex_writer = GeomVertexWriter(vertex_data, 'vertex')
+    texcoord_writer = GeomVertexWriter(vertex_data, 'texcoord')
 
     total = way.length
     start_z = way.start.level * LEVEL_HEIGHT
@@ -92,6 +98,7 @@ def build_way_geom_node(name: str, way: Way) -> GeomNode:
         return None
 
     half_width = LANE_WIDTH * way.total_lanes / 2
+    lanes_float = float(way.total_lanes)
 
     vector = way.direction_from_node(way.start,
                                      Way.Endpoint.START).normalized()
@@ -100,6 +107,9 @@ def build_way_geom_node(name: str, way: Way) -> GeomNode:
     width_vector = half_width * normal
     for vertex in (point + width_vector, point - width_vector):
         vertex_writer.add_data3f(vertex.x, vertex.y, start_z)
+    texture_v = 0.0
+    texcoord_writer.add_data2f(0.0, texture_v)
+    texcoord_writer.add_data2f(lanes_float, texture_v)
 
     vectors = way.vectors()
     last_vector = next(vectors)
@@ -111,16 +121,23 @@ def build_way_geom_node(name: str, way: Way) -> GeomNode:
         height = start_z + (end_z - start_z) * acc_len / total
         for vertex in (point - width_vector, point + width_vector):
             vertex_writer.add_data3f(vertex.x, vertex.y, height)
+        texture_v += abs(vector) / LANE_WIDTH
+        texcoord_writer.add_data2f(0.0, texture_v)
+        texcoord_writer.add_data2f(lanes_float, texture_v)
         acc_len += abs(vector)
         last_vector = vector
 
     vector = way.direction_from_node(way.end,
-                                     Way.Endpoint.END).normalized()
+                                     Way.Endpoint.END)
+    texture_v += abs(vector) / LANE_WIDTH
+    vector = vector.normalized()
     normal = vector.rotated_right()
     point = way.end.position + vector * way.end.geometry.distance(way)
     width_vector = half_width * normal
     for vertex in (point + width_vector, point - width_vector):
         vertex_writer.add_data3f(vertex.x, vertex.y, end_z)
+    texcoord_writer.add_data2f(0.0, texture_v)
+    texcoord_writer.add_data2f(lanes_float, texture_v)
 
     primitive = GeomTristrips(Geom.UH_static)
     primitive.add_consecutive_vertices(0, 4 + 2 * len(way.waypoints))

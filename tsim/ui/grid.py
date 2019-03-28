@@ -5,7 +5,7 @@ from math import floor
 
 from panda3d.core import (ConfigVariableColor, Geom, GeomLinestrips, GeomNode,
                           GeomVertexData, GeomVertexFormat, GeomVertexWriter,
-                          NodePath)
+                          NodePath, TransparencyAttrib)
 
 from tsim.model.geometry import Vector
 
@@ -28,7 +28,8 @@ class Grid:
         node = GeomNode('grid')
         node.add_geom(self.geom)
         self.node_path = parent.attach_new_node(node)
-        self.node_path.set_z(-0.1)
+        self.node_path.set_z(0.1)
+        self.node_path.set_transparency(TransparencyAttrib.M_alpha)
 
     def update(self):
         """Update callback."""
@@ -52,7 +53,7 @@ class Grid:
         for i, j in product(range(diameter), repeat=2):
             vertex_writer.add_data3f(start + i * self.spacing,
                                      start + j * self.spacing, 0.0)
-            alpha = 1 - (Vector(i - radius, j - radius).norm() / radius)
+            alpha = 0.5 - (Vector(i - radius, j - radius).norm() / radius)
             color_writer.add_data4f(color[0], color[1], color[2], alpha)
 
         primitive = GeomLinestrips(Geom.UH_static)

@@ -12,7 +12,7 @@ class Camera:
     DEFAULT_HEIGHT = 100.0
     DEFAULT_PITCH = 60.0
     DEFAULT_ROTATION = 30.0
-    DISTANCE_MIN = 5.0
+    DISTANCE_MIN = 1.0
     DISTANCE_MAX = 4000.0
     FAR = 7000.0
     FOCUS_HEIGHT = 2.0
@@ -52,15 +52,15 @@ class Camera:
         elif is_down('up'):
             move, dy = True, 1.0
         if move:
-            scale = self.camera.get_z() * Camera.SPEED
+            scale = (self.camera.get_z() + 10.0) * Camera.SPEED
             self.focus.set_pos(self.focus, dx * scale, dy * scale, 0.0)
         if is_down('zoom_in'):
             self.camera.set_pos(
-                0.0, 0.0, max(self.camera.get_z() / Camera.ZOOM_RATIO,
+                0.0, 0.0, max(self.camera.get_z() / Camera.ZOOM_RATIO - 1.0,
                               Camera.DISTANCE_MIN))
         elif is_down('zoom_out'):
             self.camera.set_pos(
-                0.0, 0.0, min(self.camera.get_z() * Camera.ZOOM_RATIO,
+                0.0, 0.0, min(self.camera.get_z() * Camera.ZOOM_RATIO + 1.0,
                               Camera.DISTANCE_MAX))
 
         if is_down('rot_right'):
