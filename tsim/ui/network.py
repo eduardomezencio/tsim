@@ -11,12 +11,13 @@ from tsim.model.entity import EntityIndex
 from tsim.model.geometry import sec
 from tsim.model.network import Node, Way
 from tsim.model.network_extra import LANE_WIDTH
+from tsim.ui import textures
 
 LEVEL_HEIGHT = 5.0
 WAY_COLOR = ConfigVariableColor('way-color')
 
 
-def create_and_attach_nodes(index: EntityIndex, parent: NodePath, texture):
+def create_and_attach_nodes(index: EntityIndex, parent: NodePath):
     """Create and add network nodes to the scene."""
     nodes = ((f'node_{k}', v) for k, v in index.entities.items()
              if isinstance(v, Node))
@@ -24,13 +25,13 @@ def create_and_attach_nodes(index: EntityIndex, parent: NodePath, texture):
         node_ = build_node_geom_node(name, node)
         if node_ is not None:
             node_path = parent.attach_new_node(node_)
-            node_path.set_texture(texture)
+            node_path.set_texture(textures.get('intersection'))
             # node_path.set_color(WAY_COLOR)
             node_path.set_pos(*astuple(node.position),
                               LEVEL_HEIGHT * node.level)
 
 
-def create_and_attach_ways(index: EntityIndex, parent: NodePath, texture):
+def create_and_attach_ways(index: EntityIndex, parent: NodePath):
     """Create and add network ways to the scene."""
     ways = ((f'way_{k}', v) for k, v in index.entities.items()
             if isinstance(v, Way))
@@ -38,7 +39,7 @@ def create_and_attach_ways(index: EntityIndex, parent: NodePath, texture):
         node = build_way_geom_node(name, way)
         if node is not None:
             node_path = parent.attach_new_node(node)
-            node_path.set_texture(texture, 1)
+            node_path.set_texture(textures.get('road'), 1)
             # node_path.set_color(WAY_COLOR)
 
 

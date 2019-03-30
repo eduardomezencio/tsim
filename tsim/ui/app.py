@@ -7,10 +7,10 @@ from direct.task import Task
 from panda3d.core import (AmbientLight, AntialiasAttrib, ConfigVariableColor,
                           DecalEffect, DirectionalLight, Fog, Geom, GeomNode,
                           GeomTristrips, GeomVertexData, GeomVertexFormat,
-                          GeomVertexWriter, NodePath, PandaNode, SamplerState,
-                          load_prc_file)
+                          GeomVertexWriter, NodePath, PandaNode, load_prc_file)
 
 from tsim.model.entity import EntityIndex
+from tsim.ui import textures
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
@@ -35,6 +35,7 @@ class App:
         # print(self.base.task_mgr)  # to print all tasks
 
         init_input(self.base)
+        textures.set_loader(self.base.loader)
 
         self.render = self.base.render
         self.render.set_antialias(AntialiasAttrib.M_auto)
@@ -46,19 +47,11 @@ class App:
         self.cursor = Cursor(self.base, self.scene)
         self.grid = Grid(50.0, 1000.0, self.render, self.cursor.cursor)
 
-        inters_tex = self.base.loader.load_texture('textures/intersection.png')
-        road_tex = self.base.loader.load_texture('textures/road.png')
-        road_tex.set_minfilter(SamplerState.FT_linear_mipmap_linear)
-        ground_tex = self.base.loader.load_texture('textures/ground.jpg')
-        ground_tex.set_minfilter(SamplerState.FT_linear_mipmap_nearest)
-
         self.init_lights()
         self.init_fog()
-        ground_np = create_and_attach_ground(self.scene, 10000.0, 16,
-                                             ground_tex)
-        ground_np.set_effect(DecalEffect.make())
-        create_and_attach_nodes(self.index, ground_np, inters_tex)
-        create_and_attach_ways(self.index, ground_np, road_tex)
+        ground_np = create_and_attach_ground(self.scene, 10000.0, 16)
+        create_and_attach_nodes(self.index, ground_np)
+        create_and_attach_ways(self.index, ground_np)
 
         self.scene.flatten_strong()
 
@@ -95,7 +88,8 @@ class App:
         self.render.set_fog(fog)
 
 
-def create_and_attach_ground(parent: NodePath, radius, count, texture):
+def create_and_attach_ground(parent: NodePath, radius: float,
+                             count: int) -> NodePath:
     """Create and add the ground plane to the scene."""
     vertex_format = GeomVertexFormat.get_v3t2()
     vertex_data = GeomVertexData('ground', vertex_format, Geom.UH_static)
@@ -122,5 +116,6 @@ def create_and_attach_ground(parent: NodePath, radius, count, texture):
     node.add_geom(geom)
 
     node_path = parent.attach_new_node(node)
-    node_path.set_texture(texture)
+    node_path.set_texture(textures.get('ground'))
+    node_path.set_effect(DecalEffect.make())
     return node_path
