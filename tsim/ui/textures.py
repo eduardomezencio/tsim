@@ -38,7 +38,7 @@ def set_loader(loader: Loader):
 
 
 def _mipmap(texture: Texture):
-    texture.set_minfilter(SamplerState.FT_nearest_mipmap_nearest)
+    texture.set_minfilter(SamplerState.FT_nearest_mipmap_linear)
 
 
 TEXTURES = {
