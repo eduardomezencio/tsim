@@ -11,8 +11,10 @@ from cached_property import cached_property
 from dataslots import with_slots
 
 from tsim.model.entity import Entity, EntityRef
-from tsim.model.geometry import BoundingRect, distance, Point, Vector
-from tsim.model.network_extra import NodeGeometry
+from tsim.model.geometry import (BoundingRect, Point, Vector, distance,
+                                 line_intersection, midpoint)
+
+LANE_WIDTH = 3.6
 
 
 @with_slots
@@ -144,6 +146,11 @@ class Way(Entity):
                              (self.end.position,))
         yield from islice(iterator, skip, None)
 
+    def vectors(self) -> Generator[Vector]:
+        """Get vectors for each edge on the way."""
+        yield from ((p - q) for p, q in
+                    zip(self.points(), self.points(skip=1)))
+
     def distances(self) -> Generator[float]:
         """Get generator for the distance between all consecutive points."""
         yield from (distance(p, q) for p, q in
@@ -182,11 +189,6 @@ class Way(Entity):
         yield from ((p - q).rotated_left().normalized()
                     for p, q in zip(self.points(), self.points(skip=1)))
 
-    def vectors(self) -> Generator[Vector]:
-        """Get vectors for each edge on the way."""
-        yield from ((p - q) for p, q in
-                    zip(self.points(), self.points(skip=1)))
-
     def direction_from_node(self, node: Node,
                             priority: Endpoint = Endpoint.START) -> Vector:
         """Get vector in the direction from the node to this way.
@@ -207,6 +209,27 @@ class Way(Entity):
         point1, point2 = islice(self.points(reverse=reverse), 2)
         return point2 - point1
 
+    def address_position(self, address: int) -> Point:
+        """Get the position at given address relative to the way.
+
+        The address is an integer and corresponds to a distance in meters from
+        the start node. Even numbers are to the left and odd numbers to the
+        right. Returns None if the given distance goes outside of the way.
+        """
+        address = int(address)
+        if address > 0:
+            counter = float(address)
+            for point, vector, length in zip(self.points(), self.vectors(),
+                                             self.distances()):
+                if counter > length:
+                    counter -= length
+                else:
+                    vector = vector.normalized()
+                    side = (vector.rotated_right() if address % 2
+                            else vector.rotated_right()) * (LANE_WIDTH / 2.0)
+                    return point + counter * vector.normalized() + side
+        return None
+
     def disconnect(self):
         """Disconnect this way from the network.
 
@@ -223,3 +246,55 @@ class Way(Entity):
         self.end = None
 
     on_delete = disconnect
+
+
+class NodeGeometry:
+    """Information on the geometric shape of a node.
+
+    The points that form the shape of the node, calculated from the ways that
+    are adjacent to this node.
+    """
+
+    __slots__ = ('node', 'way_indexes', 'way_distances', 'points')
+
+    def __init__(self, node: Node):
+        self.node = node
+        ways = node.sorted_ways()
+        self.way_indexes = {w: i for i, (w, _) in enumerate(ways)}
+        self.way_distances = [None for _ in ways]
+        self.points = self.way_distances * 2
+        self._calc_points(ways)
+
+    def distance(self, way: Way):
+        """Get distance from node center to where way should start or end."""
+        return self.way_distances[self.way_indexes[way]]
+
+    def _calc_points(self,
+                     ways: List[Tuple[Way, Way.Endpoint]]):
+        """Calculate points for the geometric bounds of the node."""
+        directions = tuple(w.direction_from_node(self.node, e).normalized()
+                           for w, e in ways)
+        for i, (way, _) in enumerate(ways):
+            half_widths = tuple(w.total_lanes * LANE_WIDTH / 2
+                                for w in (ways[i - 1][0], way))
+            # Points relative to the node position.
+            points = (directions[i - 1].rotated_left() * half_widths[0],
+                      directions[i].rotated_right() * half_widths[1])
+            try:
+                point = line_intersection(points[0], directions[i - 1],
+                                          points[1], directions[i])
+                proportion = (points[0].distance(point)
+                              / points[0].distance(points[1]))
+                if ((len(directions) == 2 and proportion > 2.0)
+                        or proportion > 5.0):
+                    point = midpoint(*points)
+            except ZeroDivisionError:
+                point = midpoint(*points)
+
+            self.points[2 * i - 1] = point
+        for i, (way, direction) in enumerate(zip(ways, directions)):
+            farthest = max(self.points[2 * i - 1], self.points[2 * i + 1],
+                           key=lambda v, d=direction: v.dot_product(d))
+            projection, reflection = farthest.projection_reflection(direction)
+            self.way_distances[i] = projection.norm()
+            self.points[2 * i] = reflection

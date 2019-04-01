@@ -9,8 +9,7 @@ from panda3d.core import (ConfigVariableColor, Geom, GeomNode, GeomTriangles,
 
 from tsim.model.entity import EntityIndex
 from tsim.model.geometry import sec
-from tsim.model.network import Node, Way
-from tsim.model.network_extra import LANE_WIDTH
+from tsim.model.network import LANE_WIDTH, Node, Way
 from tsim.ui import textures
 
 LEVEL_HEIGHT = 5.0
