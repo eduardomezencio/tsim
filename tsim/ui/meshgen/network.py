@@ -7,8 +7,8 @@ from panda3d.core import (ConfigVariableColor, Geom, GeomNode, GeomTriangles,
                           GeomTristrips, GeomVertexData, GeomVertexFormat,
                           GeomVertexWriter, NodePath)
 
-from tsim.model.entity import EntityIndex
 from tsim.model.geometry import sec
+from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network import LANE_WIDTH, Node, Way
 from tsim.ui import textures
 
@@ -16,9 +16,9 @@ LEVEL_HEIGHT = 5.0
 WAY_COLOR = ConfigVariableColor('way-color')
 
 
-def create_and_attach_nodes(index: EntityIndex, parent: NodePath):
+def create_and_attach_nodes(parent: NodePath):
     """Create and add network nodes to the scene."""
-    nodes = ((f'node_{k}', v) for k, v in index.entities.items()
+    nodes = ((f'node_{k}', v) for k, v in INDEX.entities.items()
              if isinstance(v, Node))
     for name, node in nodes:
         node_ = build_node_geom_node(name, node)
@@ -30,9 +30,9 @@ def create_and_attach_nodes(index: EntityIndex, parent: NodePath):
                               LEVEL_HEIGHT * node.level)
 
 
-def create_and_attach_ways(index: EntityIndex, parent: NodePath):
+def create_and_attach_ways(parent: NodePath):
     """Create and add network ways to the scene."""
-    ways = ((f'way_{k}', v) for k, v in index.entities.items()
+    ways = ((f'way_{k}', v) for k, v in INDEX.entities.items()
             if isinstance(v, Way))
     for name, way in ways:
         node = build_way_geom_node(name, way)

@@ -13,6 +13,7 @@ from dataslots import with_slots
 from tsim.model.entity import Entity, EntityRef
 from tsim.model.geometry import (BoundingRect, Point, Vector, distance,
                                  line_intersection, midpoint)
+from tsim.model.index import INSTANCE as INDEX
 
 LANE_WIDTH = 3.6
 
@@ -72,6 +73,39 @@ class Node(Entity):
         index = sorted_ways.index(oriented_way)
         return (sorted_ways[index - 1],
                 sorted_ways[(index + 1) % len(sorted_ways)])
+
+    def dissolve_node(self):
+        """Remove a node joining the two ways it connects."""
+        two_ways = len(self.starts) + len(self.ends) == 2
+        # pylint: disable=unsubscriptable-object
+        loops = (self.starts and self.ends and
+                 self.starts[0].value is self.ends[0].value)
+        # pylint: enable=unsubscriptable-object
+        if not two_ways or loops:
+            raise ValueError(
+                'Can only dissolve nodes connected to exactly two ways.')
+
+        ways = [r.value for r in chain(self.ends, self.starts)]
+        assert len(ways) == 2
+        start, end = (w.other(self) for w in ways)
+
+        if not self.level == start.level == end.level:
+            raise ValueError('Can not dissolve nodes in different levels.')
+
+        if not ways[0].lanes == ways[1].lanes:
+            raise ValueError('Can not dissolve nodes with lane changes.')
+
+        waypoints = []
+        waypoints.extend(ways[0].waypoints if ways[0].end is self
+                         else reversed(ways[0].waypoints))
+        waypoints.append(self.position)
+        waypoints.extend(ways[1].waypoints if ways[1].start is self
+                         else reversed(ways[1].waypoints))
+
+        INDEX.delete(self)
+
+        way = Way(start, end, lanes=ways[0].lanes, waypoints=tuple(waypoints))
+        INDEX.add(way)
 
     def disconnect(self):
         """Disconnect this node from the network.

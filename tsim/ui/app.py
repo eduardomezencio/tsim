@@ -1,11 +1,12 @@
 """App class implementation, the graphic UI main class."""
 
+from __future__ import annotations
+
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import (AmbientLight, AntialiasAttrib, ConfigVariableColor,
                           DirectionalLight, Fog, PandaNode, load_prc_file)
 
-from tsim.model.entity import EntityIndex
 from tsim.ui import textures
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
@@ -15,6 +16,7 @@ from tsim.ui.meshgen.ground import create_and_attach_ground
 from tsim.ui.meshgen.network import (create_and_attach_nodes,
                                      create_and_attach_ways)
 
+
 load_prc_file('config.prc')
 
 
@@ -22,11 +24,8 @@ class App:
     """Graphic UI application, using Panda3D."""
 
     base: ShowBase
-    index: EntityIndex
 
-    def __init__(self, index: EntityIndex):
-        self.index = index
-
+    def __init__(self):
         self.base = ShowBase()
         self.base.task_mgr.remove('audioLoop')
         self.base.task_mgr.remove('collisionLoop')
@@ -48,8 +47,8 @@ class App:
         self.init_lights()
         self.init_fog()
         ground_np = create_and_attach_ground(self.scene, 10000.0, 16)
-        create_and_attach_nodes(self.index, ground_np)
-        create_and_attach_ways(self.index, ground_np)
+        create_and_attach_nodes(ground_np)
+        create_and_attach_ways(ground_np)
 
         self.scene.flatten_strong()
 

@@ -2,16 +2,15 @@
 
 import sys
 
-from tsim.model.entity import EntityIndex, EntityRef
+from tsim.model.index import INSTANCE as INDEX
 from tsim.ui.app import App
 
 
 def main():
     """Tsim module main funcion."""
-    index = EntityIndex(sys.argv[1])
-    index.load()
-    EntityRef.index = index
+    INDEX.name = sys.argv[1]
+    INDEX.load()
     try:
-        App(index).run()
+        App().run()
     except SystemExit:
         pass
