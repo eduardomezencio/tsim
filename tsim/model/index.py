@@ -51,13 +51,13 @@ class EntityIndex:
 
     def delete(self, entity: Entity):
         """Delete entity from index."""
-        stack = [entity]
-        while stack:
-            entity = stack.pop()
+        to_remove = {entity}
+        while to_remove:
+            entity = to_remove.pop()
             assert self.entities[entity.id] is entity
             del self.entities[entity.id]
             self.rtree.delete(entity.id, entity.bounding_rect)
-            stack.extend(entity.on_delete() or ())
+            to_remove.update(entity.on_delete() or ())
 
     def generate_rtree_from_entities(self):
         """Create empty rtree and add all entities to it."""

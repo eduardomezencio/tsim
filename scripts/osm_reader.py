@@ -10,10 +10,9 @@ from xml.etree import ElementTree
 import logging as log
 import sys
 
-from tsim.model.entity import EntityIndex
+from tsim.model.index import INSTANCE as INDEX
 from tsim.model.geometry import Point
 from tsim.model.network import Node, Way
-from tsim.model.network_extra import dissolve_node
 
 
 def main():
@@ -50,7 +49,6 @@ def main():
                 if any(t.get('k') == 'highway' and t.get('v') != 'footway'
                        for t in w.iterfind('tag'))]
 
-    index = EntityIndex(sys.argv[1])
     for way in highways:
         for start, end in zip(way.nodes, islice(way.nodes, 1, None)):
             if way.level != 0:
@@ -60,12 +58,13 @@ def main():
             else:
                 lanes = ((way.lanes % 2, way.lanes - way.lanes % 2)
                          if way.lanes is not None else (1, 1))
-            index.add(nodes[start])
-            index.add(nodes[end])
-            index.add(Way(nodes[start], nodes[end], lanes))
+            INDEX.add(nodes[start])
+            INDEX.add(nodes[end])
+            INDEX.add(Way(nodes[start], nodes[end], lanes))
 
-    dissolve_nodes(index, nodes_inv)
-    index.save()
+    dissolve_nodes(nodes_inv)
+    INDEX.name = sys.argv[1]
+    INDEX.save()
 
 
 def calculate_bounds(root) -> Dict[str, float]:
@@ -101,13 +100,13 @@ def distance_meters(lat1, lon1, lat2, lon2):
                                 sin(dlon / 2) ** 2 * cos(lat1) * cos(lat2)))
 
 
-def dissolve_nodes(index: EntityIndex, nodes_inv: Dict[int, int]):
+def dissolve_nodes(nodes_inv: Dict[int, int]):
     """Dissolve all possible nodes on the network."""
-    node_ids = [k for k, v in index.entities.items() if isinstance(v, Node)]
+    node_ids = [k for k, v in INDEX.entities.items() if isinstance(v, Node)]
     dissolved = []
-    for node in map(index.entities.get, node_ids):
+    for node in map(INDEX.entities.get, node_ids):
         try:
-            dissolve_node(index, node)
+            node.dissolve()
             dissolved.append(nodes_inv[node])
         except ValueError:
             pass

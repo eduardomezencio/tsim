@@ -15,7 +15,7 @@ from tsim.model.geometry import (BoundingRect, Point, Vector, distance,
                                  line_intersection, midpoint)
 from tsim.model.index import INSTANCE as INDEX
 
-LANE_WIDTH = 3.6
+LANE_WIDTH = 3.0
 
 
 @with_slots
@@ -74,7 +74,7 @@ class Node(Entity):
         return (sorted_ways[index - 1],
                 sorted_ways[(index + 1) % len(sorted_ways)])
 
-    def dissolve_node(self):
+    def dissolve(self):
         """Remove a node joining the two ways it connects."""
         two_ways = len(self.starts) + len(self.ends) == 2
         # pylint: disable=unsubscriptable-object
@@ -87,6 +87,10 @@ class Node(Entity):
 
         ways = [r.value for r in chain(self.ends, self.starts)]
         assert len(ways) == 2
+        if any(not w.is_valid for w in ways):
+            raise ValueError(
+                'Can only dissolve nodes connected to valid ways.')
+
         start, end = (w.other(self) for w in ways)
 
         if not self.level == start.level == end.level:
@@ -102,19 +106,20 @@ class Node(Entity):
         waypoints.extend(ways[1].waypoints if ways[1].start is self
                          else reversed(ways[1].waypoints))
 
-        INDEX.delete(self)
-
         way = Way(start, end, lanes=ways[0].lanes, waypoints=tuple(waypoints))
         INDEX.add(way)
+        INDEX.delete(self)
 
-    def disconnect(self):
+    def on_delete(self):
         """Disconnect this node from the network.
 
         Returns the ways that must be disconnected to free this node.
         """
-        return [r.value for r in set(chain(self.starts, self.ends))]
-
-    on_delete = disconnect
+        for way in map(lambda r: r.value, self.starts):
+            way.start = None
+        for way in map(lambda r: r.value, self.ends):
+            way.end = None
+        return {r.value for r in set(chain(self.starts, self.ends))}
 
 
 @with_slots
@@ -156,6 +161,11 @@ class Way(Entity):
     def total_lanes(self):
         """Total number of lanes."""
         return sum(self.lanes)
+
+    @property
+    def is_valid(self):
+        """Check if way has start and end nodes."""
+        return self.start is not None and self.end is not None
 
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
@@ -264,22 +274,32 @@ class Way(Entity):
                     return point + counter * vector.normalized() + side
         return None
 
-    def disconnect(self):
+    def on_delete(self):
         """Disconnect this way from the network.
 
         Removes the connections from this way to nodes and also the references
         from the nodes to this way.
         """
-        start_index = next(i for i, v in enumerate(self.start.starts)
-                           if v.id == self.id)
-        end_index = next(i for i, v in enumerate(self.end.ends)
-                         if v.id == self.id)
-        del self.start.starts[start_index]
-        del self.end.ends[end_index]
-        self.start = None
-        self.end = None
+        result = set()
 
-    on_delete = disconnect
+        if self.start:
+            start_index = next(i for i, v in enumerate(self.start.starts)
+                               if v.id == self.id)
+            del self.start.starts[start_index]
+
+        if self.end:
+            end_index = next(i for i, v in enumerate(self.end.ends)
+                             if v.id == self.id)
+            del self.end.ends[end_index]
+
+        for node in filter(lambda n: n is not None, (self.start, self.end)):
+            if not node.starts and not node.ends:
+                result.add(node)
+            # else:
+            #     node.dissolve()
+
+        self.start = self.end = None
+        return result
 
 
 class NodeGeometry:
