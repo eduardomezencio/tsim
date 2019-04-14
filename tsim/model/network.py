@@ -74,7 +74,7 @@ class Node(Entity):
         return (sorted_ways[index - 1],
                 sorted_ways[(index + 1) % len(sorted_ways)])
 
-    def dissolve(self):
+    def dissolve(self, delete_if_dissolved=False):
         """Remove a node joining the two ways it connects."""
         two_ways = len(self.starts) + len(self.ends) == 2
         # pylint: disable=unsubscriptable-object
@@ -106,9 +106,15 @@ class Node(Entity):
         waypoints.extend(ways[1].waypoints if ways[1].start is self
                          else reversed(ways[1].waypoints))
 
+        ways[0].disconnect(start)
+        ways[1].disconnect(end)
+
         way = Way(start, end, lanes=ways[0].lanes, waypoints=tuple(waypoints))
+        way.xid = ways[0].xid if ways[0].xid is not None else ways[1].xid
         INDEX.add(way)
-        INDEX.delete(self)
+
+        if delete_if_dissolved:
+            INDEX.delete(self)
 
     def on_delete(self):
         """Disconnect this node from the network.
@@ -274,31 +280,44 @@ class Way(Entity):
                     return point + counter * vector.normalized() + side
         return None
 
+    def disconnect(self, node: Node):
+        """Disconnect this way from a node.
+
+        Removes the connections from this way to  the given node and also the
+        reference from the node to this way. Will make the way invalid.
+        """
+        if node is self.start:
+            index = next(i for i, v in enumerate(self.start.starts)
+                         if v.id == self.id)
+            del self.start.starts[index]
+            self.start = None
+
+        if node is self.end:
+            index = next(i for i, v in enumerate(self.end.ends)
+                         if v.id == self.id)
+            del self.end.ends[index]
+            self.end = None
+
     def on_delete(self):
         """Disconnect this way from the network.
 
         Removes the connections from this way to nodes and also the references
         from the nodes to this way.
         """
+        nodes = {self.start, self.end} - {None}
+        for node in nodes:
+            self.disconnect(node)
+
         result = set()
-
-        if self.start:
-            start_index = next(i for i, v in enumerate(self.start.starts)
-                               if v.id == self.id)
-            del self.start.starts[start_index]
-
-        if self.end:
-            end_index = next(i for i, v in enumerate(self.end.ends)
-                             if v.id == self.id)
-            del self.end.ends[end_index]
-
-        for node in filter(lambda n: n is not None, (self.start, self.end)):
+        for node in nodes:
             if not node.starts and not node.ends:
                 result.add(node)
-            # else:
-            #     node.dissolve()
-
-        self.start = self.end = None
+            else:
+                try:
+                    node.dissolve()
+                    result.add(node)
+                except ValueError:
+                    pass
         return result
 
 

@@ -34,8 +34,11 @@ def main():
                                       float(n.get('lon')))))
              for n in root.iterfind('node')}
     nodes_inv = {node: osm_id for osm_id, node in nodes.items()}
+    for xid, node in nodes.items():
+        node.xid = xid
 
-    Highway = namedtuple('Highway', ('nodes', 'level', 'one_way', 'lanes'))
+    Highway = namedtuple('Highway',
+                         ('nodes', 'level', 'one_way', 'lanes', 'xid'))
     highways = [Highway(nodes=[int(n.get('ref')) for n in w.iterfind('nd')],
                         level=1 if any(t.get('k') == 'bridge' and
                                        t.get('v') == 'viaduct'
@@ -44,23 +47,27 @@ def main():
                                     and t.get('v') in ('yes', 'true', '1')
                                     for t in w.iterfind('tag')),
                         lanes=next((int(t.get('v')) for t in w.iterfind('tag')
-                                    if t.get('k') == 'lanes'), None))
+                                    if t.get('k') == 'lanes'), None),
+                        xid=int(w.get('id')))
                 for w in root.iterfind('way')
                 if any(t.get('k') == 'highway' and t.get('v') != 'footway'
                        for t in w.iterfind('tag'))]
 
-    for way in highways:
-        for start, end in zip(way.nodes, islice(way.nodes, 1, None)):
-            if way.level != 0:
-                nodes[start].level = nodes[end].level = way.level
-            if way.one_way:
-                lanes = (way.lanes, 0) if way.lanes is not None else (2, 0)
+    for highway in highways:
+        for start, end in zip(highway.nodes, islice(highway.nodes, 1, None)):
+            if highway.level != 0:
+                nodes[start].level = nodes[end].level = highway.level
+            if highway.one_way:
+                lanes = ((highway.lanes, 0)
+                         if highway.lanes is not None else (2, 0))
             else:
-                lanes = ((way.lanes % 2, way.lanes - way.lanes % 2)
-                         if way.lanes is not None else (1, 1))
+                lanes = ((highway.lanes % 2, highway.lanes - highway.lanes % 2)
+                         if highway.lanes is not None else (1, 1))
             INDEX.add(nodes[start])
             INDEX.add(nodes[end])
-            INDEX.add(Way(nodes[start], nodes[end], lanes))
+            way = Way(nodes[start], nodes[end], lanes)
+            way.xid = highway.xid
+            INDEX.add(way)
 
     dissolve_nodes(nodes_inv)
     INDEX.name = sys.argv[1]
@@ -104,9 +111,9 @@ def dissolve_nodes(nodes_inv: Dict[int, int]):
     """Dissolve all possible nodes on the network."""
     node_ids = [k for k, v in INDEX.entities.items() if isinstance(v, Node)]
     dissolved = []
-    for node in map(INDEX.entities.get, node_ids):
+    for node in filter(lambda n: n, map(INDEX.entities.get, node_ids)):
         try:
-            node.dissolve()
+            node.dissolve(delete_if_dissolved=True)
             dissolved.append(nodes_inv[node])
         except ValueError:
             pass

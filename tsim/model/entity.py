@@ -20,6 +20,7 @@ class Entity(ABC):
     """Base class for spatial entities."""
 
     id: int = field(init=False, default_factory=type(None))
+    xid: int = field(init=False, default_factory=type(None))
 
     @cached_property
     def bounding_rect(self) -> BoundingRect:
