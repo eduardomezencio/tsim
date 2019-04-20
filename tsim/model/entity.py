@@ -10,7 +10,7 @@ from cached_property import cached_property
 from dataslots import with_slots
 
 from tsim.model.index import INSTANCE as INDEX
-from tsim.model.geometry import BoundingRect
+from tsim.model.geometry import BoundingRect, Point
 from tsim.utils import pickling
 
 
@@ -31,6 +31,10 @@ class Entity(ABC):
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
         """Calculate the bounding rectangle of the entity."""
+
+    @abstractmethod
+    def distance(self, point: Point, squared: bool = False) -> float:
+        """Calculate smallest distance from the entity to a point."""
 
     def on_delete(self):
         """Cleanup when deleting entity.

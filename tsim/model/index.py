@@ -8,6 +8,8 @@ import shelve
 
 from rtree.index import Rtree
 
+from tsim.model.geometry import Point
+
 if TYPE_CHECKING:
     from tsim.model.entity import Entity
 
@@ -79,6 +81,26 @@ class EntityIndex:
         with shelve.open(self.filename) as data:
             for key in EntityIndex.storage_fields:
                 data[key] = getattr(self, key)
+
+    def get_at(self, point: Point, radius: float = 10.0):
+        """Get entities at given coordinates.
+
+        Get a list with all entities within radius from given point, sorted
+        from closest to farthest.
+        """
+        distances = {}
+
+        def get_distance(entity, point):
+            result = entity.distance(point, squared=True)
+            distances[entity] = result
+            return result
+
+        return sorted(filter(lambda e: get_distance(e, point) <= radius,
+                             map(self.entities.get,
+                                 self.rtree.intersection(
+                                     (point.x - radius, point.y - radius,
+                                      point.x + radius, point.y + radius)))),
+                      key=distances.get)
 
 
 INSTANCE = EntityIndex()

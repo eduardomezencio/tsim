@@ -1,6 +1,7 @@
 {
     "files.exclude": {
         "**/.git": true,
+        "**/.tox": true,
         "**/__pycache__": true
     },
     "python.pythonPath": "~/.virtualenvs/tsim/bin/python",

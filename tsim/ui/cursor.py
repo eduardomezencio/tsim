@@ -6,6 +6,8 @@ from direct.actor.Actor import Actor
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import NodePath, PandaNode
 
+from tsim.model.geometry import Point
+
 
 class Cursor:
     """Cursor object for the UI."""
@@ -26,6 +28,12 @@ class Cursor:
         self.cursor.loop('spin')
         self.cursor.reparent_to(parent)
         self.cursor.set_pos(0.0, 0.0, 0.0)
+
+    @property
+    def position(self):
+        """Get the cursor position."""
+        position = self.cursor.get_pos()
+        return Point(position.x, position.y)
 
     def update(self):
         """Update callback."""

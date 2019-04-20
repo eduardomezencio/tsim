@@ -7,14 +7,15 @@ from direct.task import Task
 from panda3d.core import (AmbientLight, AntialiasAttrib, ConfigVariableColor,
                           DirectionalLight, Fog, PandaNode, load_prc_file)
 
+from tsim.model.index import INSTANCE as INDEX
 from tsim.ui import textures
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
-from tsim.ui.input import clear_input, init_input
 from tsim.ui.meshgen.ground import create_and_attach_ground
 from tsim.ui.meshgen.network import (create_and_attach_nodes,
                                      create_and_attach_ways)
+import tsim.ui.input as INPUT
 
 
 load_prc_file('config.prc')
@@ -31,7 +32,7 @@ class App:
         self.base.task_mgr.remove('collisionLoop')
         # print(self.base.task_mgr)  # to print all tasks
 
-        init_input(self.base)
+        INPUT.init(self.base)
         textures.set_loader(self.base.loader)
 
         self.render = self.base.render
@@ -63,7 +64,13 @@ class App:
         self.camera.update()
         self.cursor.update()
         self.grid.update()
-        clear_input()
+
+        if INPUT.pressed('select'):
+            selected = INDEX.get_at(self.cursor.position)
+            if selected:
+                print(selected[0])
+
+        INPUT.clear()
         return Task.cont
 
     def init_lights(self):

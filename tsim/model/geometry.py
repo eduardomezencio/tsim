@@ -139,10 +139,14 @@ class Vector:
         """Calculate scalar projection of this vector onto another."""
         return self.dot_product(other.normalized())
 
-    def projection_on(self, other: Vector) -> Vector:
+    def projection_on(self, other: Vector, clamp: bool = False) -> Vector:
         """Calculate the projection of this vector onto another."""
-        other_hat = other.normalized()
-        return other_hat * self.dot_product(other_hat)
+        norm = other.norm()
+        other_hat = Vector(other.x / norm, other.y / norm)
+        scalar = self.dot_product(other_hat)
+        if clamp:
+            scalar = max(0.0, min(scalar, norm))
+        return other_hat * scalar
 
     def reflection_over(self, axis: Vector) -> Vector:
         """Calculate vector reflected over an axis."""
@@ -164,6 +168,19 @@ class Vector:
     def sorting_key(self) -> float:
         """Calculate a key for sorting vectors by angle (by direction)."""
         return copysign(1.0 - self.x / (abs(self.x) + abs(self.y)), self.y)
+
+    def distance_to_segment(self, seg_start: Point, seg_vector: Vector,
+                            squared: bool = False) -> float:
+        """Calculate the smallest distance to line segment.
+
+        Calculate the smallest distance from the point to a line segment
+        represented by its starting point and a vector.
+        """
+        projection = (self - seg_start).projection_on(seg_vector)
+        closest = seg_start + projection
+        if squared:
+            return self.distance_squared(closest)
+        return self.distance(closest)
 
     bounding_rect = property(calc_bounding_rect)
     distance = distance

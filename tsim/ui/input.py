@@ -5,13 +5,14 @@ import sys
 from direct.showbase.ShowBase import ShowBase
 
 ACTIONS = ('left', 'right', 'up', 'down', 'zoom_in', 'zoom_out',
-           'rot_right', 'rot_left', 'pitch_up', 'pitch_down')
+           'rot_right', 'rot_left', 'pitch_up', 'pitch_down', 'select')
 
 MAPPING = {
     'w': 'up', 'a': 'left', 's': 'down', 'd': 'right',
     '+': 'zoom_in', '-': 'zoom_out',
     'q': 'rot_left', 'e': 'rot_right',
-    'r': 'pitch_up', 'f': 'pitch_down'
+    'r': 'pitch_up', 'f': 'pitch_down',
+    'mouse1': 'select'
 }
 
 KEYS = {k: False for k in ACTIONS}
@@ -19,7 +20,7 @@ PRESSED = set()
 RELEASED = set()
 
 
-def clear_input():
+def clear():
     """Reset state of pressed/released keys."""
     PRESSED.clear()
     RELEASED.clear()
@@ -43,7 +44,7 @@ def released(action: str):
     return action in RELEASED
 
 
-def init_input(base: ShowBase):
+def init(base: ShowBase):
     """Initialize the input module."""
     def set_key(key: str, value: bool):
         KEYS[key] = value

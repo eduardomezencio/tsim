@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from itertools import accumulate, chain, islice, repeat
+from math import sqrt
 from typing import Generator, List, Tuple
 
 from cached_property import cached_property
@@ -52,6 +53,12 @@ class Node(Entity):
                            accumulated: BoundingRect = None) -> BoundingRect:
         """Calculate the bounding rect of the node."""
         return self.position.calc_bounding_rect(accumulated)
+
+    def distance(self, point: Point, squared: bool = False) -> float:
+        """Calculate distance from the node to a point."""
+        if squared:
+            return self.position.distance_squared(point)
+        return self.position.distance(point)
 
     def sorted_ways(self) -> List[Way.Oriented]:
         """Get incident ways sorted in counterclockwise order."""
@@ -175,10 +182,16 @@ class Way(Entity):
 
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
-        """Calculate the bounding rect of the node."""
+        """Calculate the bounding rect of the way."""
         for point in self.points():
             accumulated = point.calc_bounding_rect(accumulated)
         return accumulated
+
+    def distance(self, point: Point, squared: bool = False) -> float:
+        """Calculate smallest distance from the way to a point."""
+        result = min(point.distance_to_segment(s, v, squared=True)
+                     for s, v in zip(self.points(), self.vectors()))
+        return result if squared else sqrt(result)
 
     def other(self, node: Node):
         """Get the other endpoint of the way, opposite to node."""
