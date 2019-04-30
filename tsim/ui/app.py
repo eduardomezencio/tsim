@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
+import logging as log
+
 from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import (AmbientLight, AntialiasAttrib, ConfigVariableColor,
-                          DirectionalLight, Fog, PandaNode, load_prc_file)
+                          DirectionalLight, Fog, NodePath, RigidBodyCombiner,
+                          load_prc_file)
 
 from tsim.model.index import INSTANCE as INDEX
+from tsim.model.network import Node, Way
 from tsim.ui import textures
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
-from tsim.ui.meshgen.ground import create_and_attach_ground
-from tsim.ui.meshgen.network import (create_and_attach_nodes,
-                                     create_and_attach_ways)
+from tsim.ui.objects import factory, world
 import tsim.ui.input as INPUT
 
 
@@ -27,31 +29,33 @@ class App:
     base: ShowBase
 
     def __init__(self):
+        log.basicConfig(format='%(levelname)s: %(message)s', level=log.DEBUG)
+
         self.base = ShowBase()
         self.base.task_mgr.remove('audioLoop')
         self.base.task_mgr.remove('collisionLoop')
         # print(self.base.task_mgr)  # to print all tasks
 
-        INPUT.init(self.base)
-        textures.set_loader(self.base.loader)
-
         self.render = self.base.render
         self.render.set_antialias(AntialiasAttrib.M_auto)
         # self.render.set_shader_auto()
 
-        self.scene = self.base.render.attach_new_node(PandaNode('scene'))
+        INPUT.init(self.base)
+        textures.set_loader(self.base.loader)
 
+        self.world = world.create(self.render, 10000, 16)
         self.camera = Camera(self.base)
-        self.cursor = Cursor(self.base, self.scene)
-        self.grid = Grid(50.0, 1000.0, self.render, self.cursor.cursor)
+        self.cursor = Cursor(self.base, self.world)
+        self.grid = Grid(50.0, 1000.0, self.world, self.cursor.cursor)
+
+        # self.roads = self.world.attach_new_node(PandaNode('roads'))
+        self.roads = self.world.attach_new_node(RigidBodyCombiner('roads'))
 
         self.init_lights()
         self.init_fog()
-        ground_np = create_and_attach_ground(self.scene, 10000.0, 16)
-        create_and_attach_nodes(ground_np)
-        create_and_attach_ways(ground_np)
+        self.init_objects(self.roads)
 
-        self.scene.flatten_strong()
+        self.roads.node().collect()
 
         self.base.task_mgr.add(self.update)
 
@@ -68,13 +72,37 @@ class App:
         if INPUT.pressed('select'):
             selected = INDEX.get_at(self.cursor.position)
             if selected:
-                print(selected[0])
+                INDEX.delete(selected[0])
+                self.update_entities()
+                self.roads.node().collect()
 
         INPUT.clear()
         return Task.cont
 
+    def update_entities(self):
+        """Update graphics for changed entities."""
+        for id_ in INDEX.consume_updates():
+            self._update_entity(id_)
+
+    def _update_entity(self, id_):
+        node_path = self.roads.find(str(id_))
+        if not node_path.is_empty():
+            node_path.remove_node()
+        entity = INDEX.entities.get(id_, None)
+        if entity is not None:
+            factory.create(self.roads, entity)
+
+    def init_objects(self, parent: NodePath):
+        """Create all objects on the index."""
+        for node in filter(lambda e: isinstance(e, Node),
+                           INDEX.entities.values()):
+            factory.create_node(parent, node)
+        for way in filter(lambda e: isinstance(e, Way),
+                          INDEX.entities.values()):
+            factory.create_way(parent, way)
+
     def init_lights(self):
-        """Create lights for the scene."""
+        """Create lights."""
         light = DirectionalLight('light')
         light_np = self.render.attach_new_node(light)
         light_np.set_p(240.0)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import copysign, sqrt
+from math import acos, copysign, pi, sqrt
 from typing import Tuple
 
 from dataslots import with_slots
@@ -48,6 +48,14 @@ def manhattan_distance3(point_a: Point3, point_b: Point3) -> float:
 def midpoint(point_a: Point, point_b: Point) -> Point:
     """Get the midpoint of two points."""
     return point_a + (point_b - point_a) * 0.5
+
+
+def angle(vector_a: Vector, vector_b: Vector) -> float:
+    """Get angle between vectors, counterclockwise from a to b."""
+    a_norm, b_norm = vector_a.normalized(), vector_b.normalized()
+    if a_norm.rotated_right().dot_product(b_norm) > 0.0:
+        return 2 * pi - acos(a_norm.dot_product(b_norm))
+    return acos(a_norm.dot_product(b_norm))
 
 
 def sec(vector_a: Vector, vector_b: Vector) -> float:
@@ -182,6 +190,7 @@ class Vector:
             return self.distance_squared(closest)
         return self.distance(closest)
 
+    angle = angle
     bounding_rect = property(calc_bounding_rect)
     distance = distance
     distance_squared = distance_squared
@@ -244,6 +253,7 @@ class Vector3(Vector):
         """Get vector rotated clockwise by 90 degrees."""
         return Vector3(self.y, -self.x, self.z)
 
+    angle = type(NotImplemented)
     distance = distance3
     distance_squared = distance_squared3
 

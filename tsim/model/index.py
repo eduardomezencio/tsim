@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from itertools import count
-from typing import ClassVar, Dict, Tuple, TYPE_CHECKING
+from typing import ClassVar, Dict, Tuple, Union, TYPE_CHECKING
+import logging as log
 import shelve
 
 from rtree.index import Rtree
@@ -21,7 +22,8 @@ class EntityIndex:
     a way than can be queried by id or by spatial coordinates.
     """
 
-    __slots__ = ('name', 'id_count', 'entities', 'rtree')
+    __slots__ = ('name', 'id_count', 'entities', 'rtree', 'register_updates',
+                 '_updates')
 
     extension: ClassVar[str] = 'shelf'
     storage_fields: ClassVar[Tuple[str]] = ('id_count', 'entities')
@@ -36,6 +38,8 @@ class EntityIndex:
         self.id_count = count()
         self.entities = {}
         self.rtree = Rtree()
+        self.register_updates = False
+        self._updates = set()
 
     @property
     def filename(self) -> str:
@@ -50,6 +54,8 @@ class EntityIndex:
             entity.id = next(self.id_count)
             self.entities[entity.id] = entity
             self.rtree.insert(entity.id, entity.bounding_rect)
+            self.updated(entity)
+            log.debug('[index] Added %s', entity)
 
     def delete(self, entity: Entity):
         """Delete entity from index."""
@@ -60,6 +66,25 @@ class EntityIndex:
             del self.entities[entity.id]
             self.rtree.delete(entity.id, entity.bounding_rect)
             to_remove.update(entity.on_delete() or ())
+            self.updated(entity)
+            log.debug('[index] Removed %s', entity)
+
+    def updated(self, entity: Union[Entity, int]):
+        """Mark entity as updated."""
+        if self.register_updates:
+            try:
+                self._updates.add(entity.id)
+            except AttributeError:
+                self._updates.add(entity)
+
+    def clear_updates(self):
+        """Clear entity updates."""
+        self._updates.clear()
+
+    def consume_updates(self):
+        """Get generator that pops and returns updates."""
+        while self._updates:
+            yield self._updates.pop()
 
     def generate_rtree_from_entities(self):
         """Create empty rtree and add all entities to it."""

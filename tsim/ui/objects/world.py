@@ -1,4 +1,7 @@
-"""Mesh generation for the ground."""
+"""World object creation functions.
+
+Just a parent node for the other objects, with the ground plane mesh.
+"""
 
 from itertools import product
 
@@ -9,9 +12,8 @@ from panda3d.core import (DecalEffect, Geom, GeomNode, GeomTristrips,
 from tsim.ui import textures
 
 
-def create_and_attach_ground(parent: NodePath, radius: float,
-                             count: int) -> NodePath:
-    """Create and add the ground plane to the scene."""
+def generate_mesh(radius: float, count: int) -> Geom:
+    """Generate mesh for the ground plane."""
     vertex_format = GeomVertexFormat.get_v3t2()
     vertex_data = GeomVertexData('ground', vertex_format, Geom.UH_static)
     vertex_data.set_num_rows(count ** 2)
@@ -32,8 +34,13 @@ def create_and_attach_ground(parent: NodePath, radius: float,
             primitive.add_vertex((j + j % 2) * (count + 1) + i)
     primitive.close_primitive()
     geom.add_primitive(primitive)
+    return geom
 
-    node = GeomNode('ground_node')
+
+def create(parent: NodePath, radius: float, count: int) -> NodePath:
+    """Create and add the ground plane to the scene."""
+    geom = generate_mesh(radius, count)
+    node = GeomNode('world')
     node.add_geom(geom)
 
     node_path = parent.attach_new_node(node)
