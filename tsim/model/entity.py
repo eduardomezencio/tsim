@@ -9,9 +9,9 @@ from typing import Generic, TypeVar, Union
 from cached_property import cached_property
 from dataslots import with_slots
 
-from tsim.model.index import INSTANCE as INDEX
 from tsim.model.geometry import BoundingRect, Point
-from tsim.utils import pickling
+from tsim.utils import osm as xurl_provider, pickling
+import tsim.model.index as Index
 
 
 @with_slots(add_dict=True)
@@ -26,6 +26,11 @@ class Entity(ABC):
     def bounding_rect(self) -> BoundingRect:
         """Bounding rectangle cached property."""
         return self.calc_bounding_rect()
+
+    @property
+    def xurl(self) -> str:
+        """Get external url for the entity."""
+        return xurl_provider.get_url(self)
 
     @abstractmethod
     def calc_bounding_rect(self,
@@ -81,7 +86,7 @@ class EntityRef(Generic[T]):
     def value(self):
         """Get entity from reference."""
         if not self._value:
-            self._value = INDEX.entities[self._id]
+            self._value = Index.INSTANCE.entities[self._id]
         return self._value
 
     def __getstate__(self):

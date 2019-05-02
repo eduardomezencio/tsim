@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 from itertools import count
-from typing import ClassVar, Dict, Tuple, Union, TYPE_CHECKING
+from typing import (Callable, ClassVar, Dict, Generator, List, Tuple, Type,
+                    Union)
 import logging as log
 import shelve
 
 from rtree.index import Rtree
 
+from tsim.model.entity import Entity
 from tsim.model.geometry import Point
-
-if TYPE_CHECKING:
-    from tsim.model.entity import Entity
 
 
 class EntityIndex:
@@ -81,7 +80,7 @@ class EntityIndex:
         """Clear entity updates."""
         self._updates.clear()
 
-    def consume_updates(self):
+    def consume_updates(self) -> Generator[int]:
         """Get generator that pops and returns updates."""
         while self._updates:
             yield self._updates.pop()
@@ -107,25 +106,43 @@ class EntityIndex:
             for key in EntityIndex.storage_fields:
                 data[key] = getattr(self, key)
 
-    def get_at(self, point: Point, radius: float = 10.0):
+    def get_at(self, point: Point, radius: float = 10.0,
+               of_type: Type[Entity] = None,
+               where: Callable[[Entity], bool] = None) -> List[Entity]:
         """Get entities at given coordinates.
 
-        Get a list with all entities within radius from given point, sorted
-        from closest to farthest.
+        Get a list with entities within radius from given point, sorted from
+        closest to farthest. If of_type is not None, will return only entities
+        of the given type. If where is not None, where must be a function that
+        receives an Entity and returns True or False, meaning whether the
+        entity will be returned.
         """
-        distances = {}
-
         def get_distance(entity, point):
             result = entity.distance(point, squared=True)
             distances[entity] = result
             return result
 
-        return sorted(filter(lambda e: get_distance(e, point) <= radius,
-                             map(self.entities.get,
-                                 self.rtree.intersection(
-                                     (point.x - radius, point.y - radius,
-                                      point.x + radius, point.y + radius)))),
-                      key=distances.get)
+        def distance_filter(entity):
+            return get_distance(entity, point) <= radius
+
+        def type_filter(entity):
+            return isinstance(entity, of_type)
+
+        distances = {}
+        filters = [distance_filter]
+        if where is not None:
+            filters.append(where)
+        if of_type is not None:
+            filters.append(type_filter)
+
+        return sorted(
+            filter(
+                lambda e: all(f(e) for f in filters),
+                map(self.entities.get,
+                    self.rtree.intersection(
+                        (point.x - radius, point.y - radius,
+                         point.x + radius, point.y + radius)))),
+            key=distances.get)
 
 
 INSTANCE = EntityIndex()

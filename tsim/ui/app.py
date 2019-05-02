@@ -70,11 +70,16 @@ class App:
         self.grid.update()
 
         if INPUT.pressed('select'):
-            selected = INDEX.get_at(self.cursor.position)
+            selected = INDEX.get_at(self.cursor.position, of_type=Node)
             if selected:
-                INDEX.delete(selected[0])
-                self.update_entities()
-                self.roads.node().collect()
+                print(f'{selected[0].xurl} {selected[0].lane_connections}\n')
+                # INDEX.delete(selected[0])
+                # self.update_entities()
+                # self.roads.node().collect()
+            else:
+                selected = INDEX.get_at(self.cursor.position, of_type=Way)
+                if selected:
+                    print(f'{selected[0].xurl} {selected[0].lanes}')
 
         INPUT.clear()
         return Task.cont

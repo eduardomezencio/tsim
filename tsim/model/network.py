@@ -75,7 +75,7 @@ class Node(Entity):
     def calc_default_lane_connections(self) -> Node.LaneConnections:
         """Calculate default lane connections for this node."""
         def reverse(iterable: Iterable, apply: bool) -> Iterable:
-            return reversed(iterable) if apply else iterable
+            return reversed(list(iterable)) if apply else iterable
 
         def straighter_than(angle_a: float, angle_b: float) -> bool:
             return abs(pi - angle_a) < abs(pi - angle_b)
@@ -88,9 +88,9 @@ class Node(Entity):
 
         def self_connect():
             """Connect ways[0] to itself."""
-            return {l: {o} for l, o in zip(
+            connections.update({l: {o} for l, o in zip(
                 way.iterate_lanes(direction.other()),
-                way.iterate_lanes(direction))}
+                way.iterate_lanes(direction))})
 
         def connect_to(index: int, other: Way.Oriented):
             """Connect ways[0] to the given way."""
@@ -117,23 +117,26 @@ class Node(Entity):
                     for connection in to_clear:
                         connection.clear()
 
-        ways = deque(self.sorted_ways())
-        if not ways:
-            return {}
-        if len(ways) == 1:
-            return self_connect()
-
         connections = defaultdict(set)
+        ways = deque(self.sorted_ways())
         way, direction = ways[0]
-        way_vector = way.direction_from_node(self, direction)
-        angles = [angle(way_vector, w.direction_from_node(self, d)) if i > 0
-                  else 0.0 for i, (w, d) in enumerate(ways)]
+        if ways:
+            if len(ways) == 1:
+                self_connect()
+            else:
+                way_vector = way.direction_from_node(self, direction)
 
-        for _ in range(len(ways)):
-            for i, way_ in islice(enumerate(ways), 1, None):
-                connect_to(i, way_)
-            ways.rotate(-1)
-            rotate_angles()
+                angles = [angle(way_vector, w.direction_from_node(self, d))
+                          if i > 0 else 0.0 for i, (w, d) in enumerate(ways)]
+
+                for _ in range(len(ways)):
+                    for i, way_ in islice(enumerate(ways), 1, None):
+                        connect_to(i, way_)
+                    ways.rotate(-1)
+                    way, direction = ways[0]
+                    rotate_angles()
+
+        return connections
 
     def reset_connections(self):
         """Invalidate geometry and lane connections."""
