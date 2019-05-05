@@ -184,11 +184,15 @@ class Vector:
         Calculate the smallest distance from the point to a line segment
         represented by its starting point and a vector.
         """
-        projection = (self - seg_start).projection_on(seg_vector)
+        projection = (self - seg_start).projection_on(seg_vector, clamp=True)
         closest = seg_start + projection
         if squared:
             return self.distance_squared(closest)
         return self.distance(closest)
+
+    def __iter__(self):
+        yield self.x
+        yield self.y
 
     angle = angle
     bounding_rect = property(calc_bounding_rect)
@@ -252,6 +256,11 @@ class Vector3(Vector):
     def rotated_right(self) -> Vector3:
         """Get vector rotated clockwise by 90 degrees."""
         return Vector3(self.y, -self.x, self.z)
+
+    def __iter__(self):
+        yield self.x
+        yield self.y
+        yield self.z
 
     angle = type(NotImplemented)
     distance = distance3

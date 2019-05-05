@@ -29,7 +29,7 @@ class App:
     base: ShowBase
 
     def __init__(self):
-        log.basicConfig(format='%(levelname)s: %(message)s', level=log.DEBUG)
+        log.basicConfig(format='%(levelname)s: %(message)s', level=log.ERROR)
 
         self.base = ShowBase()
         self.base.task_mgr.remove('audioLoop')
@@ -72,14 +72,15 @@ class App:
         if INPUT.pressed('select'):
             selected = INDEX.get_at(self.cursor.position, of_type=Node)
             if selected:
-                print(f'{selected[0].xurl} {selected[0].lane_connections}\n')
-                # INDEX.delete(selected[0])
-                # self.update_entities()
-                # self.roads.node().collect()
+                print(f'{selected[0].xurl}\n')
             else:
                 selected = INDEX.get_at(self.cursor.position, of_type=Way)
                 if selected:
-                    print(f'{selected[0].xurl} {selected[0].lanes}')
+                    selected = selected[0]
+                    INDEX.delete(selected)
+                    self.update_entities()
+                    self.roads.node().collect()
+                    print(f'{selected.xurl} {selected.lanes}\n')
 
         INPUT.clear()
         return Task.cont

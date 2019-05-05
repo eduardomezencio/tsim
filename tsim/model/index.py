@@ -135,14 +135,12 @@ class EntityIndex:
         if of_type is not None:
             filters.append(type_filter)
 
-        return sorted(
-            filter(
-                lambda e: all(f(e) for f in filters),
-                map(self.entities.get,
-                    self.rtree.intersection(
-                        (point.x - radius, point.y - radius,
-                         point.x + radius, point.y + radius)))),
-            key=distances.get)
+        return sorted(filter(lambda e: all(f(e) for f in filters),
+                             map(self.entities.get,
+                                 self.rtree.intersection(
+                                     (point.x - radius, point.y - radius,
+                                      point.x + radius, point.y + radius)))),
+                      key=distances.get)
 
 
 INSTANCE = EntityIndex()

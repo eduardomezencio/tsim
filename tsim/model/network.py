@@ -342,7 +342,7 @@ class Way(Entity):
 
     def vectors(self) -> Generator[Vector]:
         """Get vectors for each edge on the way."""
-        yield from ((p - q) for p, q in
+        yield from ((q - p) for p, q in
                     zip(self.points(), self.points(skip=1)))
 
     def distances(self) -> Generator[float]:

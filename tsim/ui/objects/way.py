@@ -46,7 +46,7 @@ def generate_mesh(way: Way) -> Geom:
         width_vector = (sec(bisector, vector) * half_width
                         * bisector.rotated_left().normalized())
         height = start_z + (end_z - start_z) * acc_len / total
-        for vertex in (point - width_vector, point + width_vector):
+        for vertex in (point + width_vector, point - width_vector):
             vertex_writer.add_data3f(vertex.x, vertex.y, height)
         texture_v += abs(vector) / LANE_WIDTH
         texcoord_writer.add_data2f(0.0, texture_v)
