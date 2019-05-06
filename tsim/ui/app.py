@@ -4,64 +4,47 @@ from __future__ import annotations
 
 import logging as log
 
-from direct.showbase.ShowBase import ShowBase
 from direct.task import Task
 from panda3d.core import (AmbientLight, AntialiasAttrib, ConfigVariableColor,
-                          DirectionalLight, Fog, NodePath, RigidBodyCombiner,
-                          load_prc_file)
+                          DirectionalLight, Fog, NodePath, RigidBodyCombiner)
 
 from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network import Node, Way
-from tsim.ui import textures
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
 from tsim.ui.objects import factory, world
+from tsim.ui.panda3d import P3D_BASE, P3D_RENDER, P3D_TASK_MGR
 import tsim.ui.input as INPUT
-
-
-load_prc_file('config.prc')
 
 
 class App:
     """Graphic UI application, using Panda3D."""
 
-    base: ShowBase
-
     def __init__(self):
         log.basicConfig(format='%(levelname)s: %(message)s', level=log.ERROR)
+        panda3d_init()
+        INPUT.init()
 
-        self.base = ShowBase()
-        self.base.task_mgr.remove('audioLoop')
-        self.base.task_mgr.remove('collisionLoop')
-        # print(self.base.task_mgr)  # to print all tasks
-
-        self.render = self.base.render
-        self.render.set_antialias(AntialiasAttrib.M_auto)
-        # self.render.set_shader_auto()
-
-        INPUT.init(self.base)
-        textures.set_loader(self.base.loader)
-
-        self.world = world.create(self.render, 10000, 16)
-        self.camera = Camera(self.base)
-        self.cursor = Cursor(self.base, self.world)
+        self.world = world.create(P3D_RENDER, 10000, 16)
+        self.camera = Camera()
+        self.cursor = Cursor(self.world)
         self.grid = Grid(50.0, 1000.0, self.world, self.cursor.cursor)
 
         # self.roads = self.world.attach_new_node(PandaNode('roads'))
         self.roads = self.world.attach_new_node(RigidBodyCombiner('roads'))
 
-        self.init_lights()
-        self.init_fog()
-        self.init_objects(self.roads)
+        init_lights()
+        init_fog()
+        init_objects(self.roads)
 
         self.roads.node().collect()
 
-        self.base.task_mgr.add(self.update)
+        P3D_TASK_MGR.add(self.update)
 
     def run(self):
         """Start the main loop."""
-        self.base.run()
+        P3D_BASE.run()
 
     def update(self, _task: Task):
         """Update task, to run every frame."""
@@ -69,18 +52,18 @@ class App:
         self.cursor.update()
         self.grid.update()
 
-        if INPUT.pressed('select'):
-            selected = INDEX.get_at(self.cursor.position, of_type=Node)
-            if selected:
-                print(f'{selected[0].xurl}\n')
-            else:
-                selected = INDEX.get_at(self.cursor.position, of_type=Way)
-                if selected:
-                    selected = selected[0]
-                    INDEX.delete(selected)
-                    self.update_entities()
-                    self.roads.node().collect()
-                    print(f'{selected.xurl} {selected.lanes}\n')
+        # if INPUT.pressed('select'):
+        #     selected = INDEX.get_at(self.cursor.position, of_type=Node)
+        #     if selected:
+        #         print(f'{selected[0].xurl}\n')
+        #     else:
+        #         selected = INDEX.get_at(self.cursor.position, of_type=Way)
+        #         if selected:
+        #             selected = selected[0]
+        #             INDEX.delete(selected)
+        #             self.update_entities()
+        #             self.roads.node().collect()
+        #             print(f'{selected.xurl} {selected.lanes}\n')
 
         INPUT.clear()
         return Task.cont
@@ -98,29 +81,45 @@ class App:
         if entity is not None:
             factory.create(self.roads, entity)
 
-    def init_objects(self, parent: NodePath):
-        """Create all objects on the index."""
-        for node in filter(lambda e: isinstance(e, Node),
-                           INDEX.entities.values()):
-            factory.create_node(parent, node)
-        for way in filter(lambda e: isinstance(e, Way),
-                          INDEX.entities.values()):
-            factory.create_way(parent, way)
 
-    def init_lights(self):
-        """Create lights."""
-        light = DirectionalLight('light')
-        light_np = self.render.attach_new_node(light)
-        light_np.set_p(240.0)
-        alight = AmbientLight('alight')
-        alight.set_color((0.3, 0.3, 0.3, 1.0))
-        alight_np = self.render.attach_new_node(alight)
-        self.cursor.cursor.set_light(light_np)
-        self.cursor.cursor.set_light(alight_np)
+def init_objects(parent: NodePath):
+    """Create all objects on the index."""
+    for node in filter(lambda e: isinstance(e, Node),
+                       INDEX.entities.values()):
+        factory.create_node(parent, node)
+    for way in filter(lambda e: isinstance(e, Way),
+                      INDEX.entities.values()):
+        factory.create_way(parent, way)
 
-    def init_fog(self):
-        """Create distance fog."""
-        fog = Fog('fog')
-        fog.set_color(ConfigVariableColor('background-color'))
-        fog.set_linear_range(2000.0, 7000.0)
-        self.render.set_fog(fog)
+
+def init_lights():
+    """Create lights."""
+    light = DirectionalLight('light')
+    light_np = P3D_RENDER.attach_new_node(light)
+    light_np.set_p(240.0)
+    alight = AmbientLight('alight')
+    alight.set_color((0.3, 0.3, 0.3, 1.0))
+    alight_np = P3D_RENDER.attach_new_node(alight)
+    P3D_RENDER.set_light(light_np)
+    P3D_RENDER.set_light(alight_np)
+
+
+def init_fog():
+    """Create distance fog."""
+    fog = Fog('fog')
+    fog.set_color(ConfigVariableColor('background-color'))
+    fog.set_linear_range(2000.0, 7000.0)
+    P3D_RENDER.set_fog(fog)
+
+
+def panda3d_init():
+    """Initialize Panda3D global configurations."""
+    P3D_TASK_MGR.remove('audioLoop')
+    P3D_TASK_MGR.remove('collisionLoop')
+    # print(task_mgr)  # to print all tasks
+
+    P3D_RENDER.set_antialias(AntialiasAttrib.M_auto)
+    # render.set_shader_auto()
+
+    # win.set_clear_color_active(True)
+    # win.set_clear_color(ConfigVariableColor('background-color'))

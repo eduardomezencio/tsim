@@ -2,17 +2,16 @@
 
 import sys
 
-from direct.showbase.ShowBase import ShowBase
+from tsim.ui.panda3d import P3D_BASE
 
 ACTIONS = ('left', 'right', 'up', 'down', 'zoom_in', 'zoom_out',
-           'rot_right', 'rot_left', 'pitch_up', 'pitch_down', 'select')
+           'rot_right', 'rot_left', 'pitch_up', 'pitch_down')
 
 MAPPING = {
     'w': 'up', 'a': 'left', 's': 'down', 'd': 'right',
     '+': 'zoom_in', '-': 'zoom_out',
     'q': 'rot_left', 'e': 'rot_right',
-    'r': 'pitch_up', 'f': 'pitch_down',
-    'mouse1': 'select'
+    'r': 'pitch_up', 'f': 'pitch_down'
 }
 
 KEYS = {k: False for k in ACTIONS}
@@ -44,7 +43,7 @@ def released(action: str):
     return action in RELEASED
 
 
-def init(base: ShowBase):
+def init():
     """Initialize the input module."""
     def set_key(key: str, value: bool):
         KEYS[key] = value
@@ -53,10 +52,10 @@ def init(base: ShowBase):
         else:
             RELEASED.add(key)
 
-    base.disable_mouse()
+    P3D_BASE.disable_mouse()
 
     # base.messenger.toggleVerbose()  # to print all events
-    base.accept('escape', sys.exit)
+    P3D_BASE.accept('escape', sys.exit)
     for suffix, is_pressed in (('', True), ('-up', False)):
         for key, action in MAPPING.items():
-            base.accept(f'{key}{suffix}', set_key, [action, is_pressed])
+            P3D_BASE.accept(f'{key}{suffix}', set_key, [action, is_pressed])
