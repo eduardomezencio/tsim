@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import logging as log
+import logging
 
 from direct.task import Task
 from panda3d.core import (AmbientLight, AntialiasAttrib, ConfigVariableColor,
@@ -14,7 +14,7 @@ from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
 from tsim.ui.objects import factory, world
-from tsim.ui.panda3d import P3D_BASE, P3D_RENDER, P3D_TASK_MGR
+import tsim.ui.panda3d as p3d
 import tsim.ui.input as INPUT
 
 
@@ -22,11 +22,12 @@ class App:
     """Graphic UI application, using Panda3D."""
 
     def __init__(self):
-        log.basicConfig(format='%(levelname)s: %(message)s', level=log.ERROR)
-        panda3d_init()
+        log_config()
+        panda3d_config()
+
         INPUT.init()
 
-        self.world = world.create(P3D_RENDER, 10000, 16)
+        self.world = world.create(p3d.RENDER, 10000, 16)
         self.camera = Camera()
         self.cursor = Cursor(self.world)
         self.grid = Grid(50.0, 1000.0, self.world, self.cursor.cursor)
@@ -40,11 +41,11 @@ class App:
 
         self.roads.node().collect()
 
-        P3D_TASK_MGR.add(self.update)
+        p3d.TASK_MGR.add(self.update)
 
     def run(self):
         """Start the main loop."""
-        P3D_BASE.run()
+        p3d.BASE.run()
 
     def update(self, _task: Task):
         """Update task, to run every frame."""
@@ -95,13 +96,13 @@ def init_objects(parent: NodePath):
 def init_lights():
     """Create lights."""
     light = DirectionalLight('light')
-    light_np = P3D_RENDER.attach_new_node(light)
+    light_np = p3d.RENDER.attach_new_node(light)
     light_np.set_p(240.0)
     alight = AmbientLight('alight')
     alight.set_color((0.3, 0.3, 0.3, 1.0))
-    alight_np = P3D_RENDER.attach_new_node(alight)
-    P3D_RENDER.set_light(light_np)
-    P3D_RENDER.set_light(alight_np)
+    alight_np = p3d.RENDER.attach_new_node(alight)
+    p3d.RENDER.set_light(light_np)
+    p3d.RENDER.set_light(alight_np)
 
 
 def init_fog():
@@ -109,16 +110,22 @@ def init_fog():
     fog = Fog('fog')
     fog.set_color(ConfigVariableColor('background-color'))
     fog.set_linear_range(2000.0, 7000.0)
-    P3D_RENDER.set_fog(fog)
+    p3d.RENDER.set_fog(fog)
 
 
-def panda3d_init():
+def log_config():
+    """Initialize log configuration."""
+    logging.basicConfig(format='%(levelname)s: %(message)s',
+                        level=logging.ERROR)
+
+
+def panda3d_config():
     """Initialize Panda3D global configurations."""
-    P3D_TASK_MGR.remove('audioLoop')
-    P3D_TASK_MGR.remove('collisionLoop')
+    p3d.TASK_MGR.remove('audioLoop')
+    p3d.TASK_MGR.remove('collisionLoop')
     # print(task_mgr)  # to print all tasks
 
-    P3D_RENDER.set_antialias(AntialiasAttrib.M_auto)
+    p3d.RENDER.set_antialias(AntialiasAttrib.M_auto)
     # render.set_shader_auto()
 
     # win.set_clear_color_active(True)

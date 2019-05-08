@@ -4,7 +4,7 @@ from collections import namedtuple
 
 from panda3d.core import SamplerState, Texture
 
-from tsim.ui.panda3d import P3D_LOADER
+import tsim.ui.panda3d as p3d
 
 
 TextureInfo = namedtuple('TextureInfo', ['extension', 'filters'])
@@ -20,7 +20,7 @@ def get(texture_name: str) -> Texture:
         return texture
 
     extension, filters = TEXTURES.get(texture_name, ('', ()))
-    texture = P3D_LOADER.load_texture(''.join((PATH, texture_name, extension)),
+    texture = p3d.LOADER.load_texture(''.join((PATH, texture_name, extension)),
                                       okMissing=True)
     if texture is not None:
         for filter_ in filters:

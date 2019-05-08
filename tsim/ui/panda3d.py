@@ -14,24 +14,24 @@ if TYPE_CHECKING:
     from panda3d.core import GraphicsWindow, Lens, MouseWatcher, NodePath
     # pylint: enable=ungrouped-imports
 
-    P3D_BASE: ShowBase.ShowBase
-    P3D_CAMERA: NodePath
-    P3D_LENS: Lens
-    P3D_LOADER: Loader.Loader
-    P3D_MESSENGER: Messenger.Messenger
-    P3D_MOUSE_WATCHER: MouseWatcher
-    P3D_RENDER: NodePath
-    P3D_RENDER2D: NodePath
-    P3D_TASK_MGR: Task.TaskManager
-    P3D_WIN: GraphicsWindow
+    BASE: ShowBase.ShowBase
+    CAMERA: NodePath
+    LENS: Lens
+    LOADER: Loader.Loader
+    MESSENGER: Messenger.Messenger
+    MOUSE_WATCHER: MouseWatcher
+    RENDER: NodePath
+    RENDER2D: NodePath
+    TASK_MGR: Task.TaskManager
+    WIN: GraphicsWindow
 
-P3D_BASE = ShowBase.ShowBase()
-P3D_CAMERA = P3D_BASE.camera
-P3D_LENS = P3D_BASE.cam.node().get_lens()
-P3D_LOADER = P3D_BASE.loader
-P3D_MESSENGER = P3D_BASE.messenger
-P3D_MOUSE_WATCHER = P3D_BASE.mouseWatcherNode
-P3D_RENDER = P3D_BASE.render
-P3D_RENDER2D = P3D_BASE.render2d
-P3D_TASK_MGR = P3D_BASE.task_mgr
-P3D_WIN = P3D_BASE.win
+BASE = ShowBase.ShowBase()
+CAMERA = BASE.camera
+LENS = BASE.cam.node().get_lens()
+LOADER = BASE.loader
+MESSENGER = BASE.messenger
+MOUSE_WATCHER = BASE.mouseWatcherNode
+RENDER = BASE.render
+RENDER2D = BASE.render2d
+TASK_MGR = BASE.task_mgr
+WIN = BASE.win

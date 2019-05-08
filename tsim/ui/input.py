@@ -2,7 +2,7 @@
 
 import sys
 
-from tsim.ui.panda3d import P3D_BASE
+import tsim.ui.panda3d as p3d
 
 ACTIONS = ('left', 'right', 'up', 'down', 'zoom_in', 'zoom_out',
            'rot_right', 'rot_left', 'pitch_up', 'pitch_down')
@@ -52,10 +52,10 @@ def init():
         else:
             RELEASED.add(key)
 
-    P3D_BASE.disable_mouse()
+    p3d.BASE.disable_mouse()
 
     # base.messenger.toggleVerbose()  # to print all events
-    P3D_BASE.accept('escape', sys.exit)
+    p3d.BASE.accept('escape', sys.exit)
     for suffix, is_pressed in (('', True), ('-up', False)):
         for key, action in MAPPING.items():
-            P3D_BASE.accept(f'{key}{suffix}', set_key, [action, is_pressed])
+            p3d.BASE.accept(f'{key}{suffix}', set_key, [action, is_pressed])

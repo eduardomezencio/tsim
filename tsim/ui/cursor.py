@@ -8,7 +8,7 @@ from direct.actor.Actor import Actor
 from panda3d.core import NodePath, PandaNode
 
 from tsim.model.geometry import Point
-from tsim.ui.panda3d import P3D_CAMERA, P3D_LENS, P3D_MOUSE_WATCHER
+import tsim.ui.panda3d as p3d
 
 
 class Cursor:
@@ -17,8 +17,8 @@ class Cursor:
     def __init__(self, parent: NodePath):
         self.parent = parent
 
-        self.mouse_np = P3D_CAMERA.attach_new_node(PandaNode('mouse'))
-        self.mouse_np.set_y(P3D_LENS.get_near())
+        self.mouse_np = p3d.CAMERA.attach_new_node(PandaNode('mouse'))
+        self.mouse_np.set_y(p3d.LENS.get_near())
 
         self.cursor = Actor(f'{os.getcwd()}/models/cursor',
                             {'spin': f'{os.getcwd()}/models/cursor-spin'})
@@ -45,18 +45,18 @@ class Cursor:
 
     def update(self):
         """Update callback."""
-        self.cursor.set_scale(P3D_CAMERA.get_z() ** 0.6 / 10)
+        self.cursor.set_scale(p3d.CAMERA.get_z() ** 0.6 / 10)
         self.moved = False
 
-        if P3D_MOUSE_WATCHER.has_mouse():
+        if p3d.MOUSE_WATCHER.has_mouse():
             self.last_position = self._position
 
-            film = P3D_LENS.get_film_size() * 0.5
-            self.mouse_np.set_x(P3D_MOUSE_WATCHER.get_mouse_x() * film.x)
-            self.mouse_np.set_y(P3D_LENS.get_focal_length())
-            self.mouse_np.set_z(P3D_MOUSE_WATCHER.get_mouse_y() * film.y)
+            film = p3d.LENS.get_film_size() * 0.5
+            self.mouse_np.set_x(p3d.MOUSE_WATCHER.get_mouse_x() * film.x)
+            self.mouse_np.set_y(p3d.LENS.get_focal_length())
+            self.mouse_np.set_z(p3d.MOUSE_WATCHER.get_mouse_y() * film.y)
             mouse_pos = self.mouse_np.get_pos(self.parent)
-            cam_pos = P3D_CAMERA.get_pos(self.parent)
+            cam_pos = p3d.CAMERA.get_pos(self.parent)
             mouse_vec = mouse_pos - cam_pos
             if mouse_vec.z < 0.0:
                 scale = -mouse_pos.z / mouse_vec.z
