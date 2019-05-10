@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from itertools import count
-from typing import (Callable, ClassVar, Dict, Generator, List, Tuple, Type,
+from typing import (Callable, ClassVar, Dict, Iterator, List, Tuple, Type,
                     Union)
 import logging as log
 import shelve
@@ -80,7 +80,7 @@ class EntityIndex:
         """Clear entity updates."""
         self._updates.clear()
 
-    def consume_updates(self) -> Generator[int]:
+    def consume_updates(self) -> Iterator[int]:
         """Get generator that pops and returns updates."""
         while self._updates:
             yield self._updates.pop()

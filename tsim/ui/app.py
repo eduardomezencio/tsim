@@ -41,6 +41,7 @@ class App:
 
         self.roads.node().collect()
 
+        p3d.BASE.accept('entities_changed', self.on_entities_changed)
         p3d.TASK_MGR.add(self.update)
 
     def run(self):
@@ -52,20 +53,6 @@ class App:
         self.camera.update()
         self.cursor.update()
         self.grid.update()
-
-        # if INPUT.pressed('select'):
-        #     selected = INDEX.get_at(self.cursor.position, of_type=Node)
-        #     if selected:
-        #         print(f'{selected[0].xurl}\n')
-        #     else:
-        #         selected = INDEX.get_at(self.cursor.position, of_type=Way)
-        #         if selected:
-        #             selected = selected[0]
-        #             INDEX.delete(selected)
-        #             self.update_entities()
-        #             self.roads.node().collect()
-        #             print(f'{selected.xurl} {selected.lanes}\n')
-
         INPUT.clear()
         return Task.cont
 
@@ -81,6 +68,11 @@ class App:
         entity = INDEX.entities.get(id_, None)
         if entity is not None:
             factory.create(self.roads, entity)
+
+    def on_entities_changed(self):
+        """Update entities."""
+        self.update_entities()
+        self.roads.node().collect()
 
 
 def init_objects(parent: NodePath):

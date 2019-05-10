@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from itertools import accumulate, chain, islice, repeat, product
 from math import pi, sqrt
-from typing import Dict, Generator, Iterable, List, Set, Tuple
+from typing import Dict, Iterable, Iterator, List, Set, Tuple
 
 from cached_property import cached_property
 from dataslots import with_slots
@@ -56,7 +56,7 @@ class Node(Entity):
         return len(self.starts) + len(self.ends)
 
     @property
-    def oriented_ways(self) -> Generator[Way.Oriented]:
+    def oriented_ways(self) -> Iterator[Way.Oriented]:
         """Get incident ways with orentation (endpoint)."""
         return ((r.value, e) for r, e in chain(
             zip(self.starts, repeat(Way.Endpoint.START)),
@@ -328,7 +328,7 @@ class Way(Entity):
         """Get the other endpoint of the way, opposite to node."""
         return self.start if self.end is node else self.end
 
-    def points(self, skip=0, reverse=False) -> Generator[Point]:
+    def points(self, skip=0, reverse=False) -> Iterator[Point]:
         """Get generator for points in order, including nodes and waypoints."""
         if reverse:
             # pylint: disable=bad-reversed-sequence
@@ -340,22 +340,22 @@ class Way(Entity):
                              (self.end.position,))
         yield from islice(iterator, skip, None)
 
-    def vectors(self) -> Generator[Vector]:
+    def vectors(self) -> Iterator[Vector]:
         """Get vectors for each edge on the way."""
         yield from ((q - p) for p, q in
                     zip(self.points(), self.points(skip=1)))
 
-    def distances(self) -> Generator[float]:
+    def distances(self) -> Iterator[float]:
         """Get generator for the distance between all consecutive points."""
         yield from (distance(p, q) for p, q in
                     zip(self.points(), self.points(skip=1)))
 
-    def accumulated_length(self) -> Generator[float]:
+    def accumulated_length(self) -> Iterator[float]:
         """Get generator for the accumulated length up to each point."""
         yield 0.0
         yield from accumulate(self.distances())
 
-    def waypoint_normals(self) -> Generator[Vector]:
+    def waypoint_normals(self) -> Iterator[Vector]:
         """Get the 'normals' of this way's waypoints.
 
         Normal here is used for the lack of a better term, meaning a unit
@@ -375,7 +375,7 @@ class Way(Entity):
         yield (self.end.position - other).rotated_left().normalized()
         # pylint: enable=unsubscriptable-object
 
-    def edge_normals(self) -> Generator[Vector]:
+    def edge_normals(self) -> Iterator[Vector]:
         """Get the 'normals' of this way's edges.
 
         Get a unit vector pointing right from each edge on the way.
@@ -425,7 +425,7 @@ class Way(Entity):
         raise ValueError('Address outside of Way.')
 
     def iterate_lanes(self, direction: Way.Endpoint,
-                      outwards: bool = True) -> Generator[Way.Lane]:
+                      outwards: bool = True) -> Iterator[Way.Lane]:
         """Get lanes in the given direction.
 
         Get lanes in the given direction. Check Way documentation for
