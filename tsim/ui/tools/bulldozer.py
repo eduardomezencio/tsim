@@ -9,6 +9,8 @@ import tsim.ui.panda3d as p3d
 class Bulldozer(Tool):
     """Tool for removing ways."""
 
+    KEY = 'b'
+
     def on_button1_press(self):
         """Button 1 pressed callback."""
         selected = INDEX.get_at(self.cursor.position, of_type=Way)

@@ -1,7 +1,9 @@
 """Cursor object for the UI."""
 
+from functools import partial
 from itertools import islice
-from typing import Iterable, Union
+from typing import Iterable, Type, Union
+import logging as log
 import os
 
 from direct.showbase.DirectObject import DirectObject
@@ -9,8 +11,7 @@ from direct.actor.Actor import Actor
 from panda3d.core import NodePath, PandaNode
 
 from tsim.model.geometry import Point
-from tsim.ui.tools.tool import Tool
-from tsim.ui.tools.bulldozer import Bulldozer
+from tsim.ui.tools import Tool, TOOLS
 import tsim.ui.input as INPUT
 import tsim.ui.panda3d as p3d
 
@@ -36,7 +37,7 @@ class Cursor(DirectObject):
         self.moved = False
 
         self._tool: Tool = None
-        self.tool = Bulldozer(self)
+        self._register_tool_change_events()
 
     @property
     def position(self) -> Point:
@@ -61,6 +62,7 @@ class Cursor(DirectObject):
         if self._tool is not None:
             self._tool.cleanup()
         self.ignore_all()
+        self._register_tool_change_events()
         self._tool = value
         if value is not None:
             for key in INPUT.keys_for('tool_1'):
@@ -93,3 +95,13 @@ class Cursor(DirectObject):
                 if self._position != self.last_position:
                     self.moved = True
                     p3d.MESSENGER.send('cursor_move')
+
+    def _register_tool_change_events(self):
+        def set_tool(tool: Type[Tool]):
+            self.tool = tool(self)
+            log.debug('Changing tool to %s', tool.__name__)
+        for tool in TOOLS:
+            try:
+                self.accept(tool.KEY, partial(set_tool, tool))
+            except AttributeError:
+                log.debug('No KEY set for tool %s', tool.__name__)
