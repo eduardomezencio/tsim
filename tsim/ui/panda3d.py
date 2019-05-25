@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     MOUSE_WATCHER: MouseWatcher
     RENDER: NodePath
     RENDER2D: NodePath
+    ASPECT2D: NodePath
+    PIXEL2D: NodePath
     TASK_MGR: Task.TaskManager
     WIN: GraphicsWindow
 
@@ -33,5 +35,7 @@ MESSENGER = BASE.messenger
 MOUSE_WATCHER = BASE.mouseWatcherNode
 RENDER = BASE.render
 RENDER2D = BASE.render2d
+ASPECT2D = BASE.aspect2d
+PIXEL2D = BASE.pixel2d
 TASK_MGR = BASE.task_mgr
 WIN = BASE.win

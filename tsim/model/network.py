@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections import deque, defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
-from itertools import accumulate, chain, islice, repeat, product
+from itertools import accumulate, chain, combinations, islice, repeat, product
 from math import pi, sqrt
-from typing import Dict, Iterable, Iterator, List, Set, Tuple
+from typing import (DefaultDict, Deque, Dict, Iterator, List, NamedTuple, Set,
+                    Tuple)
 
 from cached_property import cached_property
 from dataslots import with_slots
@@ -28,7 +29,7 @@ class Node(Entity):
     A Node can be the endpoint of a Way or a junction of 3 or more Ways.
     """
 
-    LaneConnections = Dict['Way.Lane', Set['Way.Lane']]
+    LaneConnections = Dict['Lane', Set['Lane']]
 
     position: Point
     level: int = field(default_factory=int)
@@ -46,6 +47,13 @@ class Node(Entity):
         return self.calc_default_lane_connections()
 
     @property
+    def lane_connections_iter(self) -> Iterator[Tuple[Lane, Lane]]:
+        """Lane connections as an iterator of lane tuples."""
+        for src, values in self.lane_connections.items():
+            for dest in values:
+                yield src, dest
+
+    @property
     def max_lanes(self) -> int:
         """Maximum number of lanes in incident ways."""
         return max(e.value.total_lanes for e in chain(self.starts, self.ends))
@@ -56,9 +64,9 @@ class Node(Entity):
         return len(self.starts) + len(self.ends)
 
     @property
-    def oriented_ways(self) -> Iterator[Way.Oriented]:
+    def oriented_ways(self) -> Iterator[OrientedWay]:
         """Get incident ways with orentation (endpoint)."""
-        return ((r.value, e) for r, e in chain(
+        return (OrientedWay(r.value, e) for r, e in chain(
             zip(self.starts, repeat(Way.Endpoint.START)),
             zip(self.ends, repeat(Way.Endpoint.END))))
 
@@ -74,11 +82,18 @@ class Node(Entity):
 
     def calc_default_lane_connections(self) -> Node.LaneConnections:
         """Calculate default lane connections for this node."""
-        def reverse(iterable: Iterable, apply: bool) -> Iterable:
-            return reversed(list(iterable)) if apply else iterable
+        angles: List[float]
+        connections: DefaultDict[Lane, Set[Lane]]
+        new_conn: DefaultDict[Lane, Set[Lane]]
+        way: OrientedWay
+        ways: Deque[OrientedWay]
 
-        def straighter_than(angle_a: float, angle_b: float) -> bool:
-            return abs(pi - angle_a) < abs(pi - angle_b)
+        def iterate_new_conn() -> Iterator[Tuple[Lane, Lane]]:
+            for key, values in new_conn.items():
+                yield from product((key,), values)
+
+        def curvier(angle_a: float, angle_b: float) -> bool:
+            return int(abs(pi - angle_a) < abs(pi - angle_b))
 
         def rotate_angles():
             angles[0] = 2 * pi
@@ -89,51 +104,57 @@ class Node(Entity):
         def self_connect():
             """Connect ways[0] to itself."""
             connections.update({l: {o} for l, o in zip(
-                way.iterate_lanes(direction.other()),
-                way.iterate_lanes(direction))})
+                way.iterate_lanes(opposite_only=True),
+                way.iterate_lanes(l_to_r=False))})
 
-        def connect_to(index: int, other: Way.Oriented):
+        def connect_to(index: int, other: OrientedWay) -> Node.LaneConnections:
             """Connect ways[0] to the given way."""
-            outwards = angles[index] > pi / 6.0
-            for source, dest in zip(
-                    reverse(way.iterate_lanes(direction.other(), outwards),
-                            outwards),
-                    other[0].iterate_lanes(other[1], outwards)):
+            outwards = angles[index] > pi * 2.0 / 3.0
+            for source, dest in zip(way.iterate_lanes(l_to_r=not(outwards),
+                                                      opposite_only=True),
+                                    other.iterate_lanes(outwards)):
+                new_conn[source].add(dest)
+                conn_angles[(source, dest)] = angles[index]
 
-                # Check for conflicts with existing connections
-                connect = True
-                to_clear = set()
-                for ((way_, direction_), angle_), lane_ in product(
-                        islice(zip(ways, angles), 1, index), range(source[2])):
-                    source_ = (way_, direction_, lane_)
-                    if connections[source_]:
-                        if straighter_than(angle_, angles[index]):
-                            connect = False
-                            break
-                        else:
-                            to_clear.add(connections)
-                if connect:
-                    connections[source].add(dest)
-                    for connection in to_clear:
-                        connection.clear()
+        def resolve_conflicts():
+            """Leave only one connection when there are conflicts."""
+            to_remove = set()
+            for conn_1, conn_2 in combinations(iterate_new_conn(), 2):
+                if conn_1[0] == conn_2[0]:
+                    continue
+                if conn_1 in to_remove or conn_2 in to_remove:
+                    continue
+                conn = ((conn_2, conn_1) if conn_1[0].index > conn_2[0].index
+                        else (conn_1, conn_2))
+                angle_1, angle_2 = conn_angles[conn[0]], conn_angles[conn[1]]
+                if angle_1 > angle_2:
+                    to_remove.add(conn[curvier(angle_1, angle_2)])
+            for conn in to_remove:
+                new_conn[conn[0]].remove(conn[1])
 
         connections = defaultdict(set)
+        new_conn = defaultdict(set)
+        conn_angles = {}
         ways = deque(self.sorted_ways())
-        way, direction = ways[0]
         if ways:
+            way = ways[0]
             if len(ways) == 1:
                 self_connect()
             else:
-                way_vector = way.direction_from_node(self, direction)
+                way_vector = way.way.direction_from_node(self, way.endpoint)
 
                 angles = [angle(way_vector, w.direction_from_node(self, d))
                           if i > 0 else 0.0 for i, (w, d) in enumerate(ways)]
 
                 for _ in range(len(ways)):
+                    new_conn.clear()
+                    conn_angles.clear()
                     for i, way_ in islice(enumerate(ways), 1, None):
                         connect_to(i, way_)
+                    resolve_conflicts()
+                    connections.update(new_conn)
                     ways.rotate(-1)
-                    way, direction = ways[0]
+                    way = ways[0]
                     rotate_angles()
 
         return connections
@@ -151,14 +172,15 @@ class Node(Entity):
             return self.position.distance_squared(point)
         return self.position.distance(point)
 
-    def sorted_ways(self) -> List[Way.Oriented]:
+    def sorted_ways(self) -> List[OrientedWay]:
         """Get incident ways sorted in counterclockwise order."""
         return sorted(
             self.oriented_ways,
-            key=lambda t: t[0].direction_from_node(self, t[1]).sorting_key())
+            key=lambda t: (t.way.direction_from_node(self, t.endpoint)
+                           .sorting_key()))
 
-    def ways_closest_to(self, oriented_way: Way.Oriented
-                        ) -> Tuple[Way.Oriented, Way.Oriented]:
+    def ways_closest_to(self, oriented_way: OrientedWay
+                        ) -> Tuple[OrientedWay, OrientedWay]:
         """Get incident way closest to given way in each direction.
 
         Returns a tuple where the first value is the closest way in the
@@ -238,23 +260,6 @@ class Way(Entity):
 
     A Way connects two Nodes and can have a list of intermediary points, called
     waypoints.
-
-    Types defined inside Way:
-
-    Endpoint: Enumeration to represent the two endpoints of the way. Values are
-    START and END.
-
-    Oriented: A tuple containing a Way and an Endpoint. Used to represent a
-    specific connection of a Way and a Node. Useful when referencing an
-    incident Way from a Node, to avoid ambiguity, since both ends of a Way can
-    be connected to the same Node. Can be interpreted as the given Way in the
-    direction starting from the given Endpoint.
-
-    Lane: A tuple where the two first elements are equivalent to the values of
-    Oriented and the third value is the number of the lane. Lanes start from
-    zero, meaning the leftmost lane if looking at the way in the direction of
-    the two first values, interpreted as an Oriented, to n - 1, with n being
-    the number of lanes in that direction.
     """
 
     class Endpoint(Enum):
@@ -263,13 +268,11 @@ class Way(Entity):
         START = 0
         END = 1
 
-        def other(self):
+        @property
+        def other(self) -> Way.Endpoint:
             """Get the opposite endpoint."""
             return (Way.Endpoint.END if self is Way.Endpoint.START
                     else Way.Endpoint.START)
-
-    Oriented = Tuple['Way', Endpoint]
-    Lane = Tuple['Way', Endpoint, int]
 
     start: Node
     end: Node
@@ -297,17 +300,17 @@ class Way(Entity):
         return not self.lanes[1]
 
     @property
-    def total_lanes(self):
+    def total_lanes(self) -> int:
         """Total number of lanes."""
         return sum(self.lanes)
 
     @property
-    def swapped_lanes(self):
+    def swapped_lanes(self) -> Tuple[int, int]:
         """Get number of lanes, with swapped directions."""
         return self.lanes[1::-1]
 
     @property
-    def is_valid(self):
+    def is_valid(self) -> bool:
         """Check if way has start and end nodes."""
         return self.start is not None and self.end is not None
 
@@ -424,17 +427,22 @@ class Way(Entity):
                     return point + vector.normalized() * counter + side
         raise ValueError('Address outside of Way.')
 
-    def iterate_lanes(self, direction: Way.Endpoint,
-                      outwards: bool = True) -> Iterator[Way.Lane]:
+    def iterate_lanes(self, direction: Way.Endpoint, l_to_r: bool = True,
+                      include_opposite: bool = False,
+                      opposite_only: bool = False) -> Iterator[Lane]:
         """Get lanes in the given direction.
 
-        Get lanes in the given direction. Check Way documentation for
-        information on Lane. If outwards is True (default), return lanes
-        starting from the left, otherwise start from the right.
+        Get lanes in the given direction. Check Lane documentation for more
+        information. If l_to_r is True (default), return lanes starting from
+        the left, otherwise start from the right.
         """
-        lanes = self.lanes[0 if direction is Way.Endpoint.START else 1]
-        for i in range(lanes) if outwards else reversed(range(lanes)):
-            yield (self, direction, i)
+        opposite = include_opposite or opposite_only
+        lanes = range(
+            -self.lanes[direction.other.value] if opposite else 0,
+            0 if opposite_only else self.lanes[direction.value])
+
+        for i in lanes if l_to_r else reversed(lanes):
+            yield Lane(self, direction, i)
 
     def disconnect(self, node: Node):
         """Disconnect this way from a node.
@@ -492,24 +500,23 @@ class NodeGeometry:
     __slots__ = ('node', 'way_indexes', 'way_distances', 'points')
 
     node: Node
-    way_indexes: Dict[Way, int]
+    way_indexes: Dict[OrientedWay, int]
     way_distances: List[float]
     points: List[Point]
 
     def __init__(self, node: Node):
         self.node = node
         ways = node.sorted_ways()
-        self.way_indexes = {w: i for i, (w, _) in enumerate(ways)}
+        self.way_indexes = {w: i for i, w in enumerate(ways)}
         self.way_distances = [None for _ in ways]
         self.points = self.way_distances * 2
         self._calc_points(ways)
 
-    def distance(self, way: Way) -> float:
+    def distance(self, oriented_way: OrientedWay) -> float:
         """Get distance from node center to where way should start or end."""
-        return self.way_distances[self.way_indexes[way]]
+        return self.way_distances[self.way_indexes[oriented_way]]
 
-    def _calc_points(self,
-                     ways: List[Tuple[Way, Way.Endpoint]]):
+    def _calc_points(self, ways: List[OrientedWay]):
         """Calculate points for the geometric bounds of the node."""
         directions = tuple(w.direction_from_node(self.node, e).normalized()
                            for w, e in ways)
@@ -531,10 +538,65 @@ class NodeGeometry:
                 point = midpoint(*points)
 
             self.points[2 * i - 1] = point
-        for i, (way, direction) in enumerate(zip(ways, directions)):
+        for i, (_, direction) in enumerate(zip(ways, directions)):
             farthest: Vector = max(
                 self.points[2 * i - 1], self.points[2 * i + 1],
                 key=lambda v, d=direction: v.dot_product(d))
             projection, reflection = farthest.projection_reflection(direction)
             self.way_distances[i] = projection.norm()
             self.points[2 * i] = reflection
+
+
+class OrientedWay(NamedTuple):
+    """A tuple containing a Way and an Endpoint.
+
+    Used to represent a specific connection of a Way and a Node. Useful when
+    referencing an incident Way from a Node, to avoid ambiguity, since both
+    ends of a Way can be connected to the same Node. Can be interpreted as the
+    given Way in the direction starting from the given Endpoint.
+    """
+
+    way: Way
+    endpoint: Way.Endpoint
+
+    def iterate_lanes(self, l_to_r: bool = True,
+                      include_opposite: bool = False,
+                      opposite_only: bool = False) -> Iterator[Lane]:
+        """Get lanes in the direction of the oriented way.
+
+        A shortcut for Way.iterate_lanes.
+        """
+        return self.way.iterate_lanes(self.endpoint, l_to_r, include_opposite,
+                                      opposite_only)
+
+
+class Lane(NamedTuple):
+    """A tuple containing the same as OrientedWay, with a lane index.
+
+    The two first elements are equivalent to the values of OrientedWay and the
+    third value is the number of the lane. Lanes start from zero, meaning the
+    leftmost lane if looking at the way in the direction of the two first
+    values, interpreted as an OrientedWay, to n - 1, with n being the number of
+    lanes in that direction.
+    """
+
+    way: Way
+    endpoint: Way.Endpoint
+    index: int
+
+    @property
+    def positive(self):
+        """Get equivalent lane with positive index."""
+        if self.index >= 0:
+            return self
+        return Lane(self.way, self.endpoint.other, -self.index - 1)
+
+    @property
+    def oriented_way(self):
+        """Get oriented way from this lane."""
+        return OrientedWay(self.way, self.endpoint)
+
+    def distance_from_center(self) -> float:
+        """Get distance to the right from way center to the lane."""
+        return (1.0 - self.way.lanes[self.endpoint.value]
+                + self.way.lanes[self.endpoint.other.value]) * LANE_WIDTH / 2

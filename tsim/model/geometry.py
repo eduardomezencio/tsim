@@ -54,8 +54,8 @@ def angle(vector_a: Vector, vector_b: Vector) -> float:
     """Get angle between vectors, counterclockwise from a to b."""
     a_norm, b_norm = vector_a.normalized(), vector_b.normalized()
     if a_norm.rotated_right().dot_product(b_norm) > 0.0:
-        return 2 * pi - acos(a_norm.dot_product(b_norm))
-    return acos(a_norm.dot_product(b_norm))
+        return 2 * pi - acos(max(-1.0, min(1.0, a_norm.dot_product(b_norm))))
+    return acos(max(-1.0, min(1.0, a_norm.dot_product(b_norm))))
 
 
 def sec(vector_a: Vector, vector_b: Vector) -> float:
@@ -66,7 +66,10 @@ def sec(vector_a: Vector, vector_b: Vector) -> float:
 
 def line_intersection(point1: Point, vector1: Vector,
                       point2: Point, vector2: Vector) -> Point:
-    """Calculate the intersection of two lines."""
+    """Calculate the intersection of two lines.
+
+    Raises ZeroDivisionError if parallel.
+    """
     if vector1.x != 0.0:
         slope1 = vector1.y / vector1.x
         if vector2.x != 0.0:
@@ -84,6 +87,21 @@ def line_intersection(point1: Point, vector1: Vector,
             y = point2.y
         x = point1.x
     return Point(x, y)
+
+
+def line_intersection_safe(point1: Point, normal_vector1: Vector,
+                           point2: Point, normal_vector2: Vector,
+                           threshold: float = 0.9) -> Point:
+    """Calculate the intersection of two lines with no exceptions.
+
+    Vectors passed as arguments must be normalized already to help checking for
+    parallelism. If the two lines are parallel or almost parallel, returns the
+    midpoint of given points instead. Lines are almost parallel if the absolute
+    value if the dot product of the vectors if above the threshold.
+    """
+    if abs(normal_vector1.dot_product(normal_vector2)) >= threshold:
+        return midpoint(point1, point2)
+    return line_intersection(point1, normal_vector1, point2, normal_vector2)
 
 
 # pylint: disable=invalid-name
@@ -112,6 +130,10 @@ class Vector:
             return (self.x, self.y, self.x, self.y)
         return (min(self.x, accumulated[0]), min(self.y, accumulated[1]),
                 max(self.x, accumulated[2]), max(self.y, accumulated[3]))
+
+    def y_flipped(self):
+        """Get vector with y coordinate flipped."""
+        return Vector(self.x, -self.y)
 
     def norm(self) -> float:
         """Calculate norm of the vector."""

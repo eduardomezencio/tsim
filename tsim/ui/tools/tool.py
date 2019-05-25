@@ -16,6 +16,10 @@ class Tool(ABC):
 
     def __init__(self, cursor: Cursor):
         self.cursor = cursor
+        self.prepare()
+
+    def prepare(self):
+        """Initialize tool."""
 
     def on_button1_press(self):
         """Button 1 pressed callback."""

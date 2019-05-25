@@ -61,7 +61,8 @@ def main():
                 lanes = ((highway.lanes, 0)
                          if highway.lanes is not None else (2, 0))
             else:
-                lanes = ((highway.lanes % 2, highway.lanes - highway.lanes % 2)
+                lanes = ((highway.lanes // 2,
+                          highway.lanes - highway.lanes // 2)
                          if highway.lanes is not None else (1, 1))
             INDEX.add(nodes[start])
             INDEX.add(nodes[end])

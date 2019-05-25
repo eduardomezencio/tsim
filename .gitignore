@@ -2,6 +2,7 @@
 .mypy_cache
 .tox
 .vscode/.ropeproject
+.vscode/tags
 __pycache__
 _test*
 *.egg-info

@@ -1,8 +1,10 @@
 """Module to load, cache and retrieve textures."""
 
 from collections import namedtuple
+from io import BytesIO
 
-from panda3d.core import SamplerState, Texture
+from panda3d.core import PNMImage, SamplerState, StringStream, Texture
+from PIL import Image
 
 import tsim.ui.panda3d as p3d
 
@@ -11,6 +13,17 @@ TextureInfo = namedtuple('TextureInfo', ['extension', 'filters'])
 
 LOADED_TEXTURES = {}
 PATH = 'textures/'
+
+
+def _mipmap(texture: Texture):
+    texture.set_minfilter(SamplerState.FT_linear_mipmap_linear)
+
+
+TEXTURES = {
+    'ground': TextureInfo('.jpg', (_mipmap,)),
+    'intersection': TextureInfo('.png', ()),
+    'road': TextureInfo('.png', (_mipmap,))
+}
 
 
 def get(texture_name: str) -> Texture:
@@ -30,12 +43,15 @@ def get(texture_name: str) -> Texture:
     return texture
 
 
-def _mipmap(texture: Texture):
-    texture.set_minfilter(SamplerState.FT_linear_mipmap_linear)
-
-
-TEXTURES = {
-    'ground': TextureInfo('.jpg', (_mipmap,)),
-    'intersection': TextureInfo('.png', ()),
-    'road': TextureInfo('.png', (_mipmap,))
-}
+def create_texture(image: Image):
+    """Create a Panda3D Texture from a PIL Image."""
+    bytes_io = BytesIO()
+    image.save(bytes_io, format='PNG')
+    bytes_io.seek(0)
+    stream = StringStream()
+    stream.set_data(bytes_io.read())
+    pnm_image = PNMImage()
+    pnm_image.read(stream)
+    texture = Texture()
+    texture.load(pnm_image)
+    return texture
