@@ -161,10 +161,11 @@ class Node(Entity):
 
     def reset_connections(self):
         """Invalidate geometry and lane connections."""
-        try:
-            del self.__dict__['geometry']
-        except KeyError:
-            pass
+        for key in ('geometry', 'lane_connections'):
+            try:
+                del self.__dict__[key]
+            except KeyError:
+                pass
 
     def distance(self, point: Point, squared: bool = False) -> float:
         """Calculate distance from the node to a point."""

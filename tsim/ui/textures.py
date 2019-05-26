@@ -50,8 +50,11 @@ def create_texture(image: Image):
     bytes_io.seek(0)
     stream = StringStream()
     stream.set_data(bytes_io.read())
+    bytes_io.close()
     pnm_image = PNMImage()
     pnm_image.read(stream)
+    stream.clear_data()
     texture = Texture()
     texture.load(pnm_image)
+    pnm_image.clear()
     return texture

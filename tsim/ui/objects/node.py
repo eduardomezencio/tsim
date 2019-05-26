@@ -116,6 +116,7 @@ def create_lane_connections_card(node: Node, parent: NodePath) -> NodePath:
     """Create textured mesh showing lane connectins and attach it."""
     image = create_lane_connections_image(node)
     texture = create_texture(image)
+    image.close()
 
     card = parent.attach_new_node(CARD_MAKER.generate())
     card.set_pos((*node.position, 0.25))
