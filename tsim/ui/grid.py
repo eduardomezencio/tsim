@@ -27,9 +27,11 @@ class Grid:
 
         node = GeomNode('grid')
         node.add_geom(self.geom)
+        node.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
         self.node_path = parent.attach_new_node(node)
         self.node_path.set_z(0.1)
         self.node_path.set_transparency(TransparencyAttrib.M_alpha)
+        self.node_path.set_shader_off()
 
     def update(self):
         """Update callback."""

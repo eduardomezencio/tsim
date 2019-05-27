@@ -11,18 +11,21 @@ from panda3d.core import (DecalEffect, Geom, GeomNode, GeomTristrips,
 
 from tsim.ui import textures
 
+VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
+
 
 def generate_mesh(radius: float, count: int) -> Geom:
     """Generate mesh for the ground plane."""
-    vertex_format = GeomVertexFormat.get_v3t2()
-    vertex_data = GeomVertexData('ground', vertex_format, Geom.UH_static)
+    vertex_data = GeomVertexData('ground', VERTEX_FORMAT, Geom.UH_static)
     vertex_data.set_num_rows(count ** 2)
     vertex_writer = GeomVertexWriter(vertex_data, 'vertex')
+    normal_writer = GeomVertexWriter(vertex_data, 'normal')
     texcoord_writer = GeomVertexWriter(vertex_data, 'texcoord')
 
     step = 2 * radius / count
     for i, j in product(range(count + 1), repeat=2):
         vertex_writer.add_data3f(i * step - radius, j * step - radius, 0.0)
+        normal_writer.add_data3f(0.0, 0.0, 1.0)
         texcoord_writer.add_data2f(i * 512, j * 512)
 
     geom = Geom(vertex_data)

@@ -8,7 +8,7 @@ from tsim.model.network import LANE_WIDTH, OrientedWay, Way
 from tsim.ui import textures
 from tsim.ui.constants import LEVEL_HEIGHT
 
-VERTEX_FORMAT = GeomVertexFormat.get_v3t2()
+VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
 
 
 def generate_mesh(way: Way) -> Geom:
@@ -16,6 +16,7 @@ def generate_mesh(way: Way) -> Geom:
     vertex_data = GeomVertexData(str(way.id), VERTEX_FORMAT, Geom.UH_static)
     vertex_data.set_num_rows(4 + 2 * len(way.waypoints))
     vertex_writer = GeomVertexWriter(vertex_data, 'vertex')
+    normal_writer = GeomVertexWriter(vertex_data, 'normal')
     texcoord_writer = GeomVertexWriter(vertex_data, 'texcoord')
 
     total = way.length
@@ -35,6 +36,7 @@ def generate_mesh(way: Way) -> Geom:
     width_vector = half_width * vector.rotated_left()
     for vertex in (point + width_vector, point - width_vector):
         vertex_writer.add_data3f(vertex.x, vertex.y, start_z)
+        normal_writer.add_data3f(0.0, 0.0, 1.0)
     texture_v = 0.0
     texcoord_writer.add_data2f(0.0, texture_v)
     texcoord_writer.add_data2f(lanes_float, texture_v)
@@ -49,6 +51,7 @@ def generate_mesh(way: Way) -> Geom:
         height = start_z + (end_z - start_z) * acc_len / total
         for vertex in (point + width_vector, point - width_vector):
             vertex_writer.add_data3f(vertex.x, vertex.y, height)
+            normal_writer.add_data3f(0.0, 0.0, 1.0)
         texture_v += abs(vector) / LANE_WIDTH
         texcoord_writer.add_data2f(0.0, texture_v)
         texcoord_writer.add_data2f(lanes_float, texture_v)
@@ -63,6 +66,7 @@ def generate_mesh(way: Way) -> Geom:
     width_vector = half_width * vector.rotated_right()
     for vertex in (point + width_vector, point - width_vector):
         vertex_writer.add_data3f(vertex.x, vertex.y, end_z)
+        normal_writer.add_data3f(0.0, 0.0, 1.0)
     texcoord_writer.add_data2f(0.0, texture_v)
     texcoord_writer.add_data2f(lanes_float, texture_v)
 
@@ -79,6 +83,7 @@ def create(parent: NodePath, way: Way) -> NodePath:
     geom = generate_mesh(way)
     node = GeomNode(str(way.id))
     node.add_geom(geom)
+    node.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
     node_path = parent.attach_new_node(node)
     node_path.set_texture(textures.get('road'), 1)
     return node_path

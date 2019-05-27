@@ -31,6 +31,7 @@ class Cursor(DirectObject):
         self.cursor.loop('spin')
         self.cursor.reparent_to(parent)
         self.cursor.set_pos(0.0, 0.0, 0.0)
+        self.cursor.set_shader_off()
 
         self._position = Point(0.0, 0.0)
         self.last_position = self._position

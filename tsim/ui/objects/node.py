@@ -18,7 +18,7 @@ COLORS = ('crimson', 'orange', 'gold', 'limegreen',
           'turquoise', 'deepskyblue', 'blueviolet', 'hotpink')
 PPM = 32
 
-VERTEX_FORMAT = GeomVertexFormat.get_v3t2()
+VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
 
 CARD_MAKER = CardMaker('lane_connections_card_maker')
 CARD_MAKER.set_frame((-16, 16, -16, 16))
@@ -30,6 +30,7 @@ def generate_mesh(node: Node) -> Geom:
     vertex_data = GeomVertexData(str(node.id), VERTEX_FORMAT, Geom.UH_static)
     vertex_data.set_num_rows(size)
     vertex_writer = GeomVertexWriter(vertex_data, 'vertex')
+    normal_writer = GeomVertexWriter(vertex_data, 'normal')
     texcoord_writer = GeomVertexWriter(vertex_data, 'texcoord')
 
     indexes = [[j for j in range(i - 1, i + 2)]
@@ -39,6 +40,7 @@ def generate_mesh(node: Node) -> Geom:
     for point in node.geometry.points:
         point = point + node.position
         vertex_writer.add_data3f(point.x, point.y, LEVEL_HEIGHT * node.level)
+        normal_writer.add_data3f(0.0, 0.0, 1.0)
         texcoord_writer.add_data2f(point.x / LANE_WIDTH, point.y / LANE_WIDTH)
 
     indexes = [i for i, t in zip(indexes, triangles)
@@ -66,6 +68,7 @@ def create(parent: NodePath, node: Node) -> NodePath:
     geom = generate_mesh(node)
     node_ = GeomNode(str(node.id))
     node_.add_geom(geom)
+    node_.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
     node_path = parent.attach_new_node(node_)
     node_path.set_texture(textures.get('intersection'))
     return node_path
@@ -123,4 +126,5 @@ def create_lane_connections_card(node: Node, parent: NodePath) -> NodePath:
     card.look_at(card, (0.0, 0.0, -1.0))
     card.set_texture(texture)
     card.set_transparency(TransparencyAttrib.M_alpha)
+    card.set_shader_off()
     return card

@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     # pylint: enable=ungrouped-imports
 
     BASE: ShowBase.ShowBase
+    CAM: NodePath
     CAMERA: NodePath
     LENS: Lens
     LOADER: Loader.Loader
@@ -28,6 +29,7 @@ if TYPE_CHECKING:
     WIN: GraphicsWindow
 
 BASE = ShowBase.ShowBase()
+CAM = BASE.cam
 CAMERA = BASE.camera
 LENS = BASE.cam.node().get_lens()
 LOADER = BASE.loader
