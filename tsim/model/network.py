@@ -293,6 +293,11 @@ class Way(Entity):
         """Total length of the Way."""
         return sum(self.distances())
 
+    @cached_property
+    def weight(self) -> float:
+        """Weight of the Way for path finding."""
+        return self.length / self.max_speed
+
     @property
     def one_way(self) -> bool:
         """Whether the way accepts traffic in only one direction.
