@@ -18,6 +18,7 @@ from tsim.model.geometry import (BoundingRect, Point, Vector, distance,
                                  line_intersection, midpoint, angle)
 from tsim.model.index import INSTANCE as INDEX
 
+DEFAULT_MAX_SPEED_KPH = 60.0
 LANE_WIDTH = 3.0
 
 
@@ -279,6 +280,7 @@ class Way(Entity):
     end: Node
     lanes: Tuple[int, int]
     waypoints: Tuple[Point] = field(default_factory=tuple)
+    max_speed: float = field(default_factory=lambda: DEFAULT_MAX_SPEED_KPH)
 
     def __post_init__(self):
         self.start.starts.append(EntityRef(self))
