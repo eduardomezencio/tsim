@@ -2,26 +2,26 @@
 
 from itertools import chain, cycle, product
 
-from panda3d.core import (CardMaker, Geom, GeomNode, GeomTriangles,
-                          GeomTristrips, GeomVertexData, GeomVertexFormat,
-                          GeomVertexWriter, NodePath, TransparencyAttrib)
+from panda3d.core import (CardMaker, ConfigVariableDouble, Geom, GeomNode,
+                          GeomTriangles, GeomTristrips, GeomVertexData,
+                          GeomVertexFormat, GeomVertexWriter, NodePath,
+                          TransparencyAttrib)
 from PIL import Image
 import aggdraw
 
 from tsim.model.geometry import Vector, line_intersection_safe
 from tsim.model.network import LANE_WIDTH, Lane, Node
 from tsim.ui import textures
-from tsim.ui.constants import LEVEL_HEIGHT
 from tsim.ui.textures import create_texture
 
-COLORS = ('crimson', 'orange', 'gold', 'limegreen',
-          'turquoise', 'deepskyblue', 'blueviolet', 'hotpink')
-PPM = 32
-
-VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
 
 CARD_MAKER = CardMaker('lane_connections_card_maker')
 CARD_MAKER.set_frame((-16, 16, -16, 16))
+COLORS = ('crimson', 'orange', 'gold', 'limegreen',
+          'turquoise', 'deepskyblue', 'blueviolet', 'hotpink')
+LEVEL_HEIGHT = ConfigVariableDouble('level-height').get_value()
+PPM = 32
+VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
 
 
 def generate_mesh(node: Node) -> Geom:

@@ -1,13 +1,14 @@
 """Way object creation functions."""
 
-from panda3d.core import (Geom, GeomNode, GeomTristrips, GeomVertexData,
-                          GeomVertexFormat, GeomVertexWriter, NodePath)
+from panda3d.core import (ConfigVariableDouble, Geom, GeomNode, GeomTristrips,
+                          GeomVertexData, GeomVertexFormat, GeomVertexWriter,
+                          NodePath)
 
 from tsim.model.geometry import sec
 from tsim.model.network import LANE_WIDTH, OrientedWay, Way
 from tsim.ui import textures
-from tsim.ui.constants import LEVEL_HEIGHT
 
+LEVEL_HEIGHT = ConfigVariableDouble('level-height').get_value()
 VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
 
 
