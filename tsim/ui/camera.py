@@ -12,7 +12,7 @@ class Camera:
     DEFAULT_HEIGHT = 100.0
     DEFAULT_PITCH = 60.0
     DEFAULT_ROTATION = 0.0
-    DISTANCE_MIN = 1.0
+    DISTANCE_MIN = 4.0
     DISTANCE_MAX = 4000.0
     FAR = 7000.0
     FOCUS_HEIGHT = 2.0
@@ -51,14 +51,13 @@ class Camera:
         if move:
             scale = (p3d.CAMERA.get_z() + 10.0) * Camera.SPEED
             self.focus.set_pos(self.focus, dx * scale, dy * scale, 0.0)
+
         if is_down('zoom_in'):
-            p3d.CAMERA.set_pos(
-                0.0, 0.0, max(p3d.CAMERA.get_z() / Camera.ZOOM_RATIO - 1.0,
-                              Camera.DISTANCE_MIN))
+            p3d.CAMERA.set_z(max(p3d.CAMERA.get_z() / Camera.ZOOM_RATIO - 1.0,
+                                 Camera.DISTANCE_MIN))
         elif is_down('zoom_out'):
-            p3d.CAMERA.set_pos(
-                0.0, 0.0, min(p3d.CAMERA.get_z() * Camera.ZOOM_RATIO + 1.0,
-                              Camera.DISTANCE_MAX))
+            p3d.CAMERA.set_z(min(p3d.CAMERA.get_z() * Camera.ZOOM_RATIO + 1.0,
+                                 Camera.DISTANCE_MAX))
 
         if is_down('rot_right'):
             self.focus.set_h(self.focus, Camera.ROTATION_SPEED)
