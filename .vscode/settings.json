@@ -4,7 +4,7 @@
         "**/.tox": true,
         "**/__pycache__": true
     },
-    "python.pythonPath": "~/.virtualenvs/tsim/bin/python",
+    "python.pythonPath": ".venv/bin/python",
     "python.testing.unittestArgs": [
         "-v",
         "-s",

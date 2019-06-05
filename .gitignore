@@ -1,9 +1,10 @@
+__pycache__
+_test*
 .idea
 .mypy_cache
 .tox
+.venv
 .vscode/.ropeproject
 .vscode/tags
-__pycache__
-_test*
 *.egg-info
 *.shelf
