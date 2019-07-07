@@ -17,12 +17,11 @@ setup(
     url='https://github.com/eduardomezencio/tsim',
     author='Eduardo Mezêncio',
     author_email='eduardomezencio@protonmail.com',
-    classifiers=[
+    classifiers=[  # https://pypi.org/classifiers/
         'Development Status :: 3 - Alpha',  # 4 - Beta, 5 - Production/Stable
         'Intended Audience :: Education',
         'Intended Audience :: End Users/Desktop',
         'Intended Audience :: Science/Research',
-        # TODO: Add license here.  https://pypi.org/classifiers/
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.7',
         'Topic :: Games/Entertainment :: Simulation'

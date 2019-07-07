@@ -18,6 +18,7 @@ panda3d = "*"
 rtree = "*"
 aggdraw = "*"
 pillow = "*"
+fibheap = "*"
 
 [requires]
 python_version = "3.7"
