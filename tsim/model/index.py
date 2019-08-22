@@ -106,6 +106,21 @@ class EntityIndex:
             for key in EntityIndex.storage_fields:
                 data[key] = getattr(self, key)
 
+    def get_all(self, of_type: Type[Entity] = None,
+                where: Callable[[Entity], bool] = None) -> Iterator[Entity]:
+        """Get all entities with optional filters."""
+        def type_filter(entity):
+            return isinstance(entity, of_type)
+
+        filters = []
+        if of_type is not None:
+            filters.append(type_filter)
+        if where is not None:
+            filters.append(where)
+
+        yield from filter(lambda e: all(f(e) for f in filters),
+                          self.entities.values())
+
     def get_at(self, point: Point, radius: float = 10.0,
                of_type: Type[Entity] = None,
                where: Callable[[Entity], bool] = None) -> List[Entity]:
@@ -130,10 +145,10 @@ class EntityIndex:
 
         distances = {}
         filters = [distance_filter]
-        if where is not None:
-            filters.append(where)
         if of_type is not None:
             filters.append(type_filter)
+        if where is not None:
+            filters.append(where)
 
         return sorted(filter(lambda e: all(f(e) for f in filters),
                              map(self.entities.get,

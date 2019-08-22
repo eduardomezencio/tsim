@@ -18,7 +18,7 @@ panda3d = "*"
 rtree = "*"
 aggdraw = "*"
 pillow = "*"
-fibheap = "*"
+fibonacci-heap-mod = "*"
 
 [requires]
 python_version = "3.7"

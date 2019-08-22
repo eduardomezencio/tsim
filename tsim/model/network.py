@@ -47,6 +47,22 @@ class Node(Entity):
         """Lane connections on this node."""
         return self.calc_default_lane_connections()
 
+    @cached_property
+    def out_neighbors(self) -> Dict[Node, OrientedWay]:
+        """Get the outgoing connections to other nodes.
+
+        Each node that is an out-neighbor of this node is returned as a key in
+        the dictionary, with the oriented way that connects to this node with
+        minimum weight as the value.
+        """
+        neighbors: Dict[Node, OrientedWay] = {}
+        for way in filter(lambda w: w.lanes, self.oriented_ways):
+            other = way.way.other(self)
+            existing = neighbors.get(other, None)
+            if not existing or existing.weight < way.weight:
+                neighbors[other] = way
+        return neighbors
+
     @property
     def lane_connections_iter(self) -> Iterator[Tuple[Lane, Lane]]:
         """Lane connections as an iterator of lane tuples."""
@@ -294,9 +310,10 @@ class Way(Entity):
         return sum(self.distances())
 
     @cached_property
-    def weight(self) -> float:
-        """Weight of the Way for path finding."""
-        return self.length / self.max_speed
+    def weight(self) -> Tuple[float, float]:
+        """Weight of the Way in each direction, for path finding."""
+        weight = self.length / self.max_speed
+        return (weight, weight)
 
     @property
     def one_way(self) -> bool:
@@ -566,6 +583,28 @@ class OrientedWay(NamedTuple):
 
     way: Way
     endpoint: Way.Endpoint
+
+    @property
+    def start(self) -> Node:
+        """Get the source node of the way in this direction."""
+        return (self.way.start if self.endpoint is Way.Endpoint.START
+                else self.way.end)
+
+    @property
+    def end(self) -> Node:
+        """Get the target node of the way in this direction."""
+        return (self.way.end if self.endpoint is Way.Endpoint.START
+                else self.way.start)
+
+    @property
+    def lanes(self) -> int:
+        """Get the number of lanes of the way in this direction."""
+        return self.way.lanes[self.endpoint.value]
+
+    @property
+    def weight(self) -> float:
+        """Get the weight of the way in this direction."""
+        return self.way.weight[self.endpoint.value]
 
     def iterate_lanes(self, l_to_r: bool = True,
                       include_opposite: bool = False,

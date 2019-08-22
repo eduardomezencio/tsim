@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "2cd3646ea5219779aa1e434d3a3570475bdc60aef4e012cf99aa0b826d553626"
+            "sha256": "0966f69d983564a003499d060a8edbdbdcf503f2c58901a16d0dc9db4fdc1c8f"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -65,12 +65,12 @@
             "index": "pypi",
             "version": "==1.0.1"
         },
-        "fibheap": {
+        "fibonacci-heap-mod": {
             "hashes": [
-                "sha256:270fcca93e3cc7e2aab68a640e441686b509cc961d3ee9199dff9256a3649cb3"
+                "sha256:8889df116329d564cc347c7461b34c7dae0d65da3a9d23b52951d1b0a553c368"
             ],
             "index": "pypi",
-            "version": "==0.2.1"
+            "version": "==1.1"
         },
         "panda3d": {
             "hashes": [
