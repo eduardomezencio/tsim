@@ -3,6 +3,8 @@
 Just a parent node for the other objects, with the ground plane mesh.
 """
 
+from __future__ import annotations
+
 from itertools import product
 
 from panda3d.core import (DecalEffect, Geom, GeomNode, GeomTristrips,

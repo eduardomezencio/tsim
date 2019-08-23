@@ -1,4 +1,7 @@
 """Factory for creating nodes for entities."""
+
+from __future__ import annotations
+
 from panda3d.core import NodePath
 
 from tsim.model.entity import Entity

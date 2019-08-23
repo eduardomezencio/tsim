@@ -1,5 +1,7 @@
 """Implementation of Sky class."""
 
+from __future__ import annotations
+
 from typing import Tuple
 
 from panda3d.core import (AmbientLight, ConfigVariableBool, DirectionalLight,

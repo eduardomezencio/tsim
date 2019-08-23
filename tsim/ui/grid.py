@@ -1,5 +1,7 @@
 """Grid class implementation."""
 
+from __future__ import annotations
+
 from itertools import product
 from math import floor
 

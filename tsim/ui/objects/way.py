@@ -1,5 +1,7 @@
 """Way object creation functions."""
 
+from __future__ import annotations
+
 from panda3d.core import (ConfigVariableDouble, Geom, GeomNode, GeomTristrips,
                           GeomVertexData, GeomVertexFormat, GeomVertexWriter,
                           NodePath)

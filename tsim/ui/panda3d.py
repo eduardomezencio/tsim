@@ -1,5 +1,7 @@
 """Module to contain Panda3D globals."""
 
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 from direct.showbase import ShowBase

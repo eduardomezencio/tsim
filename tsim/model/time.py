@@ -4,6 +4,8 @@ Time is stored as an integer, representing microseconds from some undefined
 epoch.
 """
 
+from __future__ import annotations
+
 MICROSECOND = 1
 MILLISECOND = 1000 * MICROSECOND
 SECOND = 1000 * MILLISECOND

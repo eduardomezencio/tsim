@@ -1,5 +1,7 @@
 """Node object creation functions."""
 
+from __future__ import annotations
+
 from itertools import chain, cycle, product
 
 from panda3d.core import (CardMaker, ConfigVariableDouble, Geom, GeomNode,

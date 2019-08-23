@@ -1,5 +1,7 @@
 """Module to load, cache and retrieve textures."""
 
+from __future__ import annotations
+
 from collections import namedtuple
 from io import BytesIO
 

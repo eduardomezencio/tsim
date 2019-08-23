@@ -1,5 +1,7 @@
 """Cursor object for the UI."""
 
+from __future__ import annotations
+
 from functools import partial
 from itertools import islice
 from typing import Iterable, Type, Union
