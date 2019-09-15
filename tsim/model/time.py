@@ -6,6 +6,9 @@ epoch.
 
 from __future__ import annotations
 
+Timestamp = int
+Duration = int
+
 MICROSECOND = 1
 MILLISECOND = 1000 * MICROSECOND
 SECOND = 1000 * MILLISECOND

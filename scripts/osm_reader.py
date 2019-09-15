@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """Reader for openstreetmap xml files."""
 
+import logging as log
+import sys
 from collections import namedtuple
 from itertools import islice
 from math import asin, cos, radians, sin, sqrt
 from textwrap import wrap
 from typing import Dict
 from xml.etree import ElementTree
-import logging as log
-import sys
 
-from tsim.model.index import INSTANCE as INDEX
 from tsim.model.geometry import Point
-from tsim.model.network import Node, Way
+from tsim.model.index import INSTANCE as INDEX
+from tsim.model.network.node import Node
+from tsim.model.network.way import Way
 
 
 def main():

@@ -4,18 +4,18 @@ from __future__ import annotations
 
 from itertools import chain, cycle, product
 
+import aggdraw
 from panda3d.core import (CardMaker, ConfigVariableDouble, Geom, GeomNode,
                           GeomTriangles, GeomTristrips, GeomVertexData,
                           GeomVertexFormat, GeomVertexWriter, NodePath,
                           TransparencyAttrib)
 from PIL import Image
-import aggdraw
 
 from tsim.model.geometry import Vector, line_intersection_safe
-from tsim.model.network import LANE_WIDTH, Lane, Node
+from tsim.model.network.node import Node
+from tsim.model.network.way import HALF_LANE_WIDTH, LANE_WIDTH, Lane
 from tsim.ui import textures
 from tsim.ui.textures import create_texture
-
 
 CARD_MAKER = CardMaker('lane_connections_card_maker')
 CARD_MAKER.set_frame((-16, 16, -16, 16))
@@ -93,12 +93,12 @@ def create_lane_connections_image(node: Node) -> Image:
         first = right * Lane(*way, 0).distance_from_center()
         for lane in way.iterate_lanes(include_opposite=True):
             points[lane] = (
-                vector * (node.geometry.distance(way) + LANE_WIDTH * 0.5)
+                vector * (node.geometry.distance(way) + HALF_LANE_WIDTH)
                 + right * lane.index * LANE_WIDTH
                 + first + middle)
 
     crossings = {}
-    for source, dests in node.lane_connections.items():
+    for source, dests in node.intersection.connections.items():
         for lane1, lane2 in product((source,), dests):
             crossings[(lane1, lane2)] = line_intersection_safe(
                 points[lane1], vectors[lane1.oriented_way],

@@ -4,7 +4,8 @@ from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import NodePath, TextNode
 
 from tsim.model.index import INSTANCE as INDEX
-from tsim.model.network import Node, Way
+from tsim.model.network.node import Node
+from tsim.model.network.way import Way
 from tsim.ui.objects.node import create_lane_connections_card
 from tsim.ui.panda3d import LOADER, PIXEL2D, RENDER
 from tsim.ui.tools.tool import Tool

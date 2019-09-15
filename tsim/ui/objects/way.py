@@ -7,7 +7,7 @@ from panda3d.core import (ConfigVariableDouble, Geom, GeomNode, GeomTristrips,
                           NodePath)
 
 from tsim.model.geometry import sec
-from tsim.model.network import LANE_WIDTH, OrientedWay, Way
+from tsim.model.network.way import LANE_WIDTH, OrientedWay, Way
 from tsim.ui import textures
 
 LEVEL_HEIGHT = ConfigVariableDouble('level-height').get_value()

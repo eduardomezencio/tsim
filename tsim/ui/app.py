@@ -8,15 +8,16 @@ from direct.task import Task
 from panda3d.core import (AntialiasAttrib, ConfigVariableBool, NodePath,
                           RigidBodyCombiner)
 
+import tsim.ui.input as INPUT
+import tsim.ui.panda3d as p3d
 from tsim.model.index import INSTANCE as INDEX
-from tsim.model.network import Node, Way
+from tsim.model.network.node import Node
+from tsim.model.network.way import Way
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
 from tsim.ui.objects import factory, world
 from tsim.ui.sky import Sky
-import tsim.ui.panda3d as p3d
-import tsim.ui.input as INPUT
 
 
 class App:

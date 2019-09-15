@@ -24,7 +24,7 @@ class Entity(ABC):
 
     @cached_property
     def bounding_rect(self) -> BoundingRect:
-        """Bounding rectangle cached property."""
+        """Get the bounding rectangle for the entity."""
         return self.calc_bounding_rect()
 
     @property

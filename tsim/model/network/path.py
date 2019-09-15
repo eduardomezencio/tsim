@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+import sys
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import DefaultDict, Dict, List, Iterable, TYPE_CHECKING
-import sys
+from typing import TYPE_CHECKING, DefaultDict, Dict, Iterable, List
 
 from dataslots import with_slots
 from fibonacci_heap_mod import Fibonacci_heap as FibonacciHeap
 
 if TYPE_CHECKING:
     from fibonacci_heap_mod import Entry
-    from tsim.model.network import Node, OrientedWay
+    from tsim.model.network.node import Node
+    from tsim.model.network.way import OrientedWay
 
 SingleSourceMap = Dict[Node, OrientedWay]
 AllPairsMap = Dict[Node, SingleSourceMap]

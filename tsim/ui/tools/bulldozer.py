@@ -1,9 +1,9 @@
 """Bulldozer tool."""
 
-from tsim.model.index import INSTANCE as INDEX
-from tsim.model.network import Way
-from tsim.ui.tools.tool import Tool
 import tsim.ui.panda3d as p3d
+from tsim.model.index import INSTANCE as INDEX
+from tsim.model.network.way import Way
+from tsim.ui.tools.tool import Tool
 
 
 class Bulldozer(Tool):

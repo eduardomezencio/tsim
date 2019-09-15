@@ -1,11 +1,12 @@
 """Unit tests for path finding."""
-from itertools import product
 import unittest
+from itertools import product
 
 from tsim.model.geometry import Point
 from tsim.model.index import INSTANCE as INDEX
-from tsim.model.network import Node, Way
-from tsim.model.path import dijkstra
+from tsim.model.network.node import Node
+from tsim.model.network.path import dijkstra
+from tsim.model.network.way import Way
 
 INDEX.name = 'test'
 
