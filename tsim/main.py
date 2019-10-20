@@ -1,14 +1,12 @@
 """Definition of module main funcion."""
 
-import sys
-
 from tsim.model.index import INSTANCE as INDEX
 from tsim.ui.app import App
 
 
-def main():
+def main(index_name: str):
     """Tsim module main funcion."""
-    init_index(sys.argv[1])
+    init_index(index_name)
     try:
         App().run()
     except SystemExit:
@@ -17,6 +15,5 @@ def main():
 
 def init_index(name: str):
     """Initialize index from given index name."""
-    INDEX.name = name
-    INDEX.load()
+    INDEX.load(name)
     INDEX.register_updates = True
