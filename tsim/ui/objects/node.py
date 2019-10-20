@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from itertools import chain, cycle, product
+from itertools import chain, cycle
 
 import aggdraw
 from panda3d.core import (CardMaker, ConfigVariableDouble, Geom, GeomNode,
@@ -11,9 +11,9 @@ from panda3d.core import (CardMaker, ConfigVariableDouble, Geom, GeomNode,
                           TransparencyAttrib)
 from PIL import Image
 
-from tsim.model.geometry import Vector, line_intersection_safe
+from tsim.model.geometry import Vector
 from tsim.model.network.node import Node
-from tsim.model.network.way import HALF_LANE_WIDTH, LANE_WIDTH, Lane
+from tsim.model.network.way import LANE_WIDTH
 from tsim.ui import textures
 from tsim.ui.textures import create_texture
 
@@ -35,8 +35,7 @@ def generate_mesh(node: Node) -> Geom:
     normal_writer = GeomVertexWriter(vertex_data, 'normal')
     texcoord_writer = GeomVertexWriter(vertex_data, 'texcoord')
 
-    indexes = [[j for j in range(i - 1, i + 2)]
-               for i in range(0, size, 2)]
+    indexes = [range(i - 1, i + 2) for i in range(0, size, 2)]
     triangles = [[node.geometry.points[j] for j in t] for t in indexes]
 
     for point in node.geometry.points:
@@ -76,41 +75,31 @@ def create(parent: NodePath, node: Node) -> NodePath:
     return node_path
 
 
+MIDDLE = Vector(512, -512)
+
+
 def create_lane_connections_image(node: Node) -> Image:
     """Generate image showing lane connections on a node."""
     image = Image.new('RGBA', (1024, 1024))
     draw = aggdraw.Draw(image)
 
-    middle = Vector(512, -512)
-    colors = {w: c for w, c in zip(node.oriented_ways, cycle(COLORS))}
-    vectors = {w: w.way.direction_from_node(node, w.endpoint).normalized()
-               for w in node.oriented_ways}
+    colors = dict(zip(node.oriented_ways, cycle(COLORS)))
 
-    points = {}
-    for way in node.oriented_ways:
-        vector = vectors[way] * PPM
-        right = vector.rotated_right()
-        first = right * Lane(*way, 0).distance_from_center()
-        for lane in way.iterate_lanes(include_opposite=True):
-            points[lane] = (
-                vector * (node.geometry.distance(way) + HALF_LANE_WIDTH)
-                + right * lane.index * LANE_WIDTH
-                + first + middle)
-
-    crossings = {}
-    for source, dests in node.intersection.connections.items():
-        for lane1, lane2 in product((source,), dests):
-            crossings[(lane1, lane2)] = line_intersection_safe(
-                points[lane1], vectors[lane1.oriented_way],
-                points[lane2], vectors[lane2.oriented_way])
-
-    for lanes, crossing in crossings.items():
-        start, end = map(points.get, lanes)
-        start, crossing, end = map(Vector.y_flipped, (start, crossing, end))
+    for lanes, points in node.intersection.iterate_connections_curve_points():
+        start, crossing, end = map(Vector.y_flipped,
+                                   (p * PPM + MIDDLE for p in points))
         path = aggdraw.Path()
         path.moveto(*start)
         path.curveto(*start, *crossing, *end)
         draw.path(path, aggdraw.Pen(colors[lanes[0].oriented_way], 12))
+
+    pen = aggdraw.Pen('black', 4)
+    brush = aggdraw.Brush('white')
+
+    for curve in node.intersection.curves.values():
+        for rect in ((p.point * PPM + MIDDLE).y_flipped().enclosing_rect(16.0)
+                     for _, p in curve.conflict_points):
+            draw.ellipse(rect, pen, brush)
 
     draw.flush()
     # image.show()

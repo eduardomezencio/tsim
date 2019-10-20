@@ -87,9 +87,8 @@ class EntityIndex:
 
     def generate_rtree_from_entities(self):
         """Create empty rtree and add all entities to it."""
-        self.rtree = Rtree()
-        for id_, entity in self.entities.items():
-            self.rtree.add(id_, entity.bounding_rect)
+        self.rtree = Rtree((i, e.bounding_rect, None)
+                           for i, e in self.entities.items())
 
     def load(self):
         """Load entities from shelf."""
@@ -150,12 +149,11 @@ class EntityIndex:
         if where is not None:
             filters.append(where)
 
-        return sorted(filter(lambda e: all(f(e) for f in filters),
-                             map(self.entities.get,
-                                 self.rtree.intersection(
-                                     (point.x - radius, point.y - radius,
-                                      point.x + radius, point.y + radius)))),
-                      key=distances.get)
+        return sorted(
+            filter(lambda e: all(f(e) for f in filters),
+                   map(self.entities.get,
+                       self.rtree.intersection(point.enclosing_rect(radius)))),
+            key=distances.get)
 
 
 INSTANCE = EntityIndex()

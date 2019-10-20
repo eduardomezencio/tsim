@@ -131,6 +131,11 @@ class Vector:
         return (min(self.x, accumulated[0]), min(self.y, accumulated[1]),
                 max(self.x, accumulated[2]), max(self.y, accumulated[3]))
 
+    def enclosing_rect(self, radius: float) -> BoundingRect:
+        """Get rectangle with sides at 'radius' distance from point."""
+        return (self.x - radius, self.y - radius,
+                self.x + radius, self.y + radius)
+
     def y_flipped(self):
         """Get vector with y coordinate flipped."""
         return Vector(self.x, -self.y)

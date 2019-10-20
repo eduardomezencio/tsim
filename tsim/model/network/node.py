@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
-from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from itertools import chain, combinations, islice, product, repeat
-from math import pi
-from typing import DefaultDict, Deque, Dict, Iterator, List, Set, Tuple
+from itertools import chain, repeat
+from typing import Dict, Iterator, List, Set, Tuple
 
 from cached_property import cached_property
 from dataslots import with_slots
 
 from tsim.model.entity import Entity, EntityRef
-from tsim.model.geometry import (BoundingRect, Point, Vector, angle,
+from tsim.model.geometry import (BoundingRect, Point, Vector,
                                  line_intersection, midpoint)
 from tsim.model.index import INSTANCE as INDEX
+from tsim.model.network.intersection import Intersection
 from tsim.model.network.way import LANE_WIDTH, Lane, OrientedWay, Way
 
 
@@ -241,100 +240,3 @@ class NodeGeometry:
             projection, reflection = farthest.projection_reflection(direction)
             self.way_distances[i] = projection.norm()
             self.points[2 * i] = reflection
-
-
-LaneConnections = Dict['Lane', Set['Lane']]
-
-
-class Intersection:
-    """Intersection information for a node.
-
-    Contains lane connections and conflict points.
-    """
-
-    connections: LaneConnections
-
-    __slots__ = ('connections',)
-
-    def __init__(self, node: Node):
-        self.connections = build_lane_connections(node)
-
-
-def build_lane_connections(node: Node) -> LaneConnections:
-    """Calculate default lane connections for the given node."""
-    angles: List[float]
-    connections: DefaultDict[Lane, Set[Lane]]
-    new_conn: DefaultDict[Lane, Set[Lane]]
-    way: OrientedWay
-    ways: Deque[OrientedWay]
-
-    def iterate_new_conn() -> Iterator[Tuple[Lane, Lane]]:
-        for key, values in new_conn.items():
-            yield from product((key,), values)
-
-    def curvier(angle_a: float, angle_b: float) -> bool:
-        return int(abs(pi - angle_a) < abs(pi - angle_b))
-
-    def rotate_angles():
-        angles[0] = 2 * pi
-        size = len(angles)
-        angles[0:] = [angles[i + 1 - size] - angles[1]
-                      for i in range(size)]
-
-    def self_connect():
-        """Connect ways[0] to itself."""
-        connections.update({l: {o} for l, o in zip(
-            way.iterate_lanes(opposite_only=True),
-            way.iterate_lanes(l_to_r=False))})
-
-    def connect_to(index: int, other: OrientedWay) -> LaneConnections:
-        """Connect ways[0] to the given way."""
-        outwards = angles[index] > pi * 2.0 / 3.0
-        for source, dest in zip(way.iterate_lanes(l_to_r=not(outwards),
-                                                  opposite_only=True),
-                                other.iterate_lanes(outwards)):
-            new_conn[source].add(dest)
-            conn_angles[(source, dest)] = angles[index]
-
-    def resolve_conflicts():
-        """Leave only one connection when there are conflicts."""
-        to_remove = set()
-        for conn_1, conn_2 in combinations(iterate_new_conn(), 2):
-            if conn_1[0] == conn_2[0]:
-                continue
-            if conn_1 in to_remove or conn_2 in to_remove:
-                continue
-            conn = ((conn_2, conn_1) if conn_1[0].index > conn_2[0].index
-                    else (conn_1, conn_2))
-            angle_1, angle_2 = conn_angles[conn[0]], conn_angles[conn[1]]
-            if angle_1 > angle_2:
-                to_remove.add(conn[curvier(angle_1, angle_2)])
-        for conn in to_remove:
-            new_conn[conn[0]].remove(conn[1])
-
-    connections = defaultdict(set)
-    new_conn = defaultdict(set)
-    conn_angles = {}
-    ways = deque(node.sorted_ways())
-    if ways:
-        way = ways[0]
-        if len(ways) == 1:
-            self_connect()
-        else:
-            way_vector = way.way.direction_from_node(node, way.endpoint)
-
-            angles = [angle(way_vector, w.direction_from_node(node, d))
-                      if i > 0 else 0.0 for i, (w, d) in enumerate(ways)]
-
-            for _ in range(len(ways)):
-                new_conn.clear()
-                conn_angles.clear()
-                for i, way_ in islice(enumerate(ways), 1, None):
-                    connect_to(i, way_)
-                resolve_conflicts()
-                connections.update(new_conn)
-                ways.rotate(-1)
-                way = ways[0]
-                rotate_angles()
-
-    return connections
