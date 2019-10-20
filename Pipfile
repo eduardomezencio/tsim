@@ -5,20 +5,21 @@ verify_ssl = true
 
 [dev-packages]
 flake8 = "*"
-pylint = "*"
-pydocstyle = "*"
-radon = "*"
 ipython = "*"
+pydocstyle = "*"
+pylint = "*"
+radon = "*"
 rope = "*"
 
 [packages]
+aggdraw = "*"
+bezier = "*"
 cached-property = "*"
 dataslots = "*"
-panda3d = "*"
-rtree = "*"
-aggdraw = "*"
-pillow = "*"
 fibonacci-heap-mod = "*"
+panda3d = "*"
+pillow = "*"
+rtree = "*"
 
 [requires]
 python_version = "3.7"
