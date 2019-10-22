@@ -254,19 +254,16 @@ class Curve:
 
     __slots__ = ('_curve', '_conflict_points', '_sorted')
 
-    _curve: bezier.Curve
+    curve: bezier.Curve
+    length: float
     _conflict_points: List[Tuple[float, ConflictPoint]]
     _sorted: bool
 
     def __init__(self, curve: bezier.Curve):
-        self._curve = curve
+        self.curve = curve
+        self.length = curve.length
         self._conflict_points = []
         self._sorted = True
-
-    @property
-    def curve(self):
-        """Get the bezier curve."""
-        return self._curve
 
     @property
     def conflict_points(self) -> Iterator(Tuple[float, ConflictPoint]):
@@ -292,8 +289,8 @@ class Curve:
 
     def intersect(self, other: Curve) -> numpy.ndarray:
         """Calculate intersection of bezier curves."""
-        return self._curve.intersect(other.curve)
+        return self.curve.intersect(other.curve)
 
     def evaluate(self, param: float) -> Point:
         """Evaluate bezier curve at t=param."""
-        return Point(*chain.from_iterable(self._curve.evaluate(param)))
+        return Point(*chain.from_iterable(self.curve.evaluate(param)))
