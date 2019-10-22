@@ -15,8 +15,8 @@ if TYPE_CHECKING:
     from tsim.model.network.node import Node
     from tsim.model.network.way import OrientedWay
 
-SingleSourceMap = Dict[Node, OrientedWay]
-AllPairsMap = Dict[Node, SingleSourceMap]
+    SingleSourceMap = Dict[Node, OrientedWay]
+    AllPairsMap = Dict[Node, SingleSourceMap]
 
 INF = sys.float_info.max
 

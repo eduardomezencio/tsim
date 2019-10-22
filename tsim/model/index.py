@@ -43,9 +43,9 @@ class EntityIndex:
     @property
     def filename(self) -> str:
         """Name with extension added."""
-        if self.name.endswith('.' + EntityIndex.extension):
+        if self.name.endswith(f'.{EntityIndex.extension}'):
             return self.name
-        return '.'.join((self.name, EntityIndex.extension))
+        return f'{self.name}.{EntityIndex.extension}'
 
     def add(self, entity: Entity):
         """Add entity to index."""
