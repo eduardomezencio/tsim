@@ -90,8 +90,14 @@ class EntityIndex:
         self.rtree = Rtree((i, e.bounding_rect, None)
                            for i, e in self.entities.items())
 
-    def load(self):
-        """Load entities from shelf."""
+    def load(self, name=None):
+        """Load entities from shelf.
+
+        Load enities using the this index name. If a name is passed as
+        argument, will set the index name before loading.
+        """
+        if name is not None:
+            self.name = name
         with shelve.open(self.filename) as data:
             for key in EntityIndex.storage_fields:
                 value = data.get(key, None)
