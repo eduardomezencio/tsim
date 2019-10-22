@@ -125,7 +125,7 @@ def build_lane_connections(node: Node) -> LaneConnections:
         else:
             way_vector = way.way.direction_from_node(node, way.endpoint)
 
-            angles = [angle(way_vector, w.direction_from_node(node, d))
+            angles = [angle(way_vector, w().direction_from_node(node, d))
                       if i > 0 else 0.0 for i, (w, d) in enumerate(ways)]
 
             for _ in range(len(ways)):

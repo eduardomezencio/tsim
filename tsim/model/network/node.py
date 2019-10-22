@@ -76,7 +76,7 @@ class Node(Entity):
     @property
     def oriented_ways(self) -> Iterator[OrientedWay]:
         """Get incident ways with orentation (endpoint)."""
-        return (OrientedWay(r.value, e) for r, e in chain(
+        return (OrientedWay.build(r.value, e) for r, e in chain(
             zip(self.starts, repeat(Way.Endpoint.START)),
             zip(self.ends, repeat(Way.Endpoint.END))))
 
@@ -213,10 +213,10 @@ class NodeGeometry:
 
     def _calc_points(self, ways: List[OrientedWay]):
         """Calculate points for the geometric bounds of the node."""
-        directions = tuple(w.direction_from_node(self.node, e).normalized()
+        directions = tuple(w().direction_from_node(self.node, e).normalized()
                            for w, e in ways)
         for i, (way, _) in enumerate(ways):
-            half_widths = tuple(w.total_lanes * LANE_WIDTH / 2
+            half_widths = tuple(w().total_lanes * LANE_WIDTH / 2
                                 for w in (ways[i - 1][0], way))
             # Points relative to the node position.
             points = (directions[i - 1].rotated_left() * half_widths[0],

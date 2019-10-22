@@ -35,7 +35,7 @@ def generate_mesh(way: Way) -> Geom:
     vector = way.direction_from_node(way.start,
                                      Way.Endpoint.START).normalized()
     point = way.start.position + vector * way.start.geometry.distance(
-        OrientedWay(way, Way.Endpoint.START))
+        OrientedWay.build(way, Way.Endpoint.START))
     width_vector = half_width * vector.rotated_left()
     for vertex in (point + width_vector, point - width_vector):
         vertex_writer.add_data3f(vertex.x, vertex.y, start_z)
@@ -65,7 +65,7 @@ def generate_mesh(way: Way) -> Geom:
     texture_v += abs(vector) / LANE_WIDTH
     vector = vector.normalized()
     point = way.end.position + vector * way.end.geometry.distance(
-        OrientedWay(way, Way.Endpoint.END))
+        OrientedWay.build(way, Way.Endpoint.END))
     width_vector = half_width * vector.rotated_right()
     for vertex in (point + width_vector, point - width_vector):
         vertex_writer.add_data3f(vertex.x, vertex.y, end_z)

@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from itertools import accumulate, chain, islice
 from math import sqrt
-from typing import TYPE_CHECKING, Iterator, NamedTuple, Tuple
+from typing import TYPE_CHECKING, Any, Iterator, NamedTuple, Optional, Tuple
+from weakref import ref, ReferenceType
 
 from cached_property import cached_property
 from dataslots import with_slots
@@ -49,6 +50,7 @@ class Way(Entity):
     lanes: Tuple[int, int]
     waypoints: Tuple[Point] = field(default_factory=tuple)
     max_speed: float = field(default_factory=lambda: DEFAULT_MAX_SPEED_KPH)
+    __weakref__: Any = field(init=False)
 
     def __post_init__(self):
         self.start.starts.append(EntityRef(self))
@@ -219,7 +221,7 @@ class Way(Entity):
             0 if opposite_only else self.lanes[direction.value])
 
         for i in lanes if l_to_r else reversed(lanes):
-            yield Lane(self, direction, i)
+            yield Lane.build(self, direction, i)
 
     def disconnect(self, node: Node):
         """Disconnect this way from a node.
@@ -276,8 +278,18 @@ class OrientedWay(NamedTuple):
     given Way in the direction starting from the given Endpoint.
     """
 
-    way: Way
+    way_ref: ReferenceType
     endpoint: Way.Endpoint
+
+    @staticmethod
+    def build(way: Way, endpoint: Way.Endpoint):
+        """Create OrientedWay from a Way instead of a weak reference."""
+        return OrientedWay(ref(way), endpoint)
+
+    @property
+    def way(self) -> Optional[Way]:
+        """Get the referenced way."""
+        return self.way_ref()
 
     @property
     def start(self) -> Node:
@@ -322,21 +334,31 @@ class Lane(NamedTuple):
     lanes in that direction.
     """
 
-    way: Way
+    way_ref: ReferenceType
     endpoint: Way.Endpoint
     index: int
+
+    @staticmethod
+    def build(way: Way, endpoint: Way.Endpoint, index: int):
+        """Create Lane from a Way instead of a weak reference."""
+        return Lane(ref(way), endpoint, index)
+
+    @property
+    def way(self) -> Optional[Way]:
+        """Get the referenced way."""
+        return self.way_ref()
 
     @property
     def positive(self):
         """Get equivalent lane with positive index."""
         if self.index >= 0:
             return self
-        return Lane(self.way, self.endpoint.other, -self.index - 1)
+        return Lane(self.way_ref, self.endpoint.other, -self.index - 1)
 
     @property
     def oriented_way(self):
         """Get oriented way from this lane."""
-        return OrientedWay(self.way, self.endpoint)
+        return OrientedWay(self.way_ref, self.endpoint)
 
     def distance_from_center(self) -> float:
         """Get distance to the right from way center to the lane."""
