@@ -16,7 +16,19 @@ from tsim.ui import textures
 VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
 
 
-def generate_mesh(radius: float, count: int) -> Geom:
+def create(parent: NodePath, radius: float, count: int) -> NodePath:
+    """Create and add the ground plane to the scene."""
+    geom = _generate_mesh(radius, count)
+    node = GeomNode('world')
+    node.add_geom(geom)
+
+    node_path = parent.attach_new_node(node)
+    node_path.set_texture(textures.get('ground'))
+    node_path.set_effect(DecalEffect.make())
+    return node_path
+
+
+def _generate_mesh(radius: float, count: int) -> Geom:
     """Generate mesh for the ground plane."""
     vertex_data = GeomVertexData('ground', VERTEX_FORMAT, Geom.UH_static)
     vertex_data.set_num_rows(count ** 2)
@@ -40,15 +52,3 @@ def generate_mesh(radius: float, count: int) -> Geom:
     primitive.close_primitive()
     geom.add_primitive(primitive)
     return geom
-
-
-def create(parent: NodePath, radius: float, count: int) -> NodePath:
-    """Create and add the ground plane to the scene."""
-    geom = generate_mesh(radius, count)
-    node = GeomNode('world')
-    node.add_geom(geom)
-
-    node_path = parent.attach_new_node(node)
-    node_path.set_texture(textures.get('ground'))
-    node_path.set_effect(DecalEffect.make())
-    return node_path

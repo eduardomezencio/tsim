@@ -12,9 +12,9 @@ from weakref import ref, ReferenceType
 from cached_property import cached_property
 from dataslots import with_slots
 
+import tsim.model.index as Index
 from tsim.model.entity import Entity, EntityRef
 from tsim.model.geometry import BoundingRect, Point, Vector, distance
-from tsim.model.index import INSTANCE as INDEX
 
 if TYPE_CHECKING:
     from tsim.model.network.node import Node
@@ -113,10 +113,8 @@ class Way(Entity):
     def points(self, skip=0, reverse=False) -> Iterator[Point]:
         """Get generator for points in order, including nodes and waypoints."""
         if reverse:
-            # pylint: disable=bad-reversed-sequence
             iterator = chain((self.end.position,), reversed(self.waypoints),
                              (self.start.position,))
-            # pylint: enable=bad-reversed-sequence
         else:
             iterator = chain((self.start.position,), self.waypoints,
                              (self.end.position,))
@@ -144,7 +142,6 @@ class Way(Entity):
         vector pointing to the right side of the road. One is returned for each
         node or waypoint on the way.
         """
-        # pylint: disable=unsubscriptable-object
         other = self.waypoints[0] if self.waypoints else self.end.position
         yield (other - self.start.position).rotated_left().normalized()
 
@@ -155,7 +152,6 @@ class Way(Entity):
 
         other = self.waypoints[-1] if self.waypoints else self.start.position
         yield (self.end.position - other).rotated_left().normalized()
-        # pylint: enable=unsubscriptable-object
 
     def edge_normals(self) -> Iterator[Vector]:
         """Get the 'normals' of this way's edges.
@@ -252,9 +248,9 @@ class Way(Entity):
         nodes = {self.start, self.end} - {None}
         for node in nodes:
             self.disconnect(node)
-            INDEX.updated(node)
+            Index.INSTANCE.updated(node)
             for way in node.ways:
-                INDEX.updated(way)
+                Index.INSTANCE.updated(way)
 
         result = set()
         for node in nodes:
@@ -309,6 +305,11 @@ class OrientedWay(NamedTuple):
         return self.way.lanes[self.endpoint.value]
 
     @property
+    def length(self) -> float:
+        """Get the length of the way."""
+        return self.way.length
+
+    @property
     def weight(self) -> float:
         """Get the weight of the way in this direction."""
         return self.way.weight[self.endpoint.value]
@@ -322,6 +323,10 @@ class OrientedWay(NamedTuple):
         """
         return self.way.iterate_lanes(self.endpoint, l_to_r, include_opposite,
                                       opposite_only)
+
+    def points(self, skip=0) -> Iterator[Point]:
+        """Get generator for points in order, including nodes and waypoints."""
+        return self.way.points(skip, self.endpoint is Way.Endpoint.END)
 
 
 class Lane(NamedTuple):

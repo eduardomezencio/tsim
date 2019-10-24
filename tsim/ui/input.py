@@ -9,14 +9,14 @@ import tsim.ui.panda3d as p3d
 
 ACTIONS = ('left', 'right', 'up', 'down', 'zoom_in', 'zoom_out',
            'rot_right', 'rot_left', 'pitch_up', 'pitch_down',
-           'tool_1', 'tool_2')
+           'tool_1', 'tool_2', 'tool_3')
 
 MAPPING = {
     'w': 'up', 'a': 'left', 's': 'down', 'd': 'right',
     '+': 'zoom_in', '-': 'zoom_out',
     'q': 'rot_left', 'e': 'rot_right',
     'r': 'pitch_up', 'f': 'pitch_down',
-    'mouse1': 'tool_1', 'mouse2': 'tool_2'
+    'mouse1': 'tool_1', 'mouse2': 'tool_2', 'mouse3': 'tool_3'
 }
 
 KEYS = {k: False for k in ACTIONS}

@@ -5,13 +5,15 @@ from __future__ import annotations
 import sys
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, DefaultDict, Dict, Iterable, List
+from itertools import islice
+from typing import TYPE_CHECKING, DefaultDict, Dict, Iterable, Iterator, List
 
 from dataslots import with_slots
 from fibonacci_heap_mod import Fibonacci_heap as FibonacciHeap
 
 if TYPE_CHECKING:
     from fibonacci_heap_mod import Entry
+    from tsim.model.geometry import Point
     from tsim.model.network.node import Node
     from tsim.model.network.way import OrientedWay
 
@@ -49,11 +51,9 @@ def dijkstra(source: Node) -> SingleSourceMap:
             new_dist = node_info.dist + way.weight
             if new_dist < neighbor_info.dist:
                 if neighbor_info.dist == INF:
-                    neighbor_info.entry = queue.enqueue(neighbor,
-                                                        neighbor_info.dist)
+                    neighbor_info.entry = queue.enqueue(neighbor, new_dist)
                 else:
-                    queue.decrease_key_unchecked(neighbor_info.entry,
-                                                 neighbor_info.dist)
+                    queue.decrease_key_unchecked(neighbor_info.entry, new_dist)
                 neighbor_info.dist = new_dist
                 neighbor_info.prev = way
 
@@ -80,12 +80,23 @@ class Path:
     @property
     def length(self) -> float:
         """Get the total length of the path."""
-        return sum(w.lenth for w in self.ways)
+        return sum(w.length for w in self.ways)
 
     @property
     def weight(self) -> float:
         """Get the total weight of the path."""
         return sum(w.weight for w in self.ways)
+
+    def points(self) -> Iterator[Point]:
+        """Get generator for points in order, including nodes and waypoints.
+
+        This is meant to be used as a helper for drawing the path.
+        """
+        if not self.ways:
+            return
+        yield from self.ways[0].points()
+        for way in islice(self.ways, 1, None):
+            yield from way.points(1)
 
 
 class PathMap:
@@ -93,17 +104,22 @@ class PathMap:
 
     all_pairs: AllPairsMap
 
-    def __init__(self, nodes: Iterable[Node]):
-        self.all_pairs = {n: dijkstra(n) for n in nodes}
+    def __init__(self, nodes: Iterable[Node] = None):
+        self.all_pairs = {n: dijkstra(n) for n in (nodes or ())}
 
     def path(self, source: Node, dest: Node) -> Path:
         """Get path from source node to dest node.
 
         Can return None if there is no path between the given nodes.
         """
-        result = deque()
-        single_source = self.all_pairs[source]
+        try:
+            single_source = self.all_pairs[source]
+        except KeyError:
+            single_source = dijkstra(source)
+            self.all_pairs[source] = single_source
+
         # Get last way of the path and build it backwards
+        result = deque()
         way = single_source.get(dest, None)
         while way:
             result.appendleft(way)

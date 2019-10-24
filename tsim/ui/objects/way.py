@@ -14,7 +14,18 @@ LEVEL_HEIGHT = ConfigVariableDouble('level-height').get_value()
 VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
 
 
-def generate_mesh(way: Way) -> Geom:
+def create(parent: NodePath, way: Way) -> NodePath:
+    """Create node for given way and attach it to the parent."""
+    geom = _generate_mesh(way)
+    node = GeomNode(str(way.id))
+    node.add_geom(geom)
+    node.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
+    node_path = parent.attach_new_node(node)
+    node_path.set_texture(textures.get('road'), 1)
+    return node_path
+
+
+def _generate_mesh(way: Way) -> Geom:
     """Generate mesh for a Way."""
     vertex_data = GeomVertexData(str(way.id), VERTEX_FORMAT, Geom.UH_static)
     vertex_data.set_num_rows(4 + 2 * len(way.waypoints))
@@ -79,14 +90,3 @@ def generate_mesh(way: Way) -> Geom:
     geom = Geom(vertex_data)
     geom.add_primitive(primitive)
     return geom
-
-
-def create(parent: NodePath, way: Way) -> NodePath:
-    """Create node for given way and attach it to the parent."""
-    geom = generate_mesh(way)
-    node = GeomNode(str(way.id))
-    node.add_geom(geom)
-    node.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
-    node_path = parent.attach_new_node(node)
-    node_path.set_texture(textures.get('road'), 1)
-    return node_path

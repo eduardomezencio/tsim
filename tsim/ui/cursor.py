@@ -74,6 +74,9 @@ class Cursor(DirectObject):
             for key in INPUT.keys_for('tool_2'):
                 self.accept(key, self._tool.on_button2_press)
                 self.accept(f'{key}-up', self._tool.on_button2_release)
+            for key in INPUT.keys_for('tool_3'):
+                self.accept(key, self._tool.on_button3_press)
+                self.accept(f'{key}-up', self._tool.on_button3_release)
             self.accept('cursor_move', self._tool.on_cursor_move)
 
     def update(self):

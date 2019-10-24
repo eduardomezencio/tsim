@@ -33,6 +33,12 @@ class Tool(ABC):
     def on_button2_release(self):
         """Button 2 released callback."""
 
+    def on_button3_press(self):
+        """Button 3 pressed callback."""
+
+    def on_button3_release(self):
+        """Button 3 released callback."""
+
     def on_cursor_move(self):
         """Cursor moved callback."""
 

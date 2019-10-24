@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import acos, copysign, pi, sqrt
+from math import acos, copysign, cos, pi, sin, sqrt
 from typing import Tuple
 
 from dataslots import with_slots
@@ -199,6 +199,11 @@ class Vector:
     def rotated_right(self) -> Vector:
         """Get vector rotated clockwise by 90 degrees."""
         return Vector(self.y, -self.x)
+
+    def rotated(self, radians: float):
+        """Get vector rotated counterclockwise by given angle."""
+        return Vector(self.x * cos(radians) - self.y * sin(radians),
+                      self.x * sin(radians) + self.y * cos(radians))
 
     def sorting_key(self) -> float:
         """Calculate a key for sorting vectors by angle (by direction)."""

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from math import pi
+
 from itertools import chain, cycle
 
 import aggdraw
@@ -22,11 +24,38 @@ CARD_MAKER.set_frame((-16, 16, -16, 16))
 COLORS = ('crimson', 'orange', 'gold', 'limegreen',
           'turquoise', 'deepskyblue', 'blueviolet', 'hotpink')
 LEVEL_HEIGHT = ConfigVariableDouble('level-height').get_value()
+MIDDLE = Vector(512, -512)
 PPM = 32
 VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
 
 
-def generate_mesh(node: Node) -> Geom:
+def create(parent: NodePath, node: Node) -> NodePath:
+    """Create node for given node and attach it to the parent."""
+    geom = _generate_mesh(node)
+    node_ = GeomNode(str(node.id))
+    node_.add_geom(geom)
+    node_.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
+    node_path = parent.attach_new_node(node_)
+    node_path.set_texture(textures.get('intersection'))
+    return node_path
+
+
+def create_lane_connections_card(node: Node, parent: NodePath) -> NodePath:
+    """Create textured mesh showing lane connectins and attach it."""
+    image = _create_lane_connections_image(node)
+    texture = create_texture(image)
+    image.close()
+
+    card = parent.attach_new_node(CARD_MAKER.generate())
+    card.set_pos((*node.position, 0.25))
+    card.look_at(card, (0.0, 0.0, -1.0))
+    card.set_texture(texture)
+    card.set_transparency(TransparencyAttrib.M_alpha)
+    card.set_shader_off()
+    return card
+
+
+def _generate_mesh(node: Node) -> Geom:
     """Generate mesh for a Node."""
     size = len(node.geometry.points)
     vertex_data = GeomVertexData(str(node.id), VERTEX_FORMAT, Geom.UH_static)
@@ -64,21 +93,7 @@ def generate_mesh(node: Node) -> Geom:
     return geom
 
 
-def create(parent: NodePath, node: Node) -> NodePath:
-    """Create node for given node and attach it to the parent."""
-    geom = generate_mesh(node)
-    node_ = GeomNode(str(node.id))
-    node_.add_geom(geom)
-    node_.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
-    node_path = parent.attach_new_node(node_)
-    node_path.set_texture(textures.get('intersection'))
-    return node_path
-
-
-MIDDLE = Vector(512, -512)
-
-
-def create_lane_connections_image(node: Node) -> Image:
+def _create_lane_connections_image(node: Node) -> Image:
     """Generate image showing lane connections on a node."""
     image = Image.new('RGBA', (1024, 1024))
     draw = aggdraw.Draw(image)
@@ -88,13 +103,16 @@ def create_lane_connections_image(node: Node) -> Image:
     for lanes, points in node.intersection.iterate_connections_curve_points():
         start, crossing, end = map(Vector.y_flipped,
                                    (p * PPM + MIDDLE for p in points))
+        vector = lanes[1].way.direction_from_node(node, lanes[1].endpoint)
+        vector = vector.normalized().rotated(pi * 1.25).y_flipped() * 32.0
         path = aggdraw.Path()
         path.moveto(*start)
         path.curveto(*start, *crossing, *end)
-        draw.path(path, aggdraw.Pen(colors[lanes[0].oriented_way], 12))
+        path.lineto(*(end + vector))
+        draw.path(path, aggdraw.Pen(colors[lanes[0].oriented_way], 12, 192))
 
-    pen = aggdraw.Pen('black', 4)
-    brush = aggdraw.Brush('white')
+    pen = aggdraw.Pen('black', 4, 192)
+    brush = aggdraw.Brush('white', 128)
 
     for curve in node.intersection.curves.values():
         for rect in ((p.point * PPM + MIDDLE).y_flipped().enclosing_rect(16.0)
@@ -104,18 +122,3 @@ def create_lane_connections_image(node: Node) -> Image:
     draw.flush()
     # image.show()
     return image
-
-
-def create_lane_connections_card(node: Node, parent: NodePath) -> NodePath:
-    """Create textured mesh showing lane connectins and attach it."""
-    image = create_lane_connections_image(node)
-    texture = create_texture(image)
-    image.close()
-
-    card = parent.attach_new_node(CARD_MAKER.generate())
-    card.set_pos((*node.position, 0.25))
-    card.look_at(card, (0.0, 0.0, -1.0))
-    card.set_texture(texture)
-    card.set_transparency(TransparencyAttrib.M_alpha)
-    card.set_shader_off()
-    return card

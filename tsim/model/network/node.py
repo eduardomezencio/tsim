@@ -9,10 +9,10 @@ from typing import Dict, Iterator, List, Set, Tuple
 from cached_property import cached_property
 from dataslots import with_slots
 
+import tsim.model.index as Index
 from tsim.model.entity import Entity, EntityRef
 from tsim.model.geometry import (BoundingRect, Point, Vector,
                                  line_intersection, midpoint)
-from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network.intersection import Intersection
 from tsim.model.network.way import LANE_WIDTH, Lane, OrientedWay, Way
 
@@ -92,7 +92,7 @@ class Node(Entity):
 
     def reset_connections(self):
         """Invalidate geometry and lane connections."""
-        for key in ('geometry', 'intersection'):
+        for key in ('geometry', 'intersection', 'out_neighbors'):
             try:
                 del self.__dict__[key]
             except KeyError:
@@ -129,10 +129,9 @@ class Node(Entity):
     def dissolve(self, delete_if_dissolved=False):
         """Remove a node joining the two ways it connects."""
         two_ways = len(self.starts) + len(self.ends) == 2
-        # pylint: disable=unsubscriptable-object
         loops = (self.starts and self.ends and
                  self.starts[0].value is self.ends[0].value)
-        # pylint: enable=unsubscriptable-object
+
         if not two_ways or loops:
             raise ValueError(
                 'Can only dissolve nodes connected to exactly two ways.')
@@ -168,10 +167,10 @@ class Node(Entity):
         lanes = ways[0].lanes if ways[0].end is self else ways[0].swapped_lanes
         way = Way(start, end, lanes=lanes, waypoints=tuple(waypoints))
         way.xid = ways[0].xid if ways[0].xid is not None else ways[1].xid
-        INDEX.add(way)
+        Index.INSTANCE.add(way)
 
         if delete_if_dissolved:
-            INDEX.delete(self)
+            Index.INSTANCE.delete(self)
 
     def on_delete(self):
         """Disconnect this node from the network.

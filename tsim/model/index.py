@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from itertools import count
-from typing import (Callable, ClassVar, Dict, Iterator, List, Tuple, Type,
-                    Union)
+from typing import (Callable, ClassVar, Dict, Iterator, List, Optional, Tuple,
+                    Type, Union)
 import logging as log
 import shelve
 
@@ -12,6 +12,7 @@ from rtree.index import Rtree
 
 from tsim.model.entity import Entity
 from tsim.model.geometry import Point
+from tsim.model.network.path import PathMap
 
 
 class EntityIndex:
@@ -21,8 +22,8 @@ class EntityIndex:
     a way than can be queried by id or by spatial coordinates.
     """
 
-    __slots__ = ('name', 'id_count', 'entities', 'rtree', 'register_updates',
-                 '_updates')
+    __slots__ = ('name', 'id_count', 'entities', 'rtree', 'path_map',
+                 'register_updates', '_updates')
 
     extension: ClassVar[str] = 'shelf'
     storage_fields: ClassVar[Tuple[str]] = ('id_count', 'entities')
@@ -31,12 +32,15 @@ class EntityIndex:
     id_count: count
     entities: Dict[int, Entity]
     rtree: Rtree
+    path_map: PathMap
+    register_updates: bool
 
     def __init__(self, name: str = None):
         self.name = name
         self.id_count = count()
         self.entities = {}
         self.rtree = Rtree()
+        self.path_map = PathMap()
         self.register_updates = False
         self._updates = set()
 
@@ -54,6 +58,7 @@ class EntityIndex:
             self.entities[entity.id] = entity
             self.rtree.insert(entity.id, entity.bounding_rect)
             self.updated(entity)
+            self.rebuild_path_map()
             log.debug('[index] Added %s', entity)
 
     def delete(self, entity: Entity):
@@ -66,6 +71,7 @@ class EntityIndex:
             self.rtree.delete(entity.id, entity.bounding_rect)
             to_remove.update(entity.on_delete() or ())
             self.updated(entity)
+            self.rebuild_path_map()
             log.debug('[index] Removed %s', entity)
 
     def updated(self, entity: Union[Entity, int]):
@@ -90,7 +96,7 @@ class EntityIndex:
         self.rtree = Rtree((i, e.bounding_rect, None)
                            for i, e in self.entities.items())
 
-    def load(self, name=None):
+    def load(self, name: Optional[str] = None):
         """Load entities from shelf.
 
         Load enities using the this index name. If a name is passed as
@@ -104,6 +110,7 @@ class EntityIndex:
                 if value:
                     setattr(self, key, value)
         self.generate_rtree_from_entities()
+        self.rebuild_path_map()
 
     def save(self):
         """Save entities to shelf."""
@@ -160,6 +167,10 @@ class EntityIndex:
                    map(self.entities.get,
                        self.rtree.intersection(point.enclosing_rect(radius)))),
             key=distances.get)
+
+    def rebuild_path_map(self):
+        """Rebuild the path map, invalidating the old map."""
+        self.path_map = PathMap()
 
 
 INSTANCE = EntityIndex()

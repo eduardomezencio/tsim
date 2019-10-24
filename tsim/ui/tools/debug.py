@@ -44,7 +44,7 @@ class Debug(Tool):
 
     def on_cursor_move(self):
         """Cursor moved callback."""
-        self.hud_text.setText(f'{self.cursor.position.x:.2f} '
+        self.hud_text.text = (f'{self.cursor.position.x:.2f} '
                               f'{self.cursor.position.y:.2f}')
 
     def cleanup(self):
