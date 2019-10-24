@@ -6,6 +6,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from itertools import chain, combinations, islice, product
 from math import pi
+from statistics import median_low
 from typing import (TYPE_CHECKING, DefaultDict, Deque, Dict, Iterator, List,
                     Set, Tuple)
 
@@ -205,6 +206,7 @@ def build_conflict_points(curves: Dict[LaneConnection, Curve]):
 
 def merge_points(points: Dict[int, ConflictPoint], rtree: Rtree):
     """Merge conflict points closer than MERGE_RADIUS."""
+    curves = set()
     merged = set()
     for id_, point in points.items():
         if id_ in merged:
@@ -215,11 +217,15 @@ def merge_points(points: Dict[int, ConflictPoint], rtree: Rtree):
                 continue
             other = points[other_id]
             for curve in other.curves:
+                curves.add(curve)
                 curve.replace_conflict_point(other, point)
             merged.add(other_id)
             rtree.delete(other_id, other.point.bounding_rect)
     for id_ in merged:
         del points[id_]
+
+    for curve in curves:
+        curve.remove_conflict_point_duplicates()
 
 
 def fill_neighbors(points: Dict[int, ConflictPoint], rtree: Rtree):
@@ -285,7 +291,19 @@ class Curve:
             if point is old:
                 self._conflict_points[i] = (param, new)
                 new.curves.add(self)
-                break
+                return
+        raise Exception('Old conflict point not found in curve.')
+
+    def remove_conflict_point_duplicates(self):
+        """Let each conflict point appear only once on this curve."""
+        point_map = defaultdict(list)
+        for param, cpoint in self.conflict_points:
+            point_map[cpoint].append(param)
+        for cpoint, params in list(point_map.items()):
+            if len(params) > 1:
+                params.remove(median_low(params))
+            for param in params:
+                self._conflict_points.remove((param, cpoint))
 
     def intersect(self, other: Curve) -> numpy.ndarray:
         """Calculate intersection of bezier curves."""

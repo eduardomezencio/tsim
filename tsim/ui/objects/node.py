@@ -104,20 +104,21 @@ def _create_lane_connections_image(node: Node) -> Image:
         start, crossing, end = map(Vector.y_flipped,
                                    (p * PPM + MIDDLE for p in points))
         vector = lanes[1].way.direction_from_node(node, lanes[1].endpoint)
-        vector = vector.normalized().rotated(pi * 1.25).y_flipped() * 32.0
+        vector = vector.normalized().rotated(pi * 1.125).y_flipped() * 32.0
         path = aggdraw.Path()
         path.moveto(*start)
         path.curveto(*start, *crossing, *end)
         path.lineto(*(end + vector))
-        draw.path(path, aggdraw.Pen(colors[lanes[0].oriented_way], 12, 192))
+        draw.path(path, aggdraw.Pen(colors[lanes[0].oriented_way], 12, 224))
 
-    pen = aggdraw.Pen('black', 4, 192)
-    brush = aggdraw.Brush('white', 128)
+    pen = aggdraw.Pen('black', 1, 192)
+    brush = aggdraw.Brush('white', 192)
 
-    for curve in node.intersection.curves.values():
-        for rect in ((p.point * PPM + MIDDLE).y_flipped().enclosing_rect(16.0)
-                     for _, p in curve.conflict_points):
-            draw.ellipse(rect, pen, brush)
+    cpoints = chain.from_iterable(c.conflict_points for c in
+                                  node.intersection.curves.values())
+    for cpoint in set(p for _, p in cpoints):
+        rect = (cpoint.point * PPM + MIDDLE).y_flipped().enclosing_rect(16.0)
+        draw.ellipse(rect, pen, brush)
 
     draw.flush()
     # image.show()
