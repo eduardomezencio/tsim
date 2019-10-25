@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import chain, repeat
-from typing import Dict, Iterator, List, Set, Tuple
+from typing import (TYPE_CHECKING, Dict, Iterable, Iterator, List, NamedTuple,
+                    Set, Tuple)
 
 from cached_property import cached_property
 from dataslots import with_slots
@@ -15,6 +16,9 @@ from tsim.model.geometry import (BoundingRect, Point, Vector,
                                  line_intersection, midpoint)
 from tsim.model.network.intersection import Intersection
 from tsim.model.network.way import LANE_WIDTH, Lane, OrientedWay, Way
+
+if TYPE_CHECKING:
+    from tsim.model.network.intersection import Curve, LaneConnection
 
 
 @with_slots
@@ -172,7 +176,7 @@ class Node(Entity):
         if delete_if_dissolved:
             Index.INSTANCE.delete(self)
 
-    def on_delete(self):
+    def on_delete(self) -> Iterable[Entity]:
         """Disconnect this node from the network.
 
         Returns the ways that must be disconnected to free this node.
@@ -239,3 +243,19 @@ class NodeGeometry:
             projection, reflection = farthest.projection_reflection(direction)
             self.way_distances[i] = projection.norm()
             self.points[2 * i] = reflection
+
+
+class NodeLaneConnection(NamedTuple):
+    """Information about a lane connection on a node.
+
+    Contains the node itself and a tuple with the source and destination lanes.
+    Can be used to identify the position of something on this path.
+    """
+
+    node: Node
+    lanes: LaneConnection
+
+    @property
+    def curve(self) -> Curve:
+        """Get the curve of this lane connection."""
+        return self.node.intersection.curves[self.lanes]

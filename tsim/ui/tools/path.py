@@ -35,7 +35,9 @@ class PathTool(Tool):
         self.source = None
         self.dest = None
         self.path = None
-        self.hud_text = OnscreenText(text='', pos=(10, -20), scale=22.0,
+        self.hud_text = OnscreenText(text='', pos=(5, -20), scale=22.0,
+                                     fg=(1.0, 1.0, 1.0, 1.0),
+                                     shadow=(0.0, 0.0, 0.0, 1.0),
                                      align=TextNode.A_left, font=FONT,
                                      parent=PIXEL2D, mayChange=True)
         self.path_np = None
@@ -88,8 +90,8 @@ class PathTool(Tool):
     def _update_hud_text(self):
         source_text = self.source.id if self.source else '_'
         dest_text = self.dest.id if self.dest else '_'
-        info_text = (f'len: {self.path.length:6.1f}, '
-                     f'weight: {self.path.weight:6.1f}, '
-                     f'ways: {len(self.path.ways)} '
+        info_text = (f'len: {self.path.length:6.1f}    '
+                     f'weight: {self.path.weight:6.1f}    '
+                     f'ways: {len(self.path.ways)}    '
                      if self.path is not None else '')
         self.hud_text.text = (f'{info_text}({source_text}, {dest_text})')

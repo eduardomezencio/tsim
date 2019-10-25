@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from itertools import accumulate, chain, islice
 from math import sqrt
-from typing import TYPE_CHECKING, Any, Iterator, NamedTuple, Optional, Tuple
+from typing import (TYPE_CHECKING, Any, Iterable, Iterator, NamedTuple,
+                    Optional, Tuple)
 from weakref import ref, ReferenceType
 
 from cached_property import cached_property
@@ -14,7 +15,7 @@ from dataslots import with_slots
 
 import tsim.model.index as Index
 from tsim.model.entity import Entity, EntityRef
-from tsim.model.geometry import BoundingRect, Point, Vector, distance
+from tsim.model.geometry import BoundingRect, Point, Vector
 
 if TYPE_CHECKING:
     from tsim.model.network.node import Node
@@ -120,15 +121,23 @@ class Way(Entity):
                              (self.end.position,))
         yield from islice(iterator, skip, None)
 
-    def vectors(self) -> Iterator[Vector]:
-        """Get vectors for each edge on the way."""
-        yield from ((q - p) for p, q in
-                    zip(self.points(), self.points(skip=1)))
+    def point_pairs(self, reverse=False) -> Iterator[Tuple[Point, Point]]:
+        """Get pairs of consecutive points, including nodes and waypoints."""
+        points = self.points(reverse=reverse)
+        last = next(points, None)
+        for point in points:
+            yield (last, point)
+            last = point
 
-    def distances(self) -> Iterator[float]:
+    def vectors(self, reverse=False) -> Iterator[Vector]:
+        """Get vectors for each edge on the way."""
+        yield from (q - p for p, q in
+                    self.point_pairs(reverse=reverse))
+
+    def distances(self, reverse=False) -> Iterator[float]:
         """Get generator for the distance between all consecutive points."""
-        yield from (distance(p, q) for p, q in
-                    zip(self.points(), self.points(skip=1)))
+        yield from (p.distance(q) for p, q in
+                    self.point_pairs(reverse=reverse))
 
     def accumulated_length(self) -> Iterator[float]:
         """Get generator for the accumulated length up to each point."""
@@ -159,7 +168,7 @@ class Way(Entity):
         Get a unit vector pointing right from each edge on the way.
         """
         yield from ((p - q).rotated_left().normalized()
-                    for p, q in zip(self.points(), self.points(skip=1)))
+                    for p, q in self.point_pairs())
 
     def direction_from_node(self, node: Node,
                             priority: Endpoint = Endpoint.START) -> Vector:
@@ -181,26 +190,34 @@ class Way(Entity):
         point1, point2 = islice(self.points(reverse=reverse), 2)
         return point2 - point1
 
-    def address_position(self, address: int) -> Point:
-        """Get the position at given address relative to the way.
+    def lane_distance_from_center(
+            self, lane: int, endpoint: Endpoint = Endpoint.START) -> float:
+        """Get distance to the right from way center to the lane."""
+        return (1 + lane
+                - self.lanes[endpoint.value]
+                + self.lanes[endpoint.other.value]) * HALF_LANE_WIDTH
 
-        The address is an integer and corresponds to a distance in meters from
-        the start node. Even numbers are to the left and odd numbers to the
-        right.
+    def get_position(self, distance: float,
+                     endpoint: Endpoint = Endpoint.START,
+                     lane: int = 0) -> Point:
+        """Get the position at given location in this way.
+
+        The distance is in meters from the given endpoint, being START the
+        default value. The position will be on the given lane.
         """
-        address = int(address)
-        if address > 0:
-            counter = float(address)
-            for point, vector, length in zip(self.points(), self.vectors(),
-                                             self.distances()):
+        if distance >= 0.0:
+            counter = distance
+            reverse = endpoint is Way.Endpoint.END
+            for point1, point2 in self.point_pairs(reverse=reverse):
+                length = point1.distance(point2)
                 if counter > length:
                     counter -= length
                 else:
-                    vector = vector.normalized()
-                    side = (vector.rotated_right() if address % 2
-                            else vector.rotated_right()) * (LANE_WIDTH / 2.0)
-                    return point + vector.normalized() * counter + side
-        raise ValueError('Address outside of Way.')
+                    vector = (point2 - point1).normalized()
+                    side = (vector.rotated_right() *
+                            self.lane_distance_from_center(lane, endpoint))
+                    return point1 + vector * counter + side
+        raise ValueError('Point outside of Way.')
 
     def iterate_lanes(self, direction: Way.Endpoint, l_to_r: bool = True,
                       include_opposite: bool = False,
@@ -239,7 +256,7 @@ class Way(Entity):
             node.reset_connections()
             self.end = None
 
-    def on_delete(self):
+    def on_delete(self) -> Iterable[Entity]:
         """Disconnect this way from the network.
 
         Removes the connections from this way to nodes and also the references
@@ -354,18 +371,17 @@ class Lane(NamedTuple):
         return self.way_ref()
 
     @property
-    def positive(self):
+    def positive(self) -> Lane:
         """Get equivalent lane with positive index."""
         if self.index >= 0:
             return self
         return Lane(self.way_ref, self.endpoint.other, -self.index - 1)
 
     @property
-    def oriented_way(self):
+    def oriented_way(self) -> OrientedWay:
         """Get oriented way from this lane."""
         return OrientedWay(self.way_ref, self.endpoint)
 
     def distance_from_center(self) -> float:
         """Get distance to the right from way center to the lane."""
-        return (1.0 - self.way.lanes[self.endpoint.value]
-                + self.way.lanes[self.endpoint.other.value]) * LANE_WIDTH / 2
+        return self.way.lane_distance_from_center(self.index, self.endpoint)

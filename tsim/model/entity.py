@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Generic, TypeVar, Union
+from typing import Generic, Iterable, TypeVar, Union
 
 from cached_property import cached_property
 from dataslots import with_slots
@@ -41,7 +41,7 @@ class Entity(ABC):
     def distance(self, point: Point, squared: bool = False) -> float:
         """Calculate smallest distance from the entity to a point."""
 
-    def on_delete(self):
+    def on_delete(self) -> Iterable[Entity]:
         """Cleanup when deleting entity.
 
         Will be called by the index when deleting. Must return an iterable with

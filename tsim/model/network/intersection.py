@@ -292,7 +292,7 @@ class Curve:
                 self._conflict_points[i] = (param, new)
                 new.curves.add(self)
                 return
-        raise Exception('Old conflict point not found in curve.')
+        raise ValueError('Old conflict point not found in curve.')
 
     def remove_conflict_point_duplicates(self):
         """Let each conflict point appear only once on this curve."""

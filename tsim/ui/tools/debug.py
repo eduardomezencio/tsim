@@ -23,7 +23,9 @@ class Debug(Tool):
 
     def prepare(self):
         """Initialize tool."""
-        self.hud_text = OnscreenText(text='', pos=(10, -20), scale=22.0,
+        self.hud_text = OnscreenText(text='', pos=(5, -20), scale=22.0,
+                                     fg=(1.0, 1.0, 1.0, 1.0),
+                                     shadow=(0.0, 0.0, 0.0, 1.0),
                                      align=TextNode.A_left, font=FONT,
                                      parent=PIXEL2D, mayChange=True)
         self.card = None
@@ -44,8 +46,8 @@ class Debug(Tool):
 
     def on_cursor_move(self):
         """Cursor moved callback."""
-        self.hud_text.text = (f'{self.cursor.position.x:.2f} '
-                              f'{self.cursor.position.y:.2f}')
+        self.hud_text.text = (f'{self.cursor.position.x:10.2f} '
+                              f'{self.cursor.position.y:10.2f}')
 
     def cleanup(self):
         """Clean up before changing tool."""
