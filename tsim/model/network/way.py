@@ -6,9 +6,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from itertools import accumulate, chain, islice
 from math import sqrt
-from typing import (TYPE_CHECKING, Any, Iterable, Iterator, NamedTuple,
-                    Optional, Tuple)
-from weakref import ref, ReferenceType
+from typing import (TYPE_CHECKING, Iterable, Iterator, NamedTuple, Optional,
+                    Tuple)
 
 from cached_property import cached_property
 from dataslots import with_slots
@@ -48,10 +47,9 @@ class Way(Entity):
 
     start: Node
     end: Node
-    lanes: Tuple[int, int]
+    lane_count: Tuple[int, int]
     waypoints: Tuple[Point] = field(default_factory=tuple)
     max_speed: float = field(default_factory=lambda: DEFAULT_MAX_SPEED_KPH)
-    __weakref__: Any = field(init=False)
 
     def __post_init__(self):
         self.start.starts.append(EntityRef(self))
@@ -77,17 +75,17 @@ class Way(Entity):
         The direction of traffic is always from start to end, if one_way is
         true.
         """
-        return not self.lanes[1]
+        return not self.lane_count[1]
 
     @property
-    def total_lanes(self) -> int:
+    def total_lane_count(self) -> int:
         """Total number of lanes."""
-        return sum(self.lanes)
+        return sum(self.lane_count)
 
     @property
-    def swapped_lanes(self) -> Tuple[int, int]:
+    def swapped_lane_count(self) -> Tuple[int, int]:
         """Get number of lanes, with swapped directions."""
-        return self.lanes[1::-1]
+        return self.lane_count[1::-1]
 
     @property
     def is_valid(self) -> bool:
@@ -194,8 +192,8 @@ class Way(Entity):
             self, lane: int, endpoint: Endpoint = Endpoint.START) -> float:
         """Get distance to the right from way center to the lane."""
         return (1 + lane
-                - self.lanes[endpoint.value]
-                + self.lanes[endpoint.other.value]) * HALF_LANE_WIDTH
+                - self.lane_count[endpoint.value]
+                + self.lane_count[endpoint.other.value]) * HALF_LANE_WIDTH
 
     def get_position(self, distance: float,
                      endpoint: Endpoint = Endpoint.START,
@@ -230,8 +228,8 @@ class Way(Entity):
         """
         opposite = include_opposite or opposite_only
         lanes = range(
-            -self.lanes[direction.other.value] if opposite else 0,
-            0 if opposite_only else self.lanes[direction.value])
+            -self.lane_count[direction.other.value] if opposite else 0,
+            0 if opposite_only else self.lane_count[direction.value])
 
         for i in lanes if l_to_r else reversed(lanes):
             yield Lane.build(self, direction, i)
@@ -294,13 +292,13 @@ class OrientedWay(NamedTuple):
     given Way in the direction starting from the given Endpoint.
     """
 
-    way_ref: ReferenceType
+    way_ref: EntityRef[Way]
     endpoint: Way.Endpoint
 
     @staticmethod
     def build(way: Way, endpoint: Way.Endpoint):
         """Create OrientedWay from a Way instead of a weak reference."""
-        return OrientedWay(ref(way), endpoint)
+        return OrientedWay(EntityRef(way), endpoint)
 
     @property
     def way(self) -> Optional[Way]:
@@ -320,9 +318,9 @@ class OrientedWay(NamedTuple):
                 else self.way.start)
 
     @property
-    def lanes(self) -> int:
+    def lane_count(self) -> int:
         """Get the number of lanes of the way in this direction."""
-        return self.way.lanes[self.endpoint.value]
+        return self.way.lane_count[self.endpoint.value]
 
     @property
     def length(self) -> float:
@@ -363,14 +361,14 @@ class Lane(NamedTuple):
     lanes in that direction.
     """
 
-    way_ref: ReferenceType
+    way_ref: EntityRef[Way]
     endpoint: Way.Endpoint
     index: int
 
     @staticmethod
     def build(way: Way, endpoint: Way.Endpoint, index: int):
         """Create Lane from a Way instead of a weak reference."""
-        return Lane(ref(way), endpoint, index)
+        return Lane(EntityRef(way), endpoint, index)
 
     @property
     def way(self) -> Optional[Way]:

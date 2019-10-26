@@ -94,5 +94,7 @@ class PathTool(Tool):
                      f'ways: {len(self.path.ways)}    '
                      if self.path is not None else '')
         text = f'{info_text}({source_text}, {dest_text})'
-        log.debug(text)
         self.hud_text.text = text
+
+        if self.source and self.dest:
+            log.debug(text)

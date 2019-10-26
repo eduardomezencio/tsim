@@ -53,7 +53,7 @@ class Node(Entity):
         minimum weight as the value.
         """
         neighbors: Dict[Node, OrientedWay] = {}
-        for way in filter(lambda w: w.lanes, self.oriented_ways):
+        for way in filter(lambda w: w.lane_count, self.oriented_ways):
             other = way.way.other(self)
             existing = neighbors.get(other, None)
             if not existing or existing.weight < way.weight:
@@ -63,7 +63,8 @@ class Node(Entity):
     @property
     def max_lanes(self) -> int:
         """Maximum number of lanes in incident ways."""
-        return max(e.value.total_lanes for e in chain(self.starts, self.ends))
+        return max(e.value.total_lane_count
+                   for e in chain(self.starts, self.ends))
 
     @property
     def total_way_connections(self) -> int:
@@ -161,8 +162,9 @@ class Node(Entity):
         same_dir = (((ways[0].end is self) and (ways[1].start is self)) or
                     ((ways[0].start is self) and (ways[1].end is self)))
 
-        if ((same_dir and ways[0].lanes != ways[1].lanes) or
-                (not same_dir and ways[0].lanes != ways[1].swapped_lanes)):
+        if ((same_dir and ways[0].lane_count != ways[1].lane_count)
+                or (not same_dir
+                    and ways[0].lane_count != ways[1].swapped_lane_count)):
             raise ValueError('Can not dissolve nodes with lane changes.')
 
         waypoints = []
@@ -175,8 +177,10 @@ class Node(Entity):
         ways[0].disconnect(start)
         ways[1].disconnect(end)
 
-        lanes = ways[0].lanes if ways[0].end is self else ways[0].swapped_lanes
-        way = Way(start, end, lanes=lanes, waypoints=tuple(waypoints))
+        lane_count = (ways[0].lane_count if ways[0].end is self
+                      else ways[0].swapped_lane_count)
+        way = Way(start, end, lane_count=lane_count,
+                  waypoints=tuple(waypoints))
         way.xid = ways[0].xid if ways[0].xid is not None else ways[1].xid
         Index.INSTANCE.add(way)
 
@@ -228,7 +232,7 @@ class NodeGeometry:
         directions = tuple(w().direction_from_node(self.node, e).normalized()
                            for w, e in ways)
         for i, (way, _) in enumerate(ways):
-            half_widths = tuple(w().total_lanes * LANE_WIDTH / 2
+            half_widths = tuple(w().total_lane_count * LANE_WIDTH / 2
                                 for w in (ways[i - 1][0], way))
             # Points relative to the node position.
             points = (directions[i - 1].rotated_left() * half_widths[0],

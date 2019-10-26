@@ -38,41 +38,45 @@ def main():
     for xid, node in nodes.items():
         node.xid = xid
 
-    Highway = namedtuple('Highway', ('nodes', 'level', 'one_way', 'lanes',
+    Highway = namedtuple('Highway', ('nodes', 'level', 'one_way', 'lane_count',
                                      'xid', 'max_speed'))
-    highways = [Highway(nodes=[int(n.get('ref')) for n in w.iterfind('nd')],
-                        level=1 if any(t.get('k') == 'bridge' and
-                                       t.get('v') == 'viaduct'
-                                       for t in w.iterfind('tag')) else 0,
-                        one_way=any(t.get('k') == 'oneway'
-                                    and t.get('v') in ('yes', 'true', '1')
-                                    for t in w.iterfind('tag')),
-                        lanes=next((int(t.get('v')) for t in w.iterfind('tag')
-                                    if t.get('k') == 'lanes'), None),
-                        xid=int(w.get('id')),
-                        max_speed=next((float(t.get('v').split()[0])
-                                        for t in w.iterfind('tag')
-                                        if t.get('k') == 'maxspeed'), None))
-                for w in root.iterfind('way')
-                if any(t.get('k') == 'highway' and t.get('v') != 'footway'
-                       for t in w.iterfind('tag'))]
+    highways = [
+        Highway(nodes=[int(n.get('ref')) for n in w.iterfind('nd')],
+                level=(1 if any((t.get('k') == 'bridge' and
+                                 t.get('v') == 'viaduct')
+                                for t in w.iterfind('tag'))
+                       else 0),
+                one_way=any((t.get('k') == 'oneway' and
+                             t.get('v') in ('yes', 'true', '1'))
+                            for t in w.iterfind('tag')),
+                lane_count=next((int(t.get('v')) for t in w.iterfind('tag')
+                                 if t.get('k') == 'lanes'),
+                                None),
+                xid=int(w.get('id')),
+                max_speed=next((float(t.get('v').split()[0])
+                                for t in w.iterfind('tag')
+                                if t.get('k') == 'maxspeed'),
+                               None))
+        for w in root.iterfind('way')
+        if any(t.get('k') == 'highway' and t.get('v') != 'footway'
+               for t in w.iterfind('tag'))]
 
     for highway in highways:
         for start, end in zip(highway.nodes, islice(highway.nodes, 1, None)):
             if highway.level != 0:
                 nodes[start].level = nodes[end].level = highway.level
             if highway.one_way:
-                lanes = ((highway.lanes, 0)
-                         if highway.lanes is not None else (2, 0))
+                lane_count = ((highway.lane_count, 0)
+                              if highway.lane_count is not None else (2, 0))
             else:
-                lanes = ((highway.lanes // 2,
-                          highway.lanes - highway.lanes // 2)
-                         if highway.lanes is not None else (1, 1))
+                lane_count = ((highway.lane_count // 2,
+                               highway.lane_count - highway.lane_count // 2)
+                              if highway.lane_count is not None else (1, 1))
             INDEX.add(nodes[start])
             INDEX.add(nodes[end])
-            way = (Way(nodes[start], nodes[end], lanes)
+            way = (Way(nodes[start], nodes[end], lane_count)
                    if highway.max_speed is None
-                   else Way(nodes[start], nodes[end], lanes,
+                   else Way(nodes[start], nodes[end], lane_count,
                             max_speed=highway.max_speed))
             way.xid = highway.xid
             INDEX.add(way)

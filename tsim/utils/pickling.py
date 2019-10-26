@@ -18,7 +18,8 @@ def getstate(self):
                 del dict_copy[key]
     slots = chain.from_iterable(
         getattr(c, '__slots__', ()) for c in cls.mro())
-    slots_dict = {s: getattr(self, s) for s in slots if s != '__dict__'}
+    slots_dict = {s: getattr(self, s) for s in slots
+                  if s not in ('__dict__', '__weakref__')}
     return dict_copy, slots_dict
 
 

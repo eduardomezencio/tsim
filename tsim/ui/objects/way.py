@@ -40,8 +40,8 @@ def _generate_mesh(way: Way) -> Geom:
     if total <= 0.0:
         return None
 
-    half_width = LANE_WIDTH * way.total_lanes / 2
-    lanes_float = float(way.total_lanes)
+    half_width = LANE_WIDTH * way.total_lane_count / 2
+    lanes_float = float(way.total_lane_count)
 
     vector = way.direction_from_node(way.start,
                                      Way.Endpoint.START).normalized()
