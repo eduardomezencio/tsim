@@ -44,7 +44,6 @@ def create_lane_connections_card(node: Node, parent: NodePath) -> NodePath:
     """Create textured mesh showing lane connectins and attach it."""
     image = _create_lane_connections_image(node)
     texture = create_texture(image)
-    image.close()
 
     card = parent.attach_new_node(CARD_MAKER.generate())
     card.set_pos((*node.position, 0.25))
@@ -114,9 +113,9 @@ def _create_lane_connections_image(node: Node) -> Image:
     pen = aggdraw.Pen('black', 1, 192)
     brush = aggdraw.Brush('white', 192)
 
-    cpoints = chain.from_iterable(c.conflict_points for c in
-                                  node.intersection.curves.values())
-    for cpoint in set(p for _, p in cpoints):
+    for cpoint in set(p for _, p in
+                      chain.from_iterable(c.conflict_points for c in
+                                          node.intersection.curves.values())):
         rect = (cpoint.point * PPM + MIDDLE).y_flipped().enclosing_rect(16.0)
         draw.ellipse(rect, pen, brush)
 

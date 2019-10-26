@@ -281,6 +281,9 @@ class Way(Entity):
                     pass
         return result
 
+    def __repr__(self):
+        return f'Way(id={self.id}, xid={self.xid})'
+
 
 class OrientedWay(NamedTuple):
     """A tuple containing a Way and an Endpoint.
@@ -345,6 +348,10 @@ class OrientedWay(NamedTuple):
         """Get generator for points in order, including nodes and waypoints."""
         return self.way.points(skip, self.endpoint is Way.Endpoint.END)
 
+    def __repr__(self):
+        return (f'OrientedWay(way_id={self.way.id}, '
+                f'endpoint={self.endpoint.name[0]})')
+
 
 class Lane(NamedTuple):
     """A tuple containing the same as OrientedWay, with a lane index.
@@ -385,3 +392,7 @@ class Lane(NamedTuple):
     def distance_from_center(self) -> float:
         """Get distance to the right from way center to the lane."""
         return self.way.lane_distance_from_center(self.index, self.endpoint)
+
+    def __repr__(self):
+        return (f'Lane(way_id={self.way.id}, '
+                f'endpoint={self.endpoint.name[0]}, index={self.index})')

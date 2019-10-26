@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from itertools import chain, repeat
 from typing import (TYPE_CHECKING, Dict, Iterable, Iterator, List, NamedTuple,
-                    Set, Tuple)
+                    Optional, Set, Tuple)
 
 from cached_property import cached_property
 from dataslots import with_slots
@@ -36,12 +36,12 @@ class Node(Entity):
 
     @cached_property
     def geometry(self) -> NodeGeometry:
-        """Get the geometry info of the node."""
+        """Get the geometry info for the node."""
         return NodeGeometry(self)
 
     @cached_property
     def intersection(self) -> Intersection:
-        """Lane connections on this node."""
+        """Get intersection info for the node."""
         return Intersection(self)
 
     @cached_property
@@ -59,13 +59,6 @@ class Node(Entity):
             if not existing or existing.weight < way.weight:
                 neighbors[other] = way
         return neighbors
-
-    @property
-    def lane_connections_iter(self) -> Iterator[Tuple[Lane, Lane]]:
-        """Lane connections as an iterator of lane tuples."""
-        for src, values in self.intersection.connections.items():
-            for dest in values:
-                yield src, dest
 
     @property
     def max_lanes(self) -> int:
@@ -130,6 +123,20 @@ class Node(Entity):
         return (sorted_ways[index - 1],
                 sorted_ways[(index + 1) % len(sorted_ways)])
 
+    def get_lane_connection(self, source: Lane, dest: OrientedWay) \
+            -> Optional[NodeLaneConnection]:
+        """Get the lane connection leading to the given destination.
+
+        The source is a Lane, representing the current position for an agent.
+        The destination is an OrientedWay, considering there's no need to reach
+        the destination way on a specific lane. This method tries to get a
+        connection from the source lane, but may return a connection from a
+        different lane if there is no connection from the given lane.
+
+        Useful navigating a path that does not contain lane information.
+        """
+        return self.intersection.connection_map.get((source, dest), None)
+
     def dissolve(self, delete_if_dissolved=False):
         """Remove a node joining the two ways it connects."""
         two_ways = len(self.starts) + len(self.ends) == 2
@@ -187,7 +194,12 @@ class Node(Entity):
             way.end = None
         return {r.value for r in set(chain(self.starts, self.ends))}
 
+    def __repr__(self):
+        return f'Node(id={self.id}, xid={self.xid})'
 
+
+@with_slots
+@dataclass(eq=False)
 class NodeGeometry:
     """Information on the geometric shape of a node.
 
@@ -195,16 +207,13 @@ class NodeGeometry:
     are adjacent to this node.
     """
 
-    __slots__ = ('node', 'way_indexes', 'way_distances', 'points')
-
     node: Node
-    way_indexes: Dict[OrientedWay, int]
-    way_distances: List[float]
-    points: List[Point]
+    way_indexes: Dict[OrientedWay, int] = field(init=False)
+    way_distances: List[float] = field(init=False)
+    points: List[Point] = field(init=False)
 
-    def __init__(self, node: Node):
-        self.node = node
-        ways = node.sorted_ways()
+    def __post_init__(self):
+        ways = self.node.sorted_ways()
         self.way_indexes = {w: i for i, w in enumerate(ways)}
         self.way_distances = [None for _ in ways]
         self.points = self.way_distances * 2
@@ -259,3 +268,8 @@ class NodeLaneConnection(NamedTuple):
     def curve(self) -> Curve:
         """Get the curve of this lane connection."""
         return self.node.intersection.curves[self.lanes]
+
+    def __repr__(self):
+        return (f'NodeLaneConnection(node_id={self.node.id}, '
+                f'lanes=(({self.lanes[0].way.id}, {self.lanes[0].index}), '
+                f'({self.lanes[1].way.id}, {self.lanes[1].index})))')

@@ -1,5 +1,9 @@
 """Debug tool."""
 
+from __future__ import annotations
+
+import logging as log
+
 from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import NodePath, TextNode
 
@@ -32,17 +36,17 @@ class Debug(Tool):
 
     def on_button1_press(self):
         """Button 1 pressed callback."""
-        print(f'{self.cursor.position.x:.2f}, {self.cursor.position.y:.2f}')
+        log.debug('%.2f, %.2f', self.cursor.position.x, self.cursor.position.y)
         self._clear_selection()
         selected = INDEX.get_at(self.cursor.position, of_type=Node)
         if selected:
-            print(selected[0].xurl)
+            log.debug(selected[0].xurl)
             self.card = create_lane_connections_card(selected[0], RENDER)
         else:
             selected = INDEX.get_at(self.cursor.position, of_type=Way)
             if selected:
-                print(selected[0].xurl)
-                print(selected[0])
+                log.debug(selected[0].xurl)
+                log.debug(str(selected[0]))
 
     def on_cursor_move(self):
         """Cursor moved callback."""

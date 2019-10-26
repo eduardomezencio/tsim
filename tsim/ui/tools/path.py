@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging as log
 from typing import TYPE_CHECKING
 
 from direct.gui.OnscreenText import OnscreenText
@@ -84,8 +85,6 @@ class PathTool(Tool):
             self.path = INDEX.path_map.path(self.source, self.dest)
             if self.path is not None:
                 self.path_np = create_path(RENDER, self.path)
-                print(f'{self.path.length}, {len(self.path.ways)}'
-                      if self.path is not None else None)
 
     def _update_hud_text(self):
         source_text = self.source.id if self.source else '_'
@@ -94,4 +93,6 @@ class PathTool(Tool):
                      f'weight: {self.path.weight:6.1f}    '
                      f'ways: {len(self.path.ways)}    '
                      if self.path is not None else '')
-        self.hud_text.text = (f'{info_text}({source_text}, {dest_text})')
+        text = f'{info_text}({source_text}, {dest_text})'
+        log.debug(text)
+        self.hud_text.text = text

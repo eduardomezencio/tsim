@@ -35,13 +35,15 @@ class Intersection:
     Contains lane connections and conflict points.
     """
 
-    __slots__ = ('connections', 'curves')
+    __slots__ = ('connections', 'connection_map', 'curves')
 
     connections: LaneConnections
+    connection_map: Dict[Tuple[Lane, OrientedWay], LaneConnection]
     curves: Dict[LaneConnection, Curve]
 
     def __init__(self, node: Node):
         self.connections = build_lane_connections(node)
+        self.connection_map = build_connection_map(node, self.connections)
         self.curves = build_bezier_curves(node, self.connections)
         build_conflict_points(self.curves)
 
@@ -71,7 +73,7 @@ def build_lane_connections(node: Node) -> LaneConnections:
     way: OrientedWay
     ways: Deque[OrientedWay]
 
-    def iterate_new_conn() -> Iterator[Tuple[Lane, Lane]]:
+    def iterate_new_conn() -> Iterator[LaneConnection]:
         for key, values in new_conn.items():
             yield from product((key,), values)
 
@@ -141,6 +143,43 @@ def build_lane_connections(node: Node) -> LaneConnections:
                 rotate_angles()
 
     return connections
+
+
+def build_connection_map(node: Node, connections: LaneConnections) \
+        -> Dict[Tuple[Lane, OrientedWay], LaneConnection]:
+    """Create connection map from (Lane, OrientedWay) to LaneConnection.
+
+    The map contains all lanes that reach the given node. The lane connection
+    it maps to can be from the lane itself or from another lane if there is no
+    connection from the given lane to the oriented way.
+    """
+    result = {}
+    for way in node.oriented_ways:
+        missing = defaultdict(list)
+        found = defaultdict(list)
+        for lane in way.iterate_lanes(opposite_only=True):
+            for dest_way in node.oriented_ways:
+                dest_lane = next((l for l in connections[lane]
+                                  if l.oriented_way == dest_way),
+                                 None)
+                if dest_lane is not None:
+                    found[dest_way].append((lane, dest_lane))
+                else:
+                    missing[dest_way].append(lane)
+
+        for dest_way, lanes in found.items():
+            for lane, dest_lane in lanes:
+                result[lane, dest_way] = lane
+
+        for dest_way, lanes in missing.items():
+            if not found[dest_way]:
+                continue
+            for lane in lanes:
+                result[lane, dest_way] = min(
+                    found[dest_way],
+                    key=lambda l: abs(l[0].index - lane.index))
+
+    return result
 
 
 def build_bezier_curves(node: Node, connections: LaneConnections) \

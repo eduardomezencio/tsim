@@ -89,7 +89,7 @@ def init_objects(parent: NodePath):
 def log_config():
     """Initialize log configuration."""
     logging.basicConfig(format='%(levelname)s: %(message)s',
-                        level=logging.ERROR)
+                        level=logging.DEBUG if __debug__ else logging.ERROR)
 
 
 def panda3d_config():

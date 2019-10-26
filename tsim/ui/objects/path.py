@@ -1,4 +1,4 @@
-"""Way object creation functions."""
+"""Path visualization object creation functions."""
 
 from __future__ import annotations
 
@@ -34,14 +34,15 @@ def _generate_mesh(path: Path) -> Geom:
         return Geom()
 
     vertex_data = GeomVertexData('path', VERTEX_FORMAT, Geom.UH_static)
-    vertex_data.set_num_rows(2 * len(points))
+    vertex_data.set_num_rows(2 * len(points) + 1)
     vertex_writer = GeomVertexWriter(vertex_data, 'vertex')
     normal_writer = GeomVertexWriter(vertex_data, 'normal')
     color_writer = GeomVertexWriter(vertex_data, 'color')
 
     length = path.length
     vector = points[1] - points[0]
-    position = vector.norm() / length
+    distance = vector.norm()
+    position = distance / length
     vector = vector.normalized()
 
     color = [0.0, 0.0, 1.0, 1.0]
@@ -55,7 +56,7 @@ def _generate_mesh(path: Path) -> Geom:
     last_vector = vector
     for point, next_ in zip(islice(points, 1, None), islice(points, 2, None)):
         vector = next_ - point
-        distance = vector.norm() / length
+        distance = vector.norm()
         vector = vector.normalized()
         bisector = (last_vector + vector).normalized()
         width_vector = (sec(bisector, vector) * 0.5 * LANE_WIDTH
@@ -66,20 +67,26 @@ def _generate_mesh(path: Path) -> Geom:
             color[0] = position ** 2
             color[1] = (1 - position) ** 2
             color_writer.add_data4f(*color)
-        position = position + distance
+        position = position + distance / length
         last_vector = vector
 
     point = points[-1]
-    width_vector = LANE_WIDTH * 0.01 * last_vector.rotated_left().normalized()
+    width_vector = 0.5 * LANE_WIDTH * last_vector.rotated_left()
     color[0] = 1.0
     color[1] = 0.0
-    for vertex in (point + width_vector, point - width_vector):
+
+    distance = LANE_WIDTH if distance > LANE_WIDTH else distance / 2
+    vector = -last_vector * distance
+
+    for vertex in (point + width_vector + vector,
+                   point - width_vector + vector,
+                   point):
         vertex_writer.add_data3f(vertex.x, vertex.y, HEIGHT)
         normal_writer.add_data3f(0.0, 0.0, 1.0)
         color_writer.add_data4f(*color)
 
     primitive = GeomTristrips(Geom.UH_static)
-    primitive.add_consecutive_vertices(0, 2 * len(points))
+    primitive.add_consecutive_vertices(0, 2 * len(points) + 1)
     primitive.close_primitive()
     geom = Geom(vertex_data)
     geom.add_primitive(primitive)

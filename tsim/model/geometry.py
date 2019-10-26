@@ -226,6 +226,9 @@ class Vector:
         yield self.x
         yield self.y
 
+    def __neg__(self):
+        return Vector(-self.x, -self.y)
+
     angle = angle
     bounding_rect = property(calc_bounding_rect)
     distance = distance
@@ -293,6 +296,9 @@ class Vector3(Vector):
         yield self.x
         yield self.y
         yield self.z
+
+    def __neg__(self):
+        return Vector3(-self.x, -self.y, -self.z)
 
     angle = type(NotImplemented)
     distance = distance3
