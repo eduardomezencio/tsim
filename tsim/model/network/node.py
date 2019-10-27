@@ -15,7 +15,7 @@ from tsim.model.entity import Entity, EntityRef
 from tsim.model.geometry import (BoundingRect, Point, Vector,
                                  line_intersection, midpoint)
 from tsim.model.network.intersection import Intersection
-from tsim.model.network.way import LANE_WIDTH, Lane, OrientedWay, Way
+from tsim.model.network.way import LANE_WIDTH, LaneRef, OrientedWay, Way
 
 if TYPE_CHECKING:
     from tsim.model.network.intersection import Curve, LaneConnection
@@ -124,15 +124,15 @@ class Node(Entity):
         return (sorted_ways[index - 1],
                 sorted_ways[(index + 1) % len(sorted_ways)])
 
-    def get_lane_connection(self, source: Lane, dest: OrientedWay) \
+    def get_lane_connection(self, source: LaneRef, dest: OrientedWay) \
             -> Optional[NodeLaneConnection]:
         """Get the lane connection leading to the given destination.
 
-        The source is a Lane, representing the current position for an agent.
-        The destination is an OrientedWay, considering there's no need to reach
-        the destination way on a specific lane. This method tries to get a
-        connection from the source lane, but may return a connection from a
-        different lane if there is no connection from the given lane.
+        The source is a LaneRef, representing the current position for an
+        agent. The destination is an OrientedWay, considering there's no need
+        to reach the destination way on a specific lane. This method tries to
+        get a connection from the source lane, but may return a connection from
+        a different lane if there is no connection from the given lane.
 
         Useful navigating a path that does not contain lane information.
         """

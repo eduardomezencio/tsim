@@ -217,12 +217,12 @@ class Way(Entity):
                     return point1 + vector * counter + side
         raise ValueError('Point outside of Way.')
 
-    def iterate_lanes(self, direction: Way.Endpoint, l_to_r: bool = True,
-                      include_opposite: bool = False,
-                      opposite_only: bool = False) -> Iterator[Lane]:
+    def lane_refs(self, direction: Way.Endpoint, l_to_r: bool = True,
+                  include_opposite: bool = False,
+                  opposite_only: bool = False) -> Iterator[LaneRef]:
         """Get lanes in the given direction.
 
-        Get lanes in the given direction. Check Lane documentation for more
+        Get lanes in the given direction. Check LaneRef documentation for more
         information. If l_to_r is True (default), return lanes starting from
         the left, otherwise start from the right.
         """
@@ -232,7 +232,7 @@ class Way(Entity):
             0 if opposite_only else self.lane_count[direction.value])
 
         for i in lanes if l_to_r else reversed(lanes):
-            yield Lane.build(self, direction, i)
+            yield LaneRef.build(self, direction, i)
 
     def disconnect(self, node: Node):
         """Disconnect this way from a node.
@@ -280,7 +280,7 @@ class Way(Entity):
         return result
 
     def __repr__(self):
-        return f'Way(id={self.id}, xid={self.xid})'
+        return f'{Way.__name__}(id={self.id}, xid={self.xid})'
 
 
 class OrientedWay(NamedTuple):
@@ -332,26 +332,25 @@ class OrientedWay(NamedTuple):
         """Get the weight of the way in this direction."""
         return self.way.weight[self.endpoint.value]
 
-    def iterate_lanes(self, l_to_r: bool = True,
-                      include_opposite: bool = False,
-                      opposite_only: bool = False) -> Iterator[Lane]:
+    def lane_refs(self, l_to_r: bool = True, include_opposite: bool = False,
+                  opposite_only: bool = False) -> Iterator[LaneRef]:
         """Get lanes in the direction of the oriented way.
 
-        A shortcut for Way.iterate_lanes.
+        A shortcut for Way.lane_refs.
         """
-        return self.way.iterate_lanes(self.endpoint, l_to_r, include_opposite,
-                                      opposite_only)
+        return self.way.lane_refs(self.endpoint, l_to_r, include_opposite,
+                                  opposite_only)
 
     def points(self, skip=0) -> Iterator[Point]:
         """Get generator for points in order, including nodes and waypoints."""
         return self.way.points(skip, self.endpoint is Way.Endpoint.END)
 
     def __repr__(self):
-        return (f'OrientedWay(way_id={self.way.id}, '
+        return (f'{OrientedWay.__name__}(way_id={self.way.id}, '
                 f'endpoint={self.endpoint.name[0]})')
 
 
-class Lane(NamedTuple):
+class LaneRef(NamedTuple):
     """A tuple containing the same as OrientedWay, with a lane index.
 
     The two first elements are equivalent to the values of OrientedWay and the
@@ -367,8 +366,8 @@ class Lane(NamedTuple):
 
     @staticmethod
     def build(way: Way, endpoint: Way.Endpoint, index: int):
-        """Create Lane from a Way instead of a weak reference."""
-        return Lane(EntityRef(way), endpoint, index)
+        """Create LaneRef from a Way instead of a weak reference."""
+        return LaneRef(EntityRef(way), endpoint, index)
 
     @property
     def way(self) -> Optional[Way]:
@@ -376,11 +375,11 @@ class Lane(NamedTuple):
         return self.way_ref()
 
     @property
-    def positive(self) -> Lane:
+    def positive(self) -> LaneRef:
         """Get equivalent lane with positive index."""
         if self.index >= 0:
             return self
-        return Lane(self.way_ref, self.endpoint.other, -self.index - 1)
+        return LaneRef(self.way_ref, self.endpoint.other, -self.index - 1)
 
     @property
     def oriented_way(self) -> OrientedWay:
@@ -392,5 +391,5 @@ class Lane(NamedTuple):
         return self.way.lane_distance_from_center(self.index, self.endpoint)
 
     def __repr__(self):
-        return (f'Lane(way_id={self.way.id}, '
+        return (f'{LaneRef.__name__}(way_id={self.way.id}, '
                 f'endpoint={self.endpoint.name[0]}, index={self.index})')

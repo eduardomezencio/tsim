@@ -16,14 +16,14 @@ from dataslots import with_slots
 from rtree.index import Rtree
 
 from tsim.model.geometry import Point, angle, line_intersection_safe
-from tsim.model.network.way import (HALF_LANE_WIDTH, LANE_WIDTH, Lane,
+from tsim.model.network.way import (HALF_LANE_WIDTH, LANE_WIDTH, LaneRef,
                                     OrientedWay)
 
 if TYPE_CHECKING:
     from tsim.model.network.node import Node
 
-    LaneConnection = Tuple[Lane, Lane]
-    LaneConnections = Dict[Lane, Set[Lane]]
+    LaneConnection = Tuple[LaneRef, LaneRef]
+    LaneConnections = Dict[LaneRef, Set[LaneRef]]
 
 MERGE_RADIUS = 0.1
 NEIGHBOR_RADIUS = 1.0
@@ -38,7 +38,7 @@ class Intersection:
     __slots__ = ('connections', 'connection_map', 'curves')
 
     connections: LaneConnections
-    connection_map: Dict[Tuple[Lane, OrientedWay], LaneConnection]
+    connection_map: Dict[Tuple[LaneRef, OrientedWay], LaneConnection]
     curves: Dict[LaneConnection, Curve]
 
     def __init__(self, node: Node):
@@ -48,7 +48,7 @@ class Intersection:
         build_conflict_points(self.curves)
 
     def iterate_connections(self) -> Iterator[LaneConnection]:
-        """Get iterator for connections as Tuple[Lane, Lane]s."""
+        """Get iterator for connections as Tuple[LaneRef, LaneRef]s."""
         for source, dests in self.connections.items():
             yield from product((source,), dests)
 
@@ -68,8 +68,8 @@ class Intersection:
 def build_lane_connections(node: Node) -> LaneConnections:
     """Calculate default lane connections for the given node."""
     angles: List[float]
-    connections: DefaultDict[Lane, Set[Lane]]
-    new_conn: DefaultDict[Lane, Set[Lane]]
+    connections: DefaultDict[LaneRef, Set[LaneRef]]
+    new_conn: DefaultDict[LaneRef, Set[LaneRef]]
     way: OrientedWay
     ways: Deque[OrientedWay]
 
@@ -89,15 +89,15 @@ def build_lane_connections(node: Node) -> LaneConnections:
     def self_connect():
         """Connect ways[0] to itself."""
         connections.update({l: {o} for l, o in zip(
-            way.iterate_lanes(opposite_only=True),
-            way.iterate_lanes(l_to_r=False))})
+            way.lane_refs(opposite_only=True),
+            way.lane_refs(l_to_r=False))})
 
     def connect_to(index: int, other: OrientedWay) -> LaneConnections:
         """Connect ways[0] to the given way."""
         outwards = angles[index] > pi * 2.0 / 3.0
-        for source, dest in zip(way.iterate_lanes(l_to_r=not(outwards),
-                                                  opposite_only=True),
-                                other.iterate_lanes(outwards)):
+        for source, dest in zip(way.lane_refs(l_to_r=not(outwards),
+                                              opposite_only=True),
+                                other.lane_refs(outwards)):
             new_conn[source].add(dest)
             conn_angles[(source, dest)] = angles[index]
 
@@ -146,8 +146,8 @@ def build_lane_connections(node: Node) -> LaneConnections:
 
 
 def build_connection_map(node: Node, connections: LaneConnections) \
-        -> Dict[Tuple[Lane, OrientedWay], LaneConnection]:
-    """Create connection map from (Lane, OrientedWay) to LaneConnection.
+        -> Dict[Tuple[LaneRef, OrientedWay], LaneConnection]:
+    """Create connection map from (LaneRef, OrientedWay) to LaneConnection.
 
     The map contains all lanes that reach the given node. The lane connection
     it maps to can be from the lane itself or from another lane if there is no
@@ -157,7 +157,7 @@ def build_connection_map(node: Node, connections: LaneConnections) \
     for way in node.oriented_ways:
         missing = defaultdict(list)
         found = defaultdict(list)
-        for lane in way.iterate_lanes(opposite_only=True):
+        for lane in way.lane_refs(opposite_only=True):
             for dest_way in node.oriented_ways:
                 dest_lane = next((l for l in connections[lane]
                                   if l.oriented_way == dest_way),
@@ -192,8 +192,8 @@ def build_bezier_curves(node: Node, connections: LaneConnections) \
     for way in node.oriented_ways:
         vector = vectors[way]
         right = vector.rotated_right()
-        first = right * Lane(*way, 0).distance_from_center()
-        for lane in way.iterate_lanes(include_opposite=True):
+        first = right * LaneRef(*way, 0).distance_from_center()
+        for lane in way.lane_refs(include_opposite=True):
             points[lane] = (
                 vector * (node.geometry.distance(way) + HALF_LANE_WIDTH)
                 + right * lane.index * LANE_WIDTH
