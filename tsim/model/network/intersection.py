@@ -16,8 +16,7 @@ from dataslots import with_slots
 from rtree.index import Rtree
 
 from tsim.model.geometry import Point, angle, line_intersection_safe
-from tsim.model.network.way import (HALF_LANE_WIDTH, LANE_WIDTH, LaneRef,
-                                    OrientedWay)
+from tsim.model.network.way import LANE_WIDTH, LaneRef, OrientedWay
 
 if TYPE_CHECKING:
     from tsim.model.network.node import Node
