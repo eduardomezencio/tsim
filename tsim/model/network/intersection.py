@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from itertools import chain, combinations, islice, product
 from math import pi
 from statistics import median_low
@@ -25,7 +26,8 @@ if TYPE_CHECKING:
     LaneConnections = Dict[LaneRef, Set[LaneRef]]
 
 MERGE_RADIUS = 0.1
-NEIGHBOR_RADIUS = 1.0
+NEIGHBOR_RADIUS = 1.8
+NEIGHBOR_RADIUS_SQUARED = NEIGHBOR_RADIUS ** 2
 
 
 class Intersection:
@@ -41,10 +43,10 @@ class Intersection:
     curves: Dict[LaneConnection, Curve]
 
     def __init__(self, node: Node):
-        self.connections = build_lane_connections(node)
-        self.connection_map = build_connection_map(node, self.connections)
-        self.curves = build_bezier_curves(node, self.connections)
-        build_conflict_points(self.curves)
+        self.connections = _build_lane_connections(node)
+        self.connection_map = _build_connection_map(node, self.connections)
+        self.curves = _build_bezier_curves(node, self.connections)
+        _build_conflict_points(self.curves)
 
     def iterate_connections(self) -> Iterator[LaneConnection]:
         """Get iterator for connections as Tuple[LaneRef, LaneRef]s."""
@@ -64,7 +66,91 @@ class Intersection:
                     for c in self.iterate_connections())
 
 
-def build_lane_connections(node: Node) -> LaneConnections:
+class ConflictPointType(Enum):
+    """Types of conflict point."""
+
+    DIVERGE = auto()
+    MERGE = auto()
+    CROSSING = auto()
+
+
+@with_slots
+@dataclass(eq=False)
+class ConflictPoint:
+    """Conflict point in an intersection.
+
+    The point where two lane connections cross.
+    """
+
+    point: Point
+    type: ConflictPointType
+    neighbors: Set[ConflictPoint] = field(default_factory=set, repr=False)
+    curves: Set[Curve] = field(default_factory=set, repr=False)
+
+
+class Curve:
+    """The curve of a lane connection.
+
+    Contains the bezier curve connecting one lane to the other and the conflict
+    points that intersect with this curve.
+    """
+
+    __slots__ = ('curve', 'length', '_conflict_points', '_sorted')
+
+    curve: bezier.Curve
+    length: float
+    _conflict_points: List[Tuple[float, ConflictPoint]]
+    _sorted: bool
+
+    def __init__(self, curve: bezier.Curve):
+        self.curve = curve
+        self.length = curve.length
+        self._conflict_points = []
+        self._sorted = True
+
+    @property
+    def conflict_points(self) -> Iterator(Tuple[float, ConflictPoint]):
+        """Get iterator for sorted conflict points."""
+        if not self._sorted:
+            self._conflict_points.sort()
+            self._sorted = True
+        yield from self._conflict_points
+
+    def add_conflict_point(self, param: float, point: ConflictPoint):
+        """Add conflict point to curve, with given param for sorting."""
+        self._sorted = False
+        self._conflict_points.append((param, point))
+        point.curves.add(self)
+
+    def replace_conflict_point(self, old: ConflictPoint, new: ConflictPoint):
+        """Replace conflict point, for use when merging conflict points."""
+        for i, (param, point) in enumerate(self._conflict_points):
+            if point is old:
+                self._conflict_points[i] = (param, new)
+                new.curves.add(self)
+                return
+        raise ValueError('Old conflict point not found in curve.')
+
+    def remove_conflict_point_duplicates(self):
+        """Let each conflict point appear only once on this curve."""
+        point_map = defaultdict(list)
+        for param, cpoint in self.conflict_points:
+            point_map[cpoint].append(param)
+        for cpoint, params in list(point_map.items()):
+            if len(params) <= 1:
+                continue
+            self._conflict_points.remove((median_low(params), cpoint))
+
+    def intersect(self, other: Curve) -> numpy.ndarray:
+        """Calculate intersection of bezier curves."""
+        return self.curve.intersect(other.curve)
+
+    def evaluate(self, param: float) -> Point:
+        """Evaluate bezier curve at t=param."""
+        return Point(*chain.from_iterable(self.curve.evaluate(param)))
+
+
+def _build_lane_connections(node: Node) -> LaneConnections:
     """Calculate default lane connections for the given node."""
     angles: List[float]
     connections: DefaultDict[LaneRef, Set[LaneRef]]
@@ -144,7 +230,7 @@ def build_lane_connections(node: Node) -> LaneConnections:
     return connections
 
 
-def build_connection_map(node: Node, connections: LaneConnections) \
+def _build_connection_map(node: Node, connections: LaneConnections) \
         -> Dict[Tuple[LaneRef, OrientedWay], LaneConnection]:
     """Create connection map from (LaneRef, OrientedWay) to LaneConnection.
 
@@ -181,7 +267,7 @@ def build_connection_map(node: Node, connections: LaneConnections) \
     return result
 
 
-def build_bezier_curves(node: Node, connections: LaneConnections) \
+def _build_bezier_curves(node: Node, connections: LaneConnections) \
         -> Dict[LaneConnection, Curve]:
     """Create bezier curves for each lane connection on the node."""
     vectors = {w: w.way.direction_from_node(node, w.endpoint).normalized()
@@ -214,7 +300,7 @@ def build_bezier_curves(node: Node, connections: LaneConnections) \
     return curves
 
 
-def build_conflict_points(curves: Dict[LaneConnection, Curve]):
+def _build_conflict_points(curves: Dict[LaneConnection, Curve]):
     """Create conflict points from lane connection curves.
 
     Fill conflict points in given Curve objects. Merges points that are less
@@ -222,26 +308,60 @@ def build_conflict_points(curves: Dict[LaneConnection, Curve]):
     neighbors.
     """
     points = {}
-    for curve1, curve2 in combinations(curves.values(), 2):
-        try:
-            intersection = curve1.intersect(curve2)[:, 0]
-            point = ConflictPoint(curve1.evaluate(intersection[0]))
-            curve1.add_conflict_point(intersection[0], point)
-            curve2.add_conflict_point(intersection[1], point)
+    diverge = defaultdict(set)
+    merge = defaultdict(set)
+    for (lanes1, curve1), (lanes2, curve2) in combinations(curves.items(), 2):
+        if lanes1[0] == lanes2[0]:
+            diverge[lanes1[0]].update((curve1, curve2))
+        if lanes1[1] == lanes2[1]:
+            merge[lanes1[1]].update((curve1, curve2))
+        _add_crossing_conflict_points(points, curve1, curve2)
+
+    _add_diverge_merge_conflict_points(points, diverge, merge)
+
+    if len(points) > 1:
+        rtree = Rtree((id_, p.point.bounding_rect, None)
+                      for id_, p in points.items())
+        _merge_points(points, rtree)
+        _fill_neighbors(points, rtree)
+
+
+def _add_crossing_conflict_points(points: Dict[int, ConflictPoint],
+                                  curve1: Curve, curve2: Curve):
+    """Create crossing conflict points points between given curves."""
+    try:
+        intersection = curve1.intersect(curve2)[:, 0]
+
+        # Intersections close to the endpoints are diverging or merging.
+        distance = (0.5 - abs(intersection[0] - 0.5)) * curve1.length
+        if distance < LANE_WIDTH / 3:
+            return
+
+        point = ConflictPoint(curve1.evaluate(intersection[0]),
+                              ConflictPointType.CROSSING)
+        curve1.add_conflict_point(intersection[0], point)
+        curve2.add_conflict_point(intersection[1], point)
+        points[id(point)] = point
+    except IndexError:
+        pass
+
+
+def _add_diverge_merge_conflict_points(points: Dict[int, ConflictPoint],
+                                       diverge: Dict[LaneRef, Set[Curve]],
+                                       merge: Dict[LaneRef, Set[Curve]]):
+    """Create diverge and merge points from given dicts."""
+    for collection, type_, param in zip(
+            (diverge, merge),
+            (ConflictPointType.DIVERGE, ConflictPointType.MERGE),
+            (0.0, 1.0)):
+        for curves_ in collection.values():
+            point = ConflictPoint(next(iter(curves_)).evaluate(param), type_)
             points[id(point)] = point
-        except IndexError:
-            pass
-
-    if len(points) < 2:
-        return
-
-    rtree = Rtree((id_, p.point.bounding_rect, None)
-                  for id_, p in points.items())
-    merge_points(points, rtree)
-    fill_neighbors(points, rtree)
+            for curve in curves_:
+                curve.add_conflict_point(param, point)
 
 
-def merge_points(points: Dict[int, ConflictPoint], rtree: Rtree):
+def _merge_points(points: Dict[int, ConflictPoint], rtree: Rtree):
     """Merge conflict points closer than MERGE_RADIUS."""
     curves = set()
     merged = set()
@@ -265,87 +385,14 @@ def merge_points(points: Dict[int, ConflictPoint], rtree: Rtree):
         curve.remove_conflict_point_duplicates()
 
 
-def fill_neighbors(points: Dict[int, ConflictPoint], rtree: Rtree):
+def _fill_neighbors(points: Dict[int, ConflictPoint], rtree: Rtree):
     """Add conflict points closer than NEIGHBOR_RADIUS as neighbors."""
     for id_, point in points.items():
         for other_id in rtree.intersection(
                 point.point.enclosing_rect(NEIGHBOR_RADIUS)):
             if other_id == id_:
                 continue
-            point.neighbors.add(points[other_id])
-
-
-@with_slots
-@dataclass(eq=False)
-class ConflictPoint:
-    """Conflict point in an intersection.
-
-    The point where two lane connections cross.
-    """
-
-    point: Point
-    neighbors: Set[ConflictPoint] = field(default_factory=set, repr=False)
-    curves: Set[Curve] = field(default_factory=set, repr=False)
-
-
-class Curve:
-    """The curve of a lane connection.
-
-    Contains the bezier curve connecting one lane to the other and the conflict
-    points that intersect with this curve.
-    """
-
-    __slots__ = ('curve', 'length', '_conflict_points', '_sorted')
-
-    curve: bezier.Curve
-    length: float
-    _conflict_points: List[Tuple[float, ConflictPoint]]
-    _sorted: bool
-
-    def __init__(self, curve: bezier.Curve):
-        self.curve = curve
-        self.length = curve.length
-        self._conflict_points = []
-        self._sorted = True
-
-    @property
-    def conflict_points(self) -> Iterator(Tuple[float, ConflictPoint]):
-        """Get iterator for sorted conflict points."""
-        if not self._sorted:
-            self._conflict_points.sort()
-            self._sorted = True
-        yield from self._conflict_points
-
-    def add_conflict_point(self, param: float, point: ConflictPoint):
-        """Add conflict point to curve, with given param for sorting."""
-        self._sorted = False
-        self._conflict_points.append((param, point))
-        point.curves.add(self)
-
-    def replace_conflict_point(self, old: ConflictPoint, new: ConflictPoint):
-        """Replace conflict point, for use when merging conflict points."""
-        for i, (param, point) in enumerate(self._conflict_points):
-            if point is old:
-                self._conflict_points[i] = (param, new)
-                new.curves.add(self)
-                return
-        raise ValueError('Old conflict point not found in curve.')
-
-    def remove_conflict_point_duplicates(self):
-        """Let each conflict point appear only once on this curve."""
-        point_map = defaultdict(list)
-        for param, cpoint in self.conflict_points:
-            point_map[cpoint].append(param)
-        for cpoint, params in list(point_map.items()):
-            if len(params) > 1:
-                params.remove(median_low(params))
-            for param in params:
-                self._conflict_points.remove((param, cpoint))
-
-    def intersect(self, other: Curve) -> numpy.ndarray:
-        """Calculate intersection of bezier curves."""
-        return self.curve.intersect(other.curve)
-
-    def evaluate(self, param: float) -> Point:
-        """Evaluate bezier curve at t=param."""
-        return Point(*chain.from_iterable(self.curve.evaluate(param)))
+            other = points[other_id]
+            distance_squared = point.point.distance_squared(other.point)
+            if distance_squared <= NEIGHBOR_RADIUS_SQUARED:
+                point.neighbors.add(other)

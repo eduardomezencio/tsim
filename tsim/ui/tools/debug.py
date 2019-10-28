@@ -40,13 +40,13 @@ class Debug(Tool):
         self._clear_selection()
         selected = INDEX.get_at(self.cursor.position, of_type=Node)
         if selected:
-            log.debug(selected[0].xurl)
             self.card = create_lane_connections_card(selected[0], RENDER)
         else:
             selected = INDEX.get_at(self.cursor.position, of_type=Way)
-            if selected:
-                log.debug(selected[0].xurl)
-                log.debug(str(selected[0]))
+
+        if selected:
+            log.debug(selected[0].xurl)
+            log.debug(str(selected[0]))
 
     def on_cursor_move(self):
         """Cursor moved callback."""

@@ -14,6 +14,7 @@ from panda3d.core import (CardMaker, ConfigVariableDouble, Geom, GeomNode,
 from PIL import Image
 
 from tsim.model.geometry import Vector
+from tsim.model.network.intersection import ConflictPointType
 from tsim.model.network.node import Node
 from tsim.model.network.way import LANE_WIDTH
 from tsim.ui import textures
@@ -24,8 +25,9 @@ CARD_MAKER.set_frame((-16, 16, -16, 16))
 COLORS = ('crimson', 'orange', 'gold', 'limegreen',
           'turquoise', 'deepskyblue', 'blueviolet', 'hotpink')
 LEVEL_HEIGHT = ConfigVariableDouble('level-height').get_value()
-MIDDLE = Vector(512, -512)
-PPM = 32
+RESOLUTION = 1024
+MIDDLE = Vector(RESOLUTION // 2, -RESOLUTION // 2)
+PPM = RESOLUTION // 32
 VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
 
 
@@ -94,7 +96,7 @@ def _generate_mesh(node: Node) -> Geom:
 
 def _create_lane_connections_image(node: Node) -> Image:
     """Generate image showing lane connections on a node."""
-    image = Image.new('RGBA', (1024, 1024))
+    image = Image.new('RGBA', (RESOLUTION, RESOLUTION))
     draw = aggdraw.Draw(image)
 
     colors = dict(zip(node.oriented_ways, cycle(COLORS)))
@@ -108,16 +110,27 @@ def _create_lane_connections_image(node: Node) -> Image:
         path.moveto(*start)
         path.curveto(*start, *crossing, *end)
         path.lineto(*(end + vector))
-        draw.path(path, aggdraw.Pen(colors[lanes[0].oriented_way], 12, 224))
+        draw.path(path, aggdraw.Pen(colors[lanes[0].oriented_way],
+                                    0.25 * PPM, 224))
 
     pen = aggdraw.Pen('black', 1, 192)
-    brush = aggdraw.Brush('white', 192)
+    brush = {ConflictPointType.DIVERGE: aggdraw.Brush('green', 192),
+             ConflictPointType.MERGE: aggdraw.Brush('yellow', 192),
+             ConflictPointType.CROSSING: aggdraw.Brush('white', 192)}
 
-    for cpoint in set(p for _, p in
-                      chain.from_iterable(c.conflict_points for c in
-                                          node.intersection.curves.values())):
-        rect = (cpoint.point * PPM + MIDDLE).y_flipped().enclosing_rect(16.0)
-        draw.ellipse(rect, pen, brush)
+    cpoints = set(p for _, p in
+                  chain.from_iterable(c.conflict_points for c in
+                                      node.intersection.curves.values()))
+    for cpoint in cpoints:
+        point = (cpoint.point * PPM + MIDDLE).y_flipped()
+        draw.ellipse(point.enclosing_rect(0.25 * PPM), pen, brush[cpoint.type])
+
+    pen = aggdraw.Pen('black', 1, 32)
+    for cpoint in cpoints:
+        for neighbor in cpoint.neighbors:
+            points = ((p.point * PPM + MIDDLE).y_flipped()
+                      for p in (cpoint, neighbor))
+            draw.line(tuple(chain.from_iterable(points)), pen)
 
     draw.flush()
     # image.show()
