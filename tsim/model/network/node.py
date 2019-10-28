@@ -15,7 +15,8 @@ from tsim.model.entity import Entity, EntityRef
 from tsim.model.geometry import (BoundingRect, Point, Vector,
                                  line_intersection, midpoint)
 from tsim.model.network.intersection import Intersection
-from tsim.model.network.way import LANE_WIDTH, LaneRef, OrientedWay, Way
+from tsim.model.network.way import (LANE_WIDTH, Endpoint, LaneRef, OrientedWay,
+                                    Way)
 
 if TYPE_CHECKING:
     from tsim.model.network.intersection import Curve, LaneConnection
@@ -75,8 +76,8 @@ class Node(Entity):
     def oriented_ways(self) -> Iterator[OrientedWay]:
         """Get incident ways with orentation (endpoint)."""
         return (OrientedWay.build(r.value, e) for r, e in chain(
-            zip(self.starts, repeat(Way.Endpoint.START)),
-            zip(self.ends, repeat(Way.Endpoint.END))))
+            zip(self.starts, repeat(Endpoint.START)),
+            zip(self.ends, repeat(Endpoint.END))))
 
     @property
     def ways(self) -> Set[Way]:

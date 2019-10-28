@@ -97,7 +97,7 @@ def line_intersection_safe(point1: Point, normal_vector1: Vector,
     Vectors passed as arguments must be normalized already to help checking for
     parallelism. If the two lines are parallel or almost parallel, returns the
     midpoint of given points instead. Lines are almost parallel if the absolute
-    value if the dot product of the vectors if above the threshold.
+    value if the dot product of the vectors is above the threshold.
     """
     if abs(normal_vector1.dot_product(normal_vector2)) >= threshold:
         return midpoint(point1, point2)
@@ -143,6 +143,10 @@ class Vector:
     def norm(self) -> float:
         """Calculate norm of the vector."""
         return sqrt(self.x ** 2.0 + self.y ** 2.0)
+
+    def norm_squared(self) -> float:
+        """Calculate norm of the vector squared."""
+        return self.x ** 2.0 + self.y ** 2.0
 
     def normalized(self) -> Vector:
         """Get this vector normalized."""
@@ -256,6 +260,10 @@ class Vector3(Vector):
     def norm(self) -> float:
         """Calculate norm of the vector."""
         return sqrt(self.x ** 2.0 + self.y ** 2.0 + self.z ** 2.0)
+
+    def norm_squared(self) -> float:
+        """Calculate norm of the vector squared."""
+        return self.x ** 2.0 + self.y ** 2.0 + self.z ** 2.0
 
     def normalized(self) -> Vector3:
         """Get this vector normalized."""

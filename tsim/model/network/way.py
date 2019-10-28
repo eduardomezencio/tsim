@@ -6,15 +6,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 from itertools import accumulate, chain, islice
 from math import sqrt
-from typing import (TYPE_CHECKING, Iterable, Iterator, NamedTuple, Optional,
-                    Tuple)
+from typing import (TYPE_CHECKING, Iterable, Iterator, List, NamedTuple,
+                    Optional, Tuple)
 
 from cached_property import cached_property
 from dataslots import with_slots
 
 import tsim.model.index as Index
 from tsim.model.entity import Entity, EntityRef
-from tsim.model.geometry import BoundingRect, Point, Vector
+from tsim.model.geometry import BoundingRect, Point, Vector, sec
+from tsim.utils.iterators import window_iter
 
 if TYPE_CHECKING:
     from tsim.model.network.node import Node
@@ -22,6 +23,18 @@ if TYPE_CHECKING:
 DEFAULT_MAX_SPEED_KPH = 60.0
 LANE_WIDTH = 3.0
 HALF_LANE_WIDTH = 0.5 * LANE_WIDTH
+
+
+class Endpoint(Enum):
+    """Endpoints of a Way."""
+
+    START = 0
+    END = 1
+
+    @property
+    def other(self) -> Endpoint:
+        """Get the opposite endpoint."""
+        return Endpoint.END if self is Endpoint.START else Endpoint.START
 
 
 @with_slots
@@ -32,18 +45,6 @@ class Way(Entity):
     A Way connects two Nodes and can have a list of intermediary points, called
     waypoints.
     """
-
-    class Endpoint(Enum):
-        """Endpoints of a Way."""
-
-        START = 0
-        END = 1
-
-        @property
-        def other(self) -> Way.Endpoint:
-            """Get the opposite endpoint."""
-            return (Way.Endpoint.END if self is Way.Endpoint.START
-                    else Way.Endpoint.START)
 
     start: Node
     end: Node
@@ -56,6 +57,11 @@ class Way(Entity):
         self.start.reset_connections()
         self.end.ends.append(EntityRef(self))
         self.end.reset_connections()
+
+    @cached_property
+    def geometry(self) -> WayGeometry:
+        """Get the geometry info for the way."""
+        return WayGeometry(self)
 
     @cached_property
     def length(self) -> float:
@@ -88,8 +94,13 @@ class Way(Entity):
         return self.lane_count[1::-1]
 
     @property
+    def segment_count(self) -> int:
+        """Get number of segments that compose this way."""
+        return len(self.waypoints) + 1
+
+    @property
     def is_valid(self) -> bool:
-        """Check if way has start and end nodes."""
+        """Check if way has both start and end nodes."""
         return self.start is not None and self.end is not None
 
     def calc_bounding_rect(self,
@@ -105,9 +116,13 @@ class Way(Entity):
                      for s, v in zip(self.points(), self.vectors()))
         return result if squared else sqrt(result)
 
-    def other(self, node: Node):
+    def other(self, node: Node) -> Node:
         """Get the other endpoint of the way, opposite to node."""
         return self.start if self.end is node else self.end
+
+    def oriented(self, endpoint: Endpoint = Endpoint.START) -> OrientedWay:
+        """Get OrientedWay from this way."""
+        return OrientedWay.build(self, endpoint)
 
     def points(self, skip=0, reverse=False) -> Iterator[Point]:
         """Get generator for points in order, including nodes and waypoints."""
@@ -121,11 +136,7 @@ class Way(Entity):
 
     def point_pairs(self, reverse=False) -> Iterator[Tuple[Point, Point]]:
         """Get pairs of consecutive points, including nodes and waypoints."""
-        points = self.points(reverse=reverse)
-        last = next(points, None)
-        for point in points:
-            yield (last, point)
-            last = point
+        return window_iter(self.points(reverse=reverse))
 
     def vectors(self, reverse=False) -> Iterator[Vector]:
         """Get vectors for each edge on the way."""
@@ -142,31 +153,25 @@ class Way(Entity):
         yield 0.0
         yield from accumulate(self.distances())
 
-    def waypoint_normals(self) -> Iterator[Vector]:
+    def waypoint_normals(self, reverse: bool = False) -> Iterator[Vector]:
         """Get the 'normals' of this way's waypoints.
 
         Normal here is used for the lack of a better term, meaning a unit
         vector pointing to the right side of the road. One is returned for each
-        node or waypoint on the way.
+        waypoint.
         """
-        other = self.waypoints[0] if self.waypoints else self.end.position
-        yield (other - self.start.position).rotated_left().normalized()
-
-        window = zip(self.points(), self.points(skip=1), self.points(skip=2))
         yield from (((q - p).normalized() + (r - q).normalized())
-                    .rotated_left().normalized()
-                    for p, q, r in window)
+                    .rotated_right().normalized()
+                    for p, q, r in window_iter(self.points(reverse=reverse),
+                                               size=3))
 
-        other = self.waypoints[-1] if self.waypoints else self.start.position
-        yield (self.end.position - other).rotated_left().normalized()
-
-    def edge_normals(self) -> Iterator[Vector]:
+    def edge_normals(self, reverse: bool = False) -> Iterator[Vector]:
         """Get the 'normals' of this way's edges.
 
         Get a unit vector pointing right from each edge on the way.
         """
-        yield from ((p - q).rotated_left().normalized()
-                    for p, q in self.point_pairs())
+        yield from ((q - p).rotated_right().normalized()
+                    for p, q in self.point_pairs(reverse=reverse))
 
     def direction_from_node(self, node: Node,
                             priority: Endpoint = Endpoint.START) -> Vector:
@@ -179,7 +184,7 @@ class Way(Entity):
         first way point if direction is START or to the last waypoint if
         direction is END.
         """
-        if priority is Way.Endpoint.START and node is self.start:
+        if priority is Endpoint.START and node is self.start:
             reverse = False
         else:
             reverse = node is self.end
@@ -205,7 +210,7 @@ class Way(Entity):
         """
         if distance >= 0.0:
             counter = distance
-            reverse = endpoint is Way.Endpoint.END
+            reverse = endpoint is Endpoint.END
             for point1, point2 in self.point_pairs(reverse=reverse):
                 length = point1.distance(point2)
                 if counter > length:
@@ -217,7 +222,7 @@ class Way(Entity):
                     return point1 + vector * counter + side
         raise ValueError('Point outside of Way.')
 
-    def lane_refs(self, direction: Way.Endpoint, l_to_r: bool = True,
+    def lane_refs(self, direction: Endpoint, l_to_r: bool = True,
                   include_opposite: bool = False,
                   opposite_only: bool = False) -> Iterator[LaneRef]:
         """Get lanes in the given direction.
@@ -283,6 +288,130 @@ class Way(Entity):
         return f'{Way.__name__}(id={self.id}, xid={self.xid})'
 
 
+class WaySegment(NamedTuple):
+    """A segment in the way geometry.
+
+    The segment starts at point start and ends at point end. The vector is
+    normalized, pointing from start to end and the normal points 90 degrees
+    clockwise from vector. The offsets determine the positions of the points
+    that make the trapezoid of the way segment. For example:
+
+    start_left = (start - normal * way_geometry.half_width
+                  + vector * start_left_offset)
+    """
+
+    start: Point
+    end: Point
+    vector: Vector
+    normal: Vector
+    start_left_offset: float
+    start_right_offset: float
+    end_left_offset: float
+    end_right_offset: float
+
+    def start_left(self, half_width: float) -> Point:
+        """Get the left start point of the segment trapezoid."""
+        return (self.start
+                - self.normal * half_width
+                + self.vector * self.start_left_offset)
+
+    def start_right(self, half_width: float) -> Point:
+        """Get the right start point of the segment trapezoid."""
+        return (self.start
+                + self.normal * half_width
+                + self.vector * self.start_right_offset)
+
+    def end_left(self, half_width: float) -> Point:
+        """Get the left end point of the segment trapezoid."""
+        return (self.end
+                - self.normal * half_width
+                + self.vector * self.end_left_offset)
+
+    def end_right(self, half_width: float) -> Point:
+        """Get the right end point of the segment trapezoid."""
+        return (self.end
+                + self.normal * half_width
+                + self.vector * self.end_right_offset)
+
+    def length(self) -> float:
+        """Get the length of this segment.
+
+        The length is calculated by translating start and end points by the
+        avarage of their left and right points and measuring the distance
+        between them. The sum of all segment lenths will not be equal to the
+        way length.
+        """
+        mean_start = (self.start_left_offset + self.start_right_offset) / 2
+        mean_end = (self.end_left_offset + self.end_right_offset) / 2
+        return abs(self.end + self.vector * mean_end
+                   - (self.start + self.vector * mean_start))
+
+
+@with_slots
+@dataclass(eq=False)
+class WayGeometry:
+    """Information on the geometric shape of a way."""
+
+    way: Way
+    half_width: float = field(init=False)
+    segments: List[WaySegment] = field(init=False, default_factory=list)
+
+    def __post_init__(self):
+        self.half_width = self.way.total_lane_count * HALF_LANE_WIDTH
+        self._build_segments()
+
+    @property
+    def start_offset(self):
+        """Distance from the start node to the start of the way geometry."""
+        return self.way.start.geometry.distance(self.way.oriented())
+
+    @property
+    def end_offset(self):
+        """Distance from the end node to the end of the way geometry."""
+        return self.way.end.geometry.distance(
+            self.way.oriented(endpoint=Endpoint.END))
+
+    def _build_segments(self):
+        """Build way segments."""
+        for i, points in enumerate(window_iter(self.way.points(), size=3)):
+            vectors = ((points[1] - points[0]), (points[2] - points[1]))
+            norm_vectors = tuple(v.normalized() for v in vectors)
+            normals = tuple(v.rotated_right() for v in norm_vectors)
+
+            vector = (norm_vectors[0] + norm_vectors[1]).normalized()
+            width_vector = (sec(vector, vectors[1]) * self.half_width
+                            * vector.rotated_right())
+
+            width_projection = width_vector.scalar_projection_on(vectors[0])
+            if width_projection > 0:
+                end_point = points[1] - width_vector.projection_on(vectors[0])
+            else:
+                end_point = points[1] + width_vector.projection_on(vectors[0])
+
+            start_offset = 0.0 if i > 0 else self.start_offset
+            self.segments.append(
+                WaySegment(points[0], end_point, norm_vectors[0], normals[0],
+                           start_offset, start_offset, 0.0, 0.0))
+
+            self.segments.append(
+                WaySegment(end_point, points[1], norm_vectors[0], normals[0],
+                           0.0, 0.0, -width_projection, width_projection))
+
+            end_point = points[1] + abs(width_projection) * norm_vectors[1]
+            self.segments.append(
+                WaySegment(points[1], end_point, norm_vectors[1], normals[1],
+                           width_projection, -width_projection, 0.0, 0.0))
+
+        points = list(islice(self.way.points(reverse=True), 2))
+        start_offset = (self.start_offset if self.way.segment_count == 1
+                        else 0.0)
+        end_offset = -self.end_offset
+        vector = (points[0] - points[1]).normalized()
+        self.segments.append(
+            WaySegment(points[1], points[0], vector, vector.rotated_right(),
+                       start_offset, start_offset, end_offset, end_offset))
+
+
 class OrientedWay(NamedTuple):
     """A tuple containing a Way and an Endpoint.
 
@@ -293,10 +422,10 @@ class OrientedWay(NamedTuple):
     """
 
     way_ref: EntityRef[Way]
-    endpoint: Way.Endpoint
+    endpoint: Endpoint
 
     @staticmethod
-    def build(way: Way, endpoint: Way.Endpoint):
+    def build(way: Way, endpoint: Endpoint):
         """Create OrientedWay from a Way instead of a weak reference."""
         return OrientedWay(EntityRef(way), endpoint)
 
@@ -308,13 +437,13 @@ class OrientedWay(NamedTuple):
     @property
     def start(self) -> Node:
         """Get the source node of the way in this direction."""
-        return (self.way.start if self.endpoint is Way.Endpoint.START
+        return (self.way.start if self.endpoint is Endpoint.START
                 else self.way.end)
 
     @property
     def end(self) -> Node:
         """Get the target node of the way in this direction."""
-        return (self.way.end if self.endpoint is Way.Endpoint.START
+        return (self.way.end if self.endpoint is Endpoint.START
                 else self.way.start)
 
     @property
@@ -332,6 +461,10 @@ class OrientedWay(NamedTuple):
         """Get the weight of the way in this direction."""
         return self.way.weight[self.endpoint.value]
 
+    def flipped(self) -> OrientedWay:
+        """Get OrientedWay with same way in the other direction."""
+        return OrientedWay(self.way_ref, self.endpoint.other)
+
     def lane_refs(self, l_to_r: bool = True, include_opposite: bool = False,
                   opposite_only: bool = False) -> Iterator[LaneRef]:
         """Get lanes in the direction of the oriented way.
@@ -343,7 +476,7 @@ class OrientedWay(NamedTuple):
 
     def points(self, skip=0) -> Iterator[Point]:
         """Get generator for points in order, including nodes and waypoints."""
-        return self.way.points(skip, self.endpoint is Way.Endpoint.END)
+        return self.way.points(skip, self.endpoint is Endpoint.END)
 
     def __repr__(self):
         return (f'{OrientedWay.__name__}(way_id={self.way.id}, '
@@ -361,11 +494,11 @@ class LaneRef(NamedTuple):
     """
 
     way_ref: EntityRef[Way]
-    endpoint: Way.Endpoint
+    endpoint: Endpoint
     index: int
 
     @staticmethod
-    def build(way: Way, endpoint: Way.Endpoint, index: int):
+    def build(way: Way, endpoint: Endpoint, index: int):
         """Create LaneRef from a Way instead of a weak reference."""
         return LaneRef(EntityRef(way), endpoint, index)
 
@@ -375,16 +508,27 @@ class LaneRef(NamedTuple):
         return self.way_ref()
 
     @property
+    def oriented_way(self) -> OrientedWay:
+        """Get oriented way from this lane."""
+        return OrientedWay(self.way_ref, self.endpoint)
+
+    @property
+    def start(self) -> Node:
+        """Get the start node of the lane."""
+        return (self.way.start if self.endpoint is Endpoint.START
+                else self.way.end)
+
+    @property
+    def end(self) -> Node:
+        """Get the end node of the lane."""
+        return (self.way.end if self.endpoint is Endpoint.START
+                else self.way.start)
+
     def positive(self) -> LaneRef:
         """Get equivalent lane with positive index."""
         if self.index >= 0:
             return self
         return LaneRef(self.way_ref, self.endpoint.other, -self.index - 1)
-
-    @property
-    def oriented_way(self) -> OrientedWay:
-        """Get oriented way from this lane."""
-        return OrientedWay(self.way_ref, self.endpoint)
 
     def distance_from_center(self) -> float:
         """Get distance to the right from way center to the lane."""
@@ -393,3 +537,81 @@ class LaneRef(NamedTuple):
     def __repr__(self):
         return (f'{LaneRef.__name__}(way_id={self.way.id}, '
                 f'endpoint={self.endpoint.name[0]}, index={self.index})')
+
+
+class LaneSegment(NamedTuple):
+
+    distance: float
+    way_distance: float
+    start_point: Point
+    vector: Vector
+
+
+class Lane:
+
+    __slots__ = 'segments', 'lane_ref'
+
+    lane_ref: LaneRef
+    distance_from_center: float
+    length: float
+    segments: Tuple[LaneSegment]
+
+    def __init__(self, lane_ref: LaneRef,
+                 vectors: Iterator[Vector] = None,
+                 edge_normals: Iterator[Vector] = None,
+                 waypoint_normals: Iterator[Vector] = None):
+        self.lane_ref = lane_ref.positive()
+        self.distance_from_center = lane_ref.distance_from_center()
+
+        reverse = self.endpoint is Endpoint.END
+        if vectors is None:
+            vectors = self.way.vectors(reverse=reverse)
+        if edge_normals is None:
+            edge_normals = self.way.edge_normals(reverse=reverse)
+        if waypoint_normals is None:
+            waypoint_normals = self.way.waypoint_normals(reverse=reverse)
+
+        self._build_segments(vectors, edge_normals, waypoint_normals)
+
+    @property
+    def way(self) -> Optional[Way]:
+        """Get the referenced way."""
+        return self.lane_ref.way_ref()
+
+    @property
+    def endpoint(self) -> Endpoint:
+        """Get the lane orientation."""
+        return self.lane_ref.endpoint
+
+    @property
+    def index(self) -> int:
+        """Get lane index."""
+        return self.lane_ref.index
+
+    @property
+    def oriented_way(self) -> OrientedWay:
+        """Get oriented way from this lane."""
+        return self.lane_ref.oriented_way
+
+    @property
+    def start(self) -> Node:
+        """Get the start node of the lane."""
+        return self.lane_ref.start
+
+    @property
+    def end(self) -> Node:
+        """Get the end node of the lane."""
+        return self.lane_ref.end
+
+    def _build_segments(self, vectors: Iterator[Vector] = None,
+                        edge_normals: Iterator[Vector] = None,
+                        waypoint_normals: Iterator[Vector] = None):
+        length = 0.0
+        distance = 0.0
+        way_distance = self.start.geometry.distance(self.oriented_way)
+
+        for i, (vector, edge_normal, waypoint_normal) in enumerate(
+                zip(vectors, edge_normals, waypoint_normals)):
+            vector = vector.normalized()
+
+        self.length = length
