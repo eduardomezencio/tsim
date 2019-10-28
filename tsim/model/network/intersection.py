@@ -194,10 +194,9 @@ def build_bezier_curves(node: Node, connections: LaneConnections) \
         right = vector.rotated_right()
         first = right * LaneRef(*way, 0).distance_from_center()
         for lane in way.lane_refs(include_opposite=True):
-            points[lane] = (
-                vector * (node.geometry.distance(way) + HALF_LANE_WIDTH)
-                + right * lane.index * LANE_WIDTH
-                + first)
+            points[lane] = (vector * node.geometry.distance(way)
+                            + right * lane.index * LANE_WIDTH
+                            + first)
 
     crossings = {}
     for source, dests in connections.items():
