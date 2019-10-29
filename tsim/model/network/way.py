@@ -14,7 +14,8 @@ from dataslots import with_slots
 
 import tsim.model.index as Index
 from tsim.model.entity import Entity, EntityRef
-from tsim.model.geometry import BoundingRect, Point, Vector, sec
+from tsim.model.geometry import (BoundingRect, Point, Vector,
+                                 line_intersection, sec)
 from tsim.utils.iterators import window_iter
 
 if TYPE_CHECKING:
@@ -62,6 +63,19 @@ class Way(Entity):
     def geometry(self) -> WayGeometry:
         """Get the geometry info for the way."""
         return WayGeometry(self)
+
+    @cached_property
+    def lanes(self) -> Tuple[Lane]:
+        """Get the lanes of this way in a tuple.
+
+        The indexes of the lanes are as in a LaneRef oriented from START. Lane
+        -1 is the first lane going to the opposite direction and so on. This
+        kind of indexing will work because Python.
+        """
+        return tuple(chain(
+            (Lane(l) for l in self.lane_refs(Endpoint.START)),
+            (Lane(l) for l in self.lane_refs(Endpoint.START,
+                                             opposite_only=True))))
 
     @cached_property
     def length(self) -> float:
@@ -193,8 +207,9 @@ class Way(Entity):
         point1, point2 = islice(self.points(reverse=reverse), 2)
         return point2 - point1
 
-    def lane_distance_from_center(
-            self, lane: int, endpoint: Endpoint = Endpoint.START) -> float:
+    def lane_distance_from_center(self, lane: int,
+                                  endpoint: Endpoint = Endpoint.START) \
+            -> float:
         """Get distance to the right from way center to the lane."""
         return (1 + lane
                 - self.lane_count[endpoint.value]
@@ -291,10 +306,10 @@ class Way(Entity):
 class WaySegment(NamedTuple):
     """A segment in the way geometry.
 
-    The segment starts at point start and ends at point end. The vector is
-    normalized, pointing from start to end and the normal points 90 degrees
-    clockwise from vector. The offsets determine the positions of the points
-    that make the trapezoid of the way segment. For example:
+    The segment starts at point `start` and ends at point `end`. The `vector`
+    is normalized, pointing from `start` to `end` and the `normal` points 90
+    degrees clockwise from `vector`. The offsets determine the positions of the
+    points that make the trapezoid of the way segment. For example:
 
     start_left = (start - normal * way_geometry.half_width
                   + vector * start_left_offset)
@@ -308,6 +323,17 @@ class WaySegment(NamedTuple):
     start_right_offset: float
     end_left_offset: float
     end_right_offset: float
+
+    @property
+    def is_turning(self):
+        """Get whether the segment is turning.
+
+        A segment that is not turning is always a rectangle, meaning that both
+        start offsets are equal and both end offsets are equal. If a segment
+        is a trapezoid that is not a rectangle, then it's turning.
+        """
+        return (self.start_left_offset == self.start_right_offset and
+                self.end_left_offset == self.end_right_offset)
 
     def start_left(self, half_width: float) -> Point:
         """Get the left start point of the segment trapezoid."""
@@ -339,12 +365,18 @@ class WaySegment(NamedTuple):
         The length is calculated by translating start and end points by the
         avarage of their left and right points and measuring the distance
         between them. The sum of all segment lenths will not be equal to the
-        way length.
+        way length because of the offsets from the endpoints.
         """
         mean_start = (self.start_left_offset + self.start_right_offset) / 2
         mean_end = (self.end_left_offset + self.end_right_offset) / 2
         return abs(self.end + self.vector * mean_end
                    - (self.start + self.vector * mean_start))
+
+    def inverted(self) -> WaySegment:
+        """Get the same segment, in the opposite direction."""
+        return WaySegment(self.end, self.start, -self.vector, -self.normal,
+                          -self.end_right_offset, -self.end_left_offset,
+                          -self.start_right_offset, -self.end_right_offset)
 
 
 @with_slots
@@ -540,38 +572,31 @@ class LaneRef(NamedTuple):
 
 
 class LaneSegment(NamedTuple):
+    """Segment of a `Lane`."""
 
-    distance: float
-    way_distance: float
-    start_point: Point
+    start_distance: float
+    end_distance: float
+    start_way_distance: float
+    factor: float
+    start: Point
     vector: Vector
+    is_turning: bool
 
 
 class Lane:
+    """A longitudinal section of a `Way` for one-way flow."""
 
-    __slots__ = 'segments', 'lane_ref'
+    __slots__ = 'lane_ref', 'distance_from_center', 'length', 'segments'
 
     lane_ref: LaneRef
     distance_from_center: float
     length: float
     segments: Tuple[LaneSegment]
 
-    def __init__(self, lane_ref: LaneRef,
-                 vectors: Iterator[Vector] = None,
-                 edge_normals: Iterator[Vector] = None,
-                 waypoint_normals: Iterator[Vector] = None):
+    def __init__(self, lane_ref: LaneRef):
         self.lane_ref = lane_ref.positive()
         self.distance_from_center = lane_ref.distance_from_center()
-
-        reverse = self.endpoint is Endpoint.END
-        if vectors is None:
-            vectors = self.way.vectors(reverse=reverse)
-        if edge_normals is None:
-            edge_normals = self.way.edge_normals(reverse=reverse)
-        if waypoint_normals is None:
-            waypoint_normals = self.way.waypoint_normals(reverse=reverse)
-
-        self._build_segments(vectors, edge_normals, waypoint_normals)
+        self._build_segments()
 
     @property
     def way(self) -> Optional[Way]:
@@ -603,15 +628,77 @@ class Lane:
         """Get the end node of the lane."""
         return self.lane_ref.end
 
-    def _build_segments(self, vectors: Iterator[Vector] = None,
-                        edge_normals: Iterator[Vector] = None,
-                        waypoint_normals: Iterator[Vector] = None):
-        length = 0.0
+    def lane_to_way_position(self, position: float) -> float:
+        """Get lane position from way position."""
+        way_position = None
+        if position >= 0:
+            segment = next((s for s in self.segments
+                            if s.end_distance >= position), None)
+            if segment is not None:
+                way_position = (segment.start_way_distance +
+                                (position - segment.start_distance)
+                                / segment.factor)
+
+        if way_position is not None:
+            if self.endpoint is Endpoint.END:
+                way_position = self.way.length() - way_position
+            return way_position
+
+        raise ValueError('Position outside of lane.')
+
+    def way_to_lane_position(self, position: float) -> float:
+        """Get way position from lane position."""
+        offsets = (self.way.geometry.start_offset,
+                   self.way.geometry.end_offset)
+        if self.endpoint is Endpoint.END:
+            position = self.way.length() - position
+            offsets = offsets[1::-1]
+
+        last_segment = None
+        if offsets[0] < position <= offsets[1]:
+            for segment in self.segments:
+                if segment.start_way_distance > position:
+                    break
+                last_segment = segment
+
+        segment = last_segment
+        if segment is not None:
+            return (segment.start_distance +
+                    segment.factor * (position - segment.start_way_distance))
+
+        raise ValueError('Position outside of lane.')
+
+    def _build_segments(self):
         distance = 0.0
-        way_distance = self.start.geometry.distance(self.oriented_way)
+        segments = []
 
-        for i, (vector, edge_normal, waypoint_normal) in enumerate(
-                zip(vectors, edge_normals, waypoint_normals)):
-            vector = vector.normalized()
+        way_segments = self.lane_ref.way.geometry.segments
+        if self.endpoint is Endpoint.END:
+            way_distance = self.lane_ref.way.geometry.end_offset
+            way_segments = (s.inverted for s in reversed(way_segments))
+        else:
+            way_distance = self.lane_ref.way.geometry.start_offset
 
-        self.length = length
+        for way_segment in way_segments:
+            point = (way_segment.start +
+                     self.distance_from_center * way_segment.normal)
+            left = way_segment.start_left
+            vector = (way_segment.start_right - left).normalized()
+            start = line_intersection(point, way_segment.vector,
+                                      left, vector)
+            left = way_segment.end_left
+            vector = (way_segment.end_right - left).normalized()
+            end = line_intersection(point, way_segment.vector,
+                                    left, vector)
+            length = abs(end - start)
+            way_length = way_segment.length()
+            end_distance = distance + length
+            segments.append(LaneSegment(distance, end_distance, way_distance,
+                                        length / way_length, start,
+                                        way_segment.vector,
+                                        way_segment.is_turning))
+            distance = end_distance
+            way_distance += way_length
+
+        self.length = distance
+        self.segments = tuple(segments)
