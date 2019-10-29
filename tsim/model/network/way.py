@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 from itertools import accumulate, chain, islice
-from math import sqrt
+from math import copysign, floor, sqrt
 from typing import (TYPE_CHECKING, Iterable, Iterator, List, NamedTuple,
                     Optional, Tuple)
 
@@ -126,9 +126,40 @@ class Way(Entity):
 
     def distance(self, point: Point, squared: bool = False) -> float:
         """Calculate smallest distance from the way to a point."""
-        result = min(point.distance_to_segment(s, v, squared=True)
-                     for s, v in zip(self.points(), self.vectors()))
+        result, _ = min((point.distance_to_segment(p, v, squared=True)
+                         for p, v in zip(self.points(), self.vectors())),
+                        key=lambda x: x[0])
         return result if squared else sqrt(result)
+
+    def distance_and_point(self, point: Point, squared: bool = False) \
+            -> Tuple[float, Point]:
+        """Calculate smallest distance from the way to a point.
+
+        Returns the smallest distance and the closest point in a tuple.
+        """
+        result, closest = min((point.distance_to_segment(p, v, squared=True)
+                               for p, v in zip(self.points(), self.vectors())),
+                              key=lambda x: x[0])
+        return (result if squared else sqrt(result), closest)
+
+    def way_position_at(self, point: Point) -> Tuple[float, Optional[int]]:
+        """Get the way position at the given point.
+
+        The way position is a tuple where the first element is a distance in
+        meters from the way start and the second element is a lane index.
+        """
+        (distance, closest), point_, vector, acc_len = min(
+            ((point.distance_to_segment(p, v, squared=True), p, v, d)
+             for p, v, d in zip(self.points(), self.vectors(),
+                                self.accumulated_length())),
+            key=lambda x: x[0][0])
+
+        distance = copysign(sqrt(distance),
+                            vector.rotated_right().dot_product(
+                                point - closest))
+
+        return (acc_len + abs(closest - point_),
+                self.lane_index_from_distance(distance))
 
     def other(self, node: Node) -> Node:
         """Get the other endpoint of the way, opposite to node."""
@@ -207,6 +238,12 @@ class Way(Entity):
         point1, point2 = islice(self.points(reverse=reverse), 2)
         return point2 - point1
 
+    def lane_divider_distance(self, endpoint: Endpoint = Endpoint.START) \
+            -> float:
+        """Get distance to the right of the central lane divider."""
+        return (self.lane_count[endpoint.other.value]
+                - self.total_lane_count / 2) * LANE_WIDTH
+
     def lane_distance_from_center(self, lane: int,
                                   endpoint: Endpoint = Endpoint.START) \
             -> float:
@@ -214,6 +251,22 @@ class Way(Entity):
         return (1 + lane
                 - self.lane_count[endpoint.value]
                 + self.lane_count[endpoint.other.value]) * HALF_LANE_WIDTH
+
+    def lane_index_valid(self, index: int,
+                         endpoint: Endpoint = Endpoint.START) -> bool:
+        """Get whether the given lane index is valid in given orientation."""
+        return (-self.lane_count[endpoint.other.value] <= index
+                < self.lane_count[endpoint.value])
+
+    def lane_index_from_distance(self, distance: float,
+                                 endpoint: Endpoint = Endpoint.START) \
+            -> Optional[int]:
+        """Get lane index from distance to the right from way center."""
+        index = floor((distance - self.lane_divider_distance(endpoint))
+                      / LANE_WIDTH)
+        if self.lane_index_valid(index, endpoint):
+            return index
+        return None
 
     def get_position(self, distance: float,
                      endpoint: Endpoint = Endpoint.START,

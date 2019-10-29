@@ -44,9 +44,16 @@ class Debug(Tool):
         else:
             selected = INDEX.get_at(self.cursor.position, of_type=Way)
 
-        if selected:
-            log.debug(selected[0].xurl)
-            log.debug(str(selected[0]))
+        try:
+            selected = selected[0]
+        except IndexError:
+            return
+
+        log.debug(selected.xurl)
+        log.debug(str(selected))
+        if isinstance(selected, Way):
+            position, lane = selected.way_position_at(self.cursor.position)
+            log.debug('position=%.1f, lane=%s', position, str(lane))
 
     def on_cursor_move(self):
         """Cursor moved callback."""

@@ -214,17 +214,18 @@ class Vector:
         return copysign(1.0 - self.x / (abs(self.x) + abs(self.y)), self.y)
 
     def distance_to_segment(self, seg_start: Point, seg_vector: Vector,
-                            squared: bool = False) -> float:
+                            squared: bool = False) -> Tuple[float, Point]:
         """Calculate the smallest distance to line segment.
 
         Calculate the smallest distance from the point to a line segment
-        represented by its starting point and a vector.
+        represented by its starting point and a vector. Returns a tuple with
+        the distance and the closest point.
         """
         projection = (self - seg_start).projection_on(seg_vector, clamp=True)
         closest = seg_start + projection
         if squared:
-            return self.distance_squared(closest)
-        return self.distance(closest)
+            return self.distance_squared(closest), closest
+        return self.distance(closest), closest
 
     def __iter__(self):
         yield self.x
