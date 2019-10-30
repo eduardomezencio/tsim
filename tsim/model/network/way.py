@@ -6,16 +6,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 from itertools import accumulate, chain, islice
 from math import copysign, floor, sqrt
-from typing import (TYPE_CHECKING, Iterable, Iterator, List, NamedTuple,
-                    Optional, Tuple)
+from typing import (TYPE_CHECKING, ClassVar, Iterable, Iterator, List,
+                    NamedTuple, Optional, Tuple)
 
-from cached_property import cached_property
 from dataslots import with_slots
 
-import tsim.model.index as Index
-from tsim.model.entity import Entity, EntityRef
-from tsim.model.geometry import (BoundingRect, Point, Vector,
-                                 line_intersection, sec)
+from tsim.model.entity import DeleteResult, Entity, EntityRef
+from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
+                                 calc_bounding_rect, line_intersection, sec)
+from tsim.utils.cached_property import cached_property
 from tsim.utils.iterators import window_iter
 
 if TYPE_CHECKING:
@@ -47,6 +46,9 @@ class Way(Entity):
     waypoints.
     """
 
+    cached: ClassVar[Iterable[str]] = (
+        Entity.cached + ('geometry', 'lanes', 'length', 'weight'))
+
     start: Node
     end: Node
     lane_count: Tuple[int, int]
@@ -55,14 +57,17 @@ class Way(Entity):
 
     def __post_init__(self):
         self.start.starts.append(EntityRef(self))
-        self.start.reset_connections()
+        self.start.clear_cache(True)
         self.end.ends.append(EntityRef(self))
-        self.end.reset_connections()
+        self.end.clear_cache(True)
+        super(Way, self).__post_init__()
 
     @cached_property
     def geometry(self) -> WayGeometry:
         """Get the geometry info for the way."""
         return WayGeometry(self)
+
+    geometry.on_update(Entity.update_index_bounding_rect)
 
     @cached_property
     def lanes(self) -> Tuple[Lane]:
@@ -87,6 +92,16 @@ class Way(Entity):
         """Weight of the Way in each direction, for path finding."""
         weight = self.length / self.max_speed
         return (weight, weight)
+
+    @property
+    def neighbors(self) -> Iterable[Entity]:
+        """Get iterable with entities directly connected to this way."""
+        return (self.start, self.end)
+
+    @property
+    def polygon(self) -> Polygon:
+        """Get polygon from the way geometry."""
+        return self.geometry.polygon
 
     @property
     def one_way(self) -> bool:
@@ -120,9 +135,7 @@ class Way(Entity):
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
         """Calculate the bounding rect of the way."""
-        for point in self.points():
-            accumulated = point.calc_bounding_rect(accumulated)
-        return accumulated
+        return self.geometry.calc_bounding_rect(accumulated)
 
     def distance(self, point: Point, squared: bool = False) -> float:
         """Calculate smallest distance from the way to a point."""
@@ -317,40 +330,41 @@ class Way(Entity):
             index = next(i for i, v in enumerate(self.start.starts)
                          if v.id == self.id)
             del self.start.starts[index]
-            node.reset_connections()
+            node.clear_cache(True)
             self.start = None
 
         if node is self.end:
             index = next(i for i, v in enumerate(self.end.ends)
                          if v.id == self.id)
             del self.end.ends[index]
-            node.reset_connections()
+            node.clear_cache(True)
             self.end = None
 
-    def on_delete(self) -> Iterable[Entity]:
+    def on_delete(self) -> DeleteResult:
         """Disconnect this way from the network.
 
         Removes the connections from this way to nodes and also the references
         from the nodes to this way.
         """
         nodes = {self.start, self.end} - {None}
+        updated = set()
         for node in nodes:
             self.disconnect(node)
-            Index.INSTANCE.updated(node)
+            updated.add(node)
             for way in node.ways:
-                Index.INSTANCE.updated(way)
+                updated.add(way)
 
-        result = set()
+        to_delete = set()
         for node in nodes:
             if not node.starts and not node.ends:
-                result.add(node)
+                to_delete.add(node)
             else:
                 try:
                     node.dissolve()
-                    result.add(node)
+                    to_delete.add(node)
                 except ValueError:
                     pass
-        return result
+        return DeleteResult(to_delete, updated)
 
     def __repr__(self):
         return f'{Way.__name__}(id={self.id}, xid={self.xid})'
@@ -440,10 +454,12 @@ class WayGeometry:
     way: Way
     half_width: float = field(init=False)
     segments: List[WaySegment] = field(init=False, default_factory=list)
+    polygon: Polygon = field(init=False, default_factory=list)
 
     def __post_init__(self):
         self.half_width = self.way.total_lane_count * HALF_LANE_WIDTH
         self._build_segments()
+        self._build_polygon()
 
     @property
     def start_offset(self):
@@ -455,6 +471,11 @@ class WayGeometry:
         """Distance from the end node to the end of the way geometry."""
         return self.way.end.geometry.distance(
             self.way.oriented(endpoint=Endpoint.END))
+
+    def calc_bounding_rect(self,
+                           accumulated: BoundingRect = None) -> BoundingRect:
+        """Calculate the bounding rect of the way."""
+        return calc_bounding_rect(self.polygon, accumulated)
 
     def _build_segments(self):
         """Build way segments."""
@@ -495,6 +516,14 @@ class WayGeometry:
         self.segments.append(
             WaySegment(points[1], points[0], vector, vector.rotated_right(),
                        start_offset, start_offset, end_offset, end_offset))
+
+    def _build_polygon(self):
+        self.polygon.append(self.segments[0].start_left(self.half_width))
+        for segment in self.segments:
+            self.polygon.append(segment.end_left(self.half_width))
+        self.polygon.append(self.segments[-1].end_right(self.half_width))
+        for segment in reversed(self.segments):
+            self.polygon.append(segment.start_right(self.half_width))
 
 
 class OrientedWay(NamedTuple):
@@ -724,6 +753,7 @@ class Lane:
     def _build_segments(self):
         distance = 0.0
         segments = []
+        half_width = self.lane_ref.way.geometry.half_width
 
         way_segments = self.lane_ref.way.geometry.segments
         if self.endpoint is Endpoint.END:
@@ -735,12 +765,12 @@ class Lane:
         for way_segment in way_segments:
             point = (way_segment.start +
                      self.distance_from_center * way_segment.normal)
-            left = way_segment.start_left
-            vector = (way_segment.start_right - left).normalized()
+            left = way_segment.start_left(half_width)
+            vector = (way_segment.start_right(half_width) - left).normalized()
             start = line_intersection(point, way_segment.vector,
                                       left, vector)
-            left = way_segment.end_left
-            vector = (way_segment.end_right - left).normalized()
+            left = way_segment.end_left(half_width)
+            vector = (way_segment.end_right(half_width) - left).normalized()
             end = line_intersection(point, way_segment.vector,
                                     left, vector)
             length = abs(end - start)

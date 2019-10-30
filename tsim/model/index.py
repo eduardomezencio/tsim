@@ -11,7 +11,7 @@ import shelve
 from rtree.index import Rtree
 
 from tsim.model.entity import Entity
-from tsim.model.geometry import Point
+from tsim.model.geometry import BoundingRect, Point, point_in_polygon
 from tsim.model.network.path import PathMap
 
 
@@ -22,8 +22,8 @@ class EntityIndex:
     a way than can be queried by id or by spatial coordinates.
     """
 
-    __slots__ = ('name', 'id_count', 'entities', 'rtree', 'path_map',
-                 'register_updates', '_updates')
+    __slots__ = ('name', 'id_count', 'entities', 'bounding_rects', 'rtree',
+                 'path_map', 'register_updates', '_updates')
 
     extension: ClassVar[str] = 'shelf'
     storage_fields: ClassVar[Tuple[str]] = ('id_count', 'entities')
@@ -31,6 +31,7 @@ class EntityIndex:
     name: str
     id_count: count
     entities: Dict[int, Entity]
+    bounding_rects: Dict[int, BoundingRect]
     rtree: Rtree
     path_map: PathMap
     register_updates: bool
@@ -39,6 +40,7 @@ class EntityIndex:
         self.name = name
         self.id_count = count()
         self.entities = {}
+        self.bounding_rects = {}
         self.rtree = Rtree()
         self.path_map = PathMap()
         self.register_updates = False
@@ -56,6 +58,7 @@ class EntityIndex:
         if entity.id is None:
             entity.id = next(self.id_count)
             self.entities[entity.id] = entity
+            self.bounding_rects[entity.id] = entity.bounding_rect
             self.rtree.insert(entity.id, entity.bounding_rect)
             self.updated(entity)
             self.rebuild_path_map()
@@ -67,12 +70,36 @@ class EntityIndex:
         while to_remove:
             entity = to_remove.pop()
             assert self.entities[entity.id] is entity
+            self.rtree.delete(entity.id, self.bounding_rects[entity.id])
             del self.entities[entity.id]
-            self.rtree.delete(entity.id, entity.bounding_rect)
-            to_remove.update(entity.on_delete() or ())
+            del self.bounding_rects[entity.id]
+            delete_result = entity.on_delete()
+            to_remove.update(delete_result.cascade)
+            for updated in delete_result.updated:
+                self.updated(updated)
             self.updated(entity)
             self.rebuild_path_map()
             log.debug('[index] Removed %s', entity)
+
+    def update_bounding_rect(self, entity: Entity,
+                             new_rect: Optional[BoundingRect] = None):
+        """Change the bounding rectangle of an entity.
+
+        Update the bounding rect to `entity.bounding_rect` or to `new_rect` if
+        it's not None.
+        """
+        assert self.entities[entity.id] is entity
+
+        if new_rect is None:
+            new_rect = entity.bounding_rect
+
+        old_rect = self.bounding_rects.get(entity.id, None)
+        if old_rect is None or old_rect == new_rect:
+            return
+
+        self.rtree.delete(entity.id, old_rect)
+        self.bounding_rects[entity.id] = new_rect
+        self.rtree.insert(entity.id, new_rect)
 
     def updated(self, entity: Union[Entity, int]):
         """Mark entity as updated."""
@@ -93,8 +120,10 @@ class EntityIndex:
 
     def generate_rtree_from_entities(self):
         """Create empty rtree and add all entities to it."""
-        self.rtree = Rtree((i, e.bounding_rect, None)
-                           for i, e in self.entities.items())
+        self.bounding_rects = {id_: e.bounding_rect
+                               for id_, e in self.entities.items()}
+        self.rtree = Rtree((id_, self.bounding_rects[id_], None)
+                           for id_ in self.entities)
 
     def load(self, name: Optional[str] = None):
         """Load entities from shelf.
@@ -133,40 +162,31 @@ class EntityIndex:
         yield from filter(lambda e: all(f(e) for f in filters),
                           self.entities.values())
 
-    def get_at(self, point: Point, radius: float = 10.0,
-               of_type: Type[Entity] = None,
+    def get_at(self, point: Point, of_type: Type[Entity] = None,
                where: Callable[[Entity], bool] = None) -> List[Entity]:
         """Get entities at given coordinates.
 
-        Get a list with entities within radius from given point, sorted from
-        closest to farthest. If of_type is not None, will return only entities
-        of the given type. If where is not None, where must be a function that
-        receives an Entity and returns True or False, meaning whether the
-        entity will be returned.
+        Get a list with entities intersecting the given point. If of_type is
+        not None, will return only entities of the given type. If where is not
+        None, where must be a function that receives an Entity and returns True
+        or False, meaning whether the entity will be returned.
         """
-        def get_distance(entity, point):
-            result = entity.distance(point, squared=True)
-            distances[entity] = result
-            return result
+        def polygon_filter(entity: Entity) -> bool:
+            return point_in_polygon(point, entity.polygon)
 
-        def distance_filter(entity):
-            return get_distance(entity, point) <= radius
-
-        def type_filter(entity):
+        def type_filter(entity: Entity) -> bool:
             return isinstance(entity, of_type)
 
-        distances = {}
-        filters = [distance_filter]
+        filters = [polygon_filter]
         if of_type is not None:
             filters.append(type_filter)
         if where is not None:
             filters.append(where)
 
-        return sorted(
-            filter(lambda e: all(f(e) for f in filters),
-                   map(self.entities.get,
-                       self.rtree.intersection(point.enclosing_rect(radius)))),
-            key=distances.get)
+        return list(filter(
+            lambda e: all(f(e) for f in filters),
+            map(self.entities.get,
+                self.rtree.intersection(point.bounding_rect))))
 
     def rebuild_path_map(self):
         """Rebuild the path map, invalidating the old map."""

@@ -14,7 +14,6 @@ rope = "*"
 [packages]
 aggdraw = "*"
 bezier = "*"
-cached-property = "*"
 dataslots = "*"
 fibonacci-heap-mod = "*"
 panda3d = "*"

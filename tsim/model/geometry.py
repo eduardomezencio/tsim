@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import acos, copysign, cos, pi, sin, sqrt
-from typing import Tuple
+from typing import Iterable, Sequence, Tuple
 
 from dataslots import with_slots
+
+from tsim.utils.iterators import window_iter
 
 
 BoundingRect = Tuple[float, float, float, float]
@@ -102,6 +104,33 @@ def line_intersection_safe(point1: Point, normal_vector1: Vector,
     if abs(normal_vector1.dot_product(normal_vector2)) >= threshold:
         return midpoint(point1, point2)
     return line_intersection(point1, normal_vector1, point2, normal_vector2)
+
+
+def calc_bounding_rect(points: Iterable[Point],
+                       accumulated: BoundingRect = None) -> BoundingRect:
+    """Calculate the bounding rectangle of given points."""
+    for point in points:
+        accumulated = point.calc_bounding_rect(accumulated)
+    return accumulated
+
+
+def point_in_polygon(point: Point, polygon: Polygon) -> bool:
+    """Calculate if point is inside the given polygon."""
+    crossings = 0
+    for point1, point2 in window_iter(polygon, extend=True):
+        if point1.x >= point.x and point2.x >= point.x:
+            continue
+        if point1.y > point2.y:
+            point1, point2 = point2, point1
+        if point1.y <= point.y < point2.y:
+            if point1.x < point.x and point2.x < point.x:
+                crossings += 1
+                continue
+            vector = point2 - point1
+            vector_x = vector.x * ((point.y - point1.y) / vector.y)
+            if point1.x + vector_x < point.x:
+                crossings += 1
+    return bool(crossings % 2)
 
 
 # pylint: disable=invalid-name
@@ -249,6 +278,7 @@ class Vector:
 
 
 Point = Vector
+Polygon = Sequence[Point]
 
 
 @with_slots

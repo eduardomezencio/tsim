@@ -72,14 +72,11 @@ def main():
                 lane_count = ((highway.lane_count // 2,
                                highway.lane_count - highway.lane_count // 2)
                               if highway.lane_count is not None else (1, 1))
-            INDEX.add(nodes[start])
-            INDEX.add(nodes[end])
             way = (Way(nodes[start], nodes[end], lane_count)
                    if highway.max_speed is None
                    else Way(nodes[start], nodes[end], lane_count,
                             max_speed=highway.max_speed))
             way.xid = highway.xid
-            INDEX.add(way)
 
     dissolve_nodes(nodes_inv)
     INDEX.name = sys.argv[1]
@@ -123,7 +120,7 @@ def dissolve_nodes(nodes_inv: Dict[int, int]):
     """Dissolve all possible nodes on the network."""
     node_ids = [k for k, v in INDEX.entities.items() if isinstance(v, Node)]
     dissolved = []
-    for node in filter(lambda n: n, map(INDEX.entities.get, node_ids)):
+    for node in filter(bool, map(INDEX.entities.get, node_ids)):
         try:
             node.dissolve(delete_if_dissolved=True)
             dissolved.append(nodes_inv[node])

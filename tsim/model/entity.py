@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass, field
-from typing import Any, Generic, Iterable, Optional, TypeVar, Union
+from typing import (Any, ClassVar, Generic, Iterable, NamedTuple, Optional,
+                    TypeVar, Union)
 from weakref import ref, ReferenceType
 
-from cached_property import cached_property
 from dataslots import with_slots
 
-from tsim.model.geometry import BoundingRect, Point
+from tsim.model.geometry import BoundingRect, Point, Polygon
 from tsim.utils import osm as xurl_provider, pickling
+from tsim.utils.cached_property import cached_property
 import tsim.model.index as Index
 
 
@@ -20,19 +21,38 @@ import tsim.model.index as Index
 class Entity(ABC):
     """Base class for spatial entities."""
 
+    cached: ClassVar[Iterable[str]] = ('bounding_rect',)
+
     id: int = field(init=False, default_factory=type(None))
     xid: int = field(init=False, default_factory=type(None))
     __weakref__: Any = field(init=False)
+
+    def __post_init__(self):
+        Index.INSTANCE.add(self)
 
     @cached_property
     def bounding_rect(self) -> BoundingRect:
         """Get the bounding rectangle for the entity."""
         return self.calc_bounding_rect()
 
+    @bounding_rect.on_update
+    def update_index_bounding_rect(self):
+        """Update the index with the entity's current bounding rectangle."""
+        Index.INSTANCE.update_bounding_rect(self)
+
+    @property
+    def neighbors(self) -> Iterable[Entity]:
+        """Get iterable with entities directly connected to this entity."""
+        return ()
+
     @property
     def xurl(self) -> str:
         """Get external url for the entity."""
         return xurl_provider.get_url(self)
+
+    @abstractproperty
+    def polygon(self) -> Polygon:
+        """Get polygon of the entity."""
 
     @abstractmethod
     def calc_bounding_rect(self,
@@ -43,7 +63,15 @@ class Entity(ABC):
     def distance(self, point: Point, squared: bool = False) -> float:
         """Calculate smallest distance from the entity to a point."""
 
-    def on_delete(self) -> Iterable[Entity]:
+    def clear_cache(self, clear_neighbors: bool = False):
+        """Delete cached properties listed in class var `_cached`."""
+        for key in type(self).cached:
+            self.__dict__.pop(key, None)
+        if clear_neighbors:
+            for neighbor in self.neighbors:
+                neighbor.clear_cache()
+
+    def on_delete(self) -> DeleteResult:
         """Cleanup when deleting entity.
 
         Will be called by the index when deleting. Must return an iterable with
@@ -137,3 +165,14 @@ class EntityRef(Generic[T]):
 
     def __str__(self):
         return repr(self)
+
+
+class DeleteResult(NamedTuple):
+    """Result of a delete operation.
+
+    All other entities to be deleted as a consequence of this deletion must be
+    in `cascade` while all entities that suffered changes must be in `updated`.
+    """
+
+    cascade: Iterable[Entity]
+    updated: Iterable[Entity]

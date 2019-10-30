@@ -8,7 +8,7 @@ from panda3d.core import (ConfigVariableDouble, Geom, GeomNode, GeomTristrips,
                           GeomVertexData, GeomVertexFormat, GeomVertexWriter,
                           NodePath)
 
-from tsim.model.network.way import LANE_WIDTH, Way, WayGeometry
+from tsim.model.network.way import LANE_WIDTH, Way
 from tsim.ui import textures
 
 LEVEL_HEIGHT = ConfigVariableDouble('level-height').get_value()
@@ -28,7 +28,7 @@ def create(parent: NodePath, way: Way) -> NodePath:
 
 def _generate_mesh(way: Way) -> Geom:
     """Generate mesh for a Way."""
-    geometry: WayGeometry = way.geometry
+    geometry = way.geometry
     rows = 2 * len(geometry.segments) + 2
 
     vertex_data = GeomVertexData(str(way.id), VERTEX_FORMAT, Geom.UH_static)

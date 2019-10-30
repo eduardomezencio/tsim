@@ -13,8 +13,8 @@ class Bulldozer(Tool):
 
     def on_button1_press(self):
         """Button 1 pressed callback."""
-        selected = INDEX.get_at(self.cursor.position, of_type=Way)
-        if selected:
-            selected = selected[0]
+        selected = next(iter(INDEX.get_at(self.cursor.position, of_type=Way)),
+                        None)
+        if selected is not None:
             INDEX.delete(selected)
             p3d.MESSENGER.send('entities_changed')

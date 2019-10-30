@@ -2,7 +2,7 @@
 
 from itertools import chain
 
-from cached_property import cached_property
+from tsim.utils.cached_property import CachedProperty
 
 
 def getstate(self):
@@ -14,7 +14,7 @@ def getstate(self):
     dict_copy = self.__dict__.copy()
     for key in self.__dict__:
         if hasattr(cls, key):
-            if isinstance(getattr(cls, key), cached_property):
+            if isinstance(getattr(cls, key), CachedProperty):
                 del dict_copy[key]
     slots = chain.from_iterable(
         getattr(c, '__slots__', ()) for c in cls.mro())

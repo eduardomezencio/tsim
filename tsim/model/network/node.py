@@ -4,19 +4,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import chain, repeat
-from typing import (TYPE_CHECKING, Dict, Iterable, Iterator, List, NamedTuple,
-                    Optional, Set, Tuple)
+from typing import (TYPE_CHECKING, ClassVar, Dict, Iterable, Iterator, List,
+                    NamedTuple, Optional, Set, Tuple)
 
-from cached_property import cached_property
 from dataslots import with_slots
 
 import tsim.model.index as Index
-from tsim.model.entity import Entity, EntityRef
-from tsim.model.geometry import (BoundingRect, Point, Vector,
-                                 line_intersection, midpoint)
+from tsim.model.entity import DeleteResult, Entity, EntityRef
+from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
+                                 calc_bounding_rect, line_intersection,
+                                 midpoint)
 from tsim.model.network.intersection import Intersection
 from tsim.model.network.way import (LANE_WIDTH, Endpoint, LaneRef, OrientedWay,
                                     Way)
+from tsim.utils.cached_property import cached_property
 
 if TYPE_CHECKING:
     from tsim.model.network.intersection import Curve, LaneConnection
@@ -29,6 +30,9 @@ class Node(Entity):
 
     A Node can be the endpoint of a Way or a junction of 3 or more Ways.
     """
+
+    cached: ClassVar[Iterable[str]] = (
+        Entity.cached + ('geometry', 'intersection', 'out_neighbors'))
 
     position: Point
     level: int = field(default_factory=int)
@@ -62,6 +66,16 @@ class Node(Entity):
         return neighbors
 
     @property
+    def neighbors(self) -> Iterable[Entity]:
+        """Get iterable with entities directly connected to this node."""
+        return self.ways
+
+    @property
+    def polygon(self) -> Polygon:
+        """Get polygon from the node geometry."""
+        return self.geometry.polygon
+
+    @property
     def max_lanes(self) -> int:
         """Maximum number of lanes in incident ways."""
         return max(e.value.total_lane_count
@@ -87,15 +101,7 @@ class Node(Entity):
     def calc_bounding_rect(self,
                            accumulated: BoundingRect = None) -> BoundingRect:
         """Calculate the bounding rect of the node."""
-        return self.position.calc_bounding_rect(accumulated)
-
-    def reset_connections(self):
-        """Invalidate geometry and lane connections."""
-        for key in ('geometry', 'intersection', 'out_neighbors'):
-            try:
-                del self.__dict__[key]
-            except KeyError:
-                pass
+        return self.geometry.calc_bounding_rect(accumulated)
 
     def distance(self, point: Point, squared: bool = False) -> float:
         """Calculate distance from the node to a point."""
@@ -183,12 +189,11 @@ class Node(Entity):
         way = Way(start, end, lane_count=lane_count,
                   waypoints=tuple(waypoints))
         way.xid = ways[0].xid if ways[0].xid is not None else ways[1].xid
-        Index.INSTANCE.add(way)
 
         if delete_if_dissolved:
             Index.INSTANCE.delete(self)
 
-    def on_delete(self) -> Iterable[Entity]:
+    def on_delete(self) -> DeleteResult:
         """Disconnect this node from the network.
 
         Returns the ways that must be disconnected to free this node.
@@ -197,10 +202,11 @@ class Node(Entity):
             way.start = None
         for way in map(lambda r: r.value, self.ends):
             way.end = None
-        return {r.value for r in set(chain(self.starts, self.ends))}
+        to_delete = {r.value for r in set(chain(self.starts, self.ends))}
+        return DeleteResult(to_delete, ())
 
     def __repr__(self):
-        return f'Node(id={self.id}, xid={self.xid})'
+        return f'{Node.__name__}(id={self.id}, xid={self.xid})'
 
 
 @with_slots
@@ -215,21 +221,28 @@ class NodeGeometry:
     node: Node
     way_indexes: Dict[OrientedWay, int] = field(init=False)
     way_distances: List[float] = field(init=False)
-    points: List[Point] = field(init=False)
+    polygon: Polygon = field(init=False, default_factory=list)
 
     def __post_init__(self):
         ways = self.node.sorted_ways()
         self.way_indexes = {w: i for i, w in enumerate(ways)}
         self.way_distances = [None for _ in ways]
-        self.points = self.way_distances * 2
-        self._calc_points(ways)
+        self._build_polygon(ways)
 
     def distance(self, oriented_way: OrientedWay) -> float:
         """Get distance from node center to where way should start or end."""
         return self.way_distances[self.way_indexes[oriented_way]]
 
-    def _calc_points(self, ways: List[OrientedWay]):
+    def calc_bounding_rect(self,
+                           accumulated: BoundingRect = None) -> BoundingRect:
+        """Calculate the bounding rect of the node."""
+        if not self.polygon:
+            return self.node.position.calc_bounding_rect(accumulated)
+        return calc_bounding_rect(self.polygon, accumulated)
+
+    def _build_polygon(self, ways: List[OrientedWay]):
         """Calculate points for the geometric bounds of the node."""
+        polygon = [None for _ in range(2 * len(ways))]
         directions = tuple(w().direction_from_node(self.node, e).normalized()
                            for w, e in ways)
         for i, (way, _) in enumerate(ways):
@@ -249,14 +262,15 @@ class NodeGeometry:
             except ZeroDivisionError:
                 point = midpoint(*points)
 
-            self.points[2 * i - 1] = point
+            polygon[2 * i - 1] = point
         for i, (_, direction) in enumerate(zip(ways, directions)):
             farthest: Vector = max(
-                self.points[2 * i - 1], self.points[2 * i + 1],
+                polygon[2 * i - 1], polygon[2 * i + 1],
                 key=lambda v, d=direction: v.dot_product(d))
             projection, reflection = farthest.projection_reflection(direction)
             self.way_distances[i] = projection.norm()
-            self.points[2 * i] = reflection
+            polygon[2 * i] = reflection
+        self.polygon = [p + self.node.position for p in polygon]
 
 
 class NodeLaneConnection(NamedTuple):
@@ -275,6 +289,6 @@ class NodeLaneConnection(NamedTuple):
         return self.node.intersection.curves[self.lanes]
 
     def __repr__(self):
-        return (f'NodeLaneConnection(node_id={self.node.id}, '
+        return (f'{NodeLaneConnection.__name__}(node_id={self.node.id}, '
                 f'lanes=(({self.lanes[0].way.id}, {self.lanes[0].index}), '
                 f'({self.lanes[1].way.id}, {self.lanes[1].index})))')

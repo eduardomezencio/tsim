@@ -62,8 +62,7 @@ class PathTool(Tool):
         self.hud_text.destroy()
 
     def _change_node(self, node: str):
-        selected = next(iter(INDEX.get_at(self.cursor.position, radius=50.0,
-                                          of_type=Node)),
+        selected = next(iter(INDEX.get_at(self.cursor.position, of_type=Node)),
                         None)
         setattr(self, node, selected)
         self._update_path_np()

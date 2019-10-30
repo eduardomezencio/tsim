@@ -58,7 +58,7 @@ def create_lane_connections_card(node: Node, parent: NodePath) -> NodePath:
 
 def _generate_mesh(node: Node) -> Geom:
     """Generate mesh for a Node."""
-    size = len(node.geometry.points)
+    size = len(node.geometry.polygon)
     vertex_data = GeomVertexData(str(node.id), VERTEX_FORMAT, Geom.UH_static)
     vertex_data.set_num_rows(size)
     vertex_writer = GeomVertexWriter(vertex_data, 'vertex')
@@ -66,10 +66,9 @@ def _generate_mesh(node: Node) -> Geom:
     texcoord_writer = GeomVertexWriter(vertex_data, 'texcoord')
 
     indexes = [range(i - 1, i + 2) for i in range(0, size, 2)]
-    triangles = [[node.geometry.points[j] for j in t] for t in indexes]
+    triangles = [[node.geometry.polygon[j] for j in t] for t in indexes]
 
-    for point in node.geometry.points:
-        point = point + node.position
+    for point in node.geometry.polygon:
         vertex_writer.add_data3f(point.x, point.y, LEVEL_HEIGHT * node.level)
         normal_writer.add_data3f(0.0, 0.0, 1.0)
         texcoord_writer.add_data2f(point.x / LANE_WIDTH, point.y / LANE_WIDTH)
