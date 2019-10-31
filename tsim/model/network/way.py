@@ -723,7 +723,7 @@ class Lane:
 
         if way_position is not None:
             if self.endpoint is Endpoint.END:
-                way_position = self.way.length() - way_position
+                way_position = self.way.length - way_position
             return way_position
 
         raise ValueError('Position outside of lane.')
@@ -733,11 +733,11 @@ class Lane:
         offsets = (self.way.geometry.start_offset,
                    self.way.geometry.end_offset)
         if self.endpoint is Endpoint.END:
-            position = self.way.length() - position
+            position = self.way.length - position
             offsets = offsets[1::-1]
 
         last_segment = None
-        if offsets[0] < position <= offsets[1]:
+        if offsets[0] < position <= self.way.length - offsets[1]:
             for segment in self.segments:
                 if segment.start_way_distance > position:
                     break
@@ -758,7 +758,7 @@ class Lane:
         way_segments = self.lane_ref.way.geometry.segments
         if self.endpoint is Endpoint.END:
             way_distance = self.lane_ref.way.geometry.end_offset
-            way_segments = (s.inverted for s in reversed(way_segments))
+            way_segments = (s.inverted() for s in reversed(way_segments))
         else:
             way_distance = self.lane_ref.way.geometry.start_offset
 
