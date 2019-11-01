@@ -37,7 +37,7 @@ class CachedProperty:
 
             @rect.on_update
             def on_rect_update(self):
-                self.update_area()
+                self.parent.update_rect(self)
 
         """
         self._on_update = func

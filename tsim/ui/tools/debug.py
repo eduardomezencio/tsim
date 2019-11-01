@@ -32,12 +32,12 @@ class Debug(Tool):
     def prepare(self):
         """Initialize tool."""
         self.hud_text = OnscreenText(text='', pos=(5, -20), scale=22.0,
-                                     fg=(1.0, 1.0, 1.0, 1.0),
-                                     shadow=(0.0, 0.0, 0.0, 1.0),
+                                     fg=(1.0, 1.0, 1.0, 0.9),
+                                     shadow=(0.0, 0.0, 0.0, 0.9),
                                      align=TextNode.A_left, font=FONT,
                                      parent=PIXEL2D, mayChange=True)
         self.card = None
-        self.text_lines = [None for _ in range(LINES)]
+        self.text_lines = [None] * LINES
         self._update_position()
         self._update_hud_text()
 
@@ -88,7 +88,7 @@ class Debug(Tool):
             self.card.get_texture().clear()
             self.card.remove_node()
             self.card = None
-        self.text_lines = [None for _ in range(LINES)]
+        self.text_lines = [None] * LINES
         self._update_position()
 
     def _update_position(self):

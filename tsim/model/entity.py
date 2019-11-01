@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass, field
-from typing import (Any, ClassVar, Generic, Iterable, NamedTuple, Optional,
-                    TypeVar, Union)
+from typing import (ClassVar, Generic, Iterable, NamedTuple, Optional, TypeVar,
+                    Union)
 from weakref import ref, ReferenceType
 
 from dataslots import with_slots
@@ -16,7 +16,7 @@ from tsim.utils.cached_property import cached_property
 import tsim.model.index as Index
 
 
-@with_slots(add_dict=True)
+@with_slots(add_dict=True, add_weakref=True)
 @dataclass(eq=False)
 class Entity(ABC):
     """Base class for spatial entities."""
@@ -25,7 +25,6 @@ class Entity(ABC):
 
     id: int = field(init=False, default_factory=type(None))
     xid: int = field(init=False, default_factory=type(None))
-    __weakref__: Any = field(init=False)
 
     def __post_init__(self):
         Index.INSTANCE.add(self)

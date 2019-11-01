@@ -544,6 +544,11 @@ class OrientedWay(NamedTuple):
         return OrientedWay(EntityRef(way), endpoint)
 
     @property
+    def way_id(self) -> int:
+        """Get the id of the referenced way."""
+        return self.way_ref.id
+
+    @property
     def way(self) -> Optional[Way]:
         """Get the referenced way."""
         return self.way_ref()
