@@ -14,8 +14,9 @@ from dataslots import with_slots
 from tsim.model.entity import DeleteResult, Entity, EntityRef
 from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
                                  calc_bounding_rect, line_intersection, sec)
+from tsim.model.position import WayPosition, OrientedWayPosition, LanePosition
 from tsim.utils.cached_property import cached_property
-from tsim.utils.iterators import window_iter
+from tsim.utils.iterators import drop_duplicates, window_iter
 
 if TYPE_CHECKING:
     from tsim.model.network.node import Node
@@ -46,14 +47,14 @@ class Way(Entity):
     waypoints.
     """
 
-    cached: ClassVar[Iterable[str]] = (
-        Entity.cached + ('geometry', 'lanes', 'length', 'weight'))
+    cached: ClassVar[Iterable[str]] = \
+        Entity.cached + ('geometry', 'lanes', 'length', 'weight')
 
     start: Node
     end: Node
     lane_count: Tuple[int, int]
     waypoints: Tuple[Point] = field(default_factory=tuple)
-    max_speed: float = field(default_factory=lambda: DEFAULT_MAX_SPEED_KPH)
+    max_speed: float = field(default=DEFAULT_MAX_SPEED_KPH)
 
     def __post_init__(self):
         self.start.starts.append(EntityRef(self))
@@ -155,11 +156,13 @@ class Way(Entity):
                               key=lambda x: x[0])
         return (result if squared else sqrt(result), closest)
 
-    def way_position_at(self, point: Point) -> Tuple[float, Optional[int]]:
+    def way_position_raw(self, point: Point, include_lane: bool = True) \
+            -> Tuple[float, Optional[int]]:
         """Get the way position at the given point.
 
-        The way position is a tuple where the first element is a distance in
-        meters from the way start and the second element is a lane index.
+        Returns a tuple with the distance in meters from the start of the way
+        and the lane index at the given point. If `include_lane` is False, the
+        lane index is `None`.
         """
         (distance, closest), point_, vector, acc_len = min(
             ((point.distance_to_segment(p, v, squared=True), p, v, d)
@@ -167,12 +170,47 @@ class Way(Entity):
                                 self.accumulated_length())),
             key=lambda x: x[0][0])
 
-        distance = copysign(sqrt(distance),
-                            vector.rotated_right().dot_product(
-                                point - closest))
+        if include_lane:
+            distance = copysign(sqrt(distance),
+                                vector.rotated_right().dot_product(
+                                    point - closest))
 
-        return (acc_len + abs(closest - point_),
-                self.lane_index_from_distance(distance))
+            index = self.lane_index_from_distance(distance)
+        else:
+            index = None
+
+        return acc_len + abs(closest - point_), index
+
+    def way_position_at(self, point: Point) -> WayPosition:
+        """Get the way position at the given point.
+
+        The `position` value is in meters from the start of the way.
+        """
+        way_position, _ = self.way_position_raw(point, False)
+        return WayPosition(EntityRef(self), way_position)
+
+    def oriented_position_at(self, point: Point) -> OrientedWayPosition:
+        """Get the oriented way position at the given point.
+
+        The `position` value is in meters from the endpoint of the oriented
+        way.
+        """
+        way_position, index = self.way_position_raw(point)
+        if index >= 0:
+            endpoint = Endpoint.START
+        else:
+            endpoint = Endpoint.END
+            way_position = self.length - way_position
+        return OrientedWayPosition(self.oriented(endpoint), way_position)
+
+    def lane_position_at(self, point: Point) -> LanePosition:
+        """Get the way position at the given point.
+
+        The `position` value is in meters from the start of the lane.
+        """
+        way_position, index = self.way_position_raw(point)
+        lane = self.lanes[index]
+        return LanePosition(lane, lane.way_to_lane_position(way_position))
 
     def other(self, node: Node) -> Node:
         """Get the other endpoint of the way, opposite to node."""
@@ -182,15 +220,57 @@ class Way(Entity):
         """Get OrientedWay from this way."""
         return OrientedWay.build(self, endpoint)
 
-    def points(self, skip=0, reverse=False) -> Iterator[Point]:
+    def points(self, offsets: Optional[Tuple[float, Optional[float]]] = None,
+               skip: int = 0, reverse: bool = False) -> Iterator[Point]:
         """Get generator for points in order, including nodes and waypoints."""
+        first, last = self.start.position, self.end.position
+        waypoints = self.waypoints
         if reverse:
-            iterator = chain((self.end.position,), reversed(self.waypoints),
-                             (self.start.position,))
-        else:
-            iterator = chain((self.start.position,), self.waypoints,
-                             (self.end.position,))
-        yield from islice(iterator, skip, None)
+            first, last = last, first
+            waypoints = reversed(waypoints)
+
+        if offsets is not None:
+            start, end = offsets
+            if end is not None and start > end:
+                raise ValueError('Start offset cannot be after end offset.')
+
+            covered = 0.0
+            points = enumerate(self.point_pairs(reverse=reverse))
+
+            drop, take = 0, None
+            i, point1, point2 = None, None, None
+            if start > 0.0:
+                for i, (point1, point2) in points:
+                    vector = point2 - point1
+                    distance = abs(vector)
+                    if covered + distance >= start:
+                        vector = vector.normalized()
+                        first = point1 + vector * (start - covered)
+                        drop = i
+                        break
+                    covered += distance
+                if end is not None and covered + distance >= end:
+                    last = point1 + vector * (end - covered)
+                    take = i
+                    end = None
+                else:
+                    covered += distance
+
+            if end is not None:
+                for i, (point1, point2) in points:
+                    vector = point2 - point1
+                    distance = abs(vector)
+                    if covered + distance >= end:
+                        vector = vector.normalized()
+                        last = point1 + vector * (end - covered)
+                        take = i
+                        break
+                    covered += distance
+
+            waypoints = islice(waypoints, drop, take)
+
+        iterator = chain((first,), waypoints, (last,))
+        yield from drop_duplicates(islice(iterator, skip, None))
 
     def point_pairs(self, reverse=False) -> Iterator[Tuple[Point, Point]]:
         """Get pairs of consecutive points, including nodes and waypoints."""
@@ -580,6 +660,11 @@ class OrientedWay(NamedTuple):
         """Get the weight of the way in this direction."""
         return self.way.weight[self.endpoint.value]
 
+    @property
+    def way_connections(self) -> Iterable[OrientedWay]:
+        """Get the way connections from the end of this oriented way."""
+        return self.end.way_connections(self)
+
     def flipped(self) -> OrientedWay:
         """Get OrientedWay with same way in the other direction."""
         return OrientedWay(self.way_ref, self.endpoint.other)
@@ -593,9 +678,11 @@ class OrientedWay(NamedTuple):
         return self.way.lane_refs(self.endpoint, l_to_r, include_opposite,
                                   opposite_only)
 
-    def points(self, skip=0) -> Iterator[Point]:
+    def points(self, offsets: Optional[Tuple[float, Optional[float]]] = None,
+               skip: int = 0) -> Iterator[Point]:
         """Get generator for points in order, including nodes and waypoints."""
-        return self.way.points(skip, self.endpoint is Endpoint.END)
+        return self.way.points(offsets=offsets, skip=skip,
+                               reverse=self.endpoint is Endpoint.END)
 
     def __repr__(self):
         return (f'{OrientedWay.__name__}(way_id={self.way.id}, '
@@ -716,7 +803,7 @@ class Lane:
         return self.lane_ref.end
 
     def lane_to_way_position(self, position: float) -> float:
-        """Get lane position from way position."""
+        """Get way position from lane position."""
         way_position = None
         if position >= 0:
             segment = next((s for s in self.segments
@@ -733,8 +820,15 @@ class Lane:
 
         raise ValueError('Position outside of lane.')
 
+    def lane_to_oriented_position(self, position: float) -> float:
+        """Get oriented way position from lane position."""
+        way_position = self.lane_to_way_position(position)
+        if self.endpoint is Endpoint.START:
+            return way_position
+        return self.way.length - way_position
+
     def way_to_lane_position(self, position: float) -> float:
-        """Get way position from lane position."""
+        """Get lane position from way position."""
         offsets = (self.way.geometry.start_offset,
                    self.way.geometry.end_offset)
         if self.endpoint is Endpoint.END:

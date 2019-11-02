@@ -59,13 +59,16 @@ class Debug(Tool):
 
         self.text_lines[1] = f'{selected} - {selected.xurl}'
         if isinstance(selected, Way):
-            position = selected.way_position_at(self.cursor.position)
+            position = selected.way_position_raw(self.cursor.position)
             way_position, lane_index = position
             lane = selected.lanes[lane_index]
             lane_position = lane.way_to_lane_position(way_position)
-            self.text_lines[2] = (f'way_position={way_position:.2f}, '
-                                  f'lane_position={lane_position:.2f}, '
-                                  f'lane={lane_index}')
+            oriented_position = lane.lane_to_oriented_position(lane_position)
+            self.text_lines[2] = (
+                f'way_position={way_position:.2f}, '
+                f'oriented_position={oriented_position:.2f}, '
+                f'lane_position={lane_position:.2f}, '
+                f'lane={lane_index}')
 
         log.debug('\n'.join(l for l in islice(self.text_lines, 1, None)
                             if l is not None))

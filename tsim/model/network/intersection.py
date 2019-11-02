@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
-from enum import Enum, auto
+from enum import Enum
 from itertools import chain, combinations, islice, product
 from math import pi
 from statistics import median_low
@@ -22,8 +22,9 @@ from tsim.model.network.way import LANE_WIDTH, LaneRef, OrientedWay
 if TYPE_CHECKING:
     from tsim.model.network.node import Node
 
-    LaneConnection = Tuple[LaneRef, LaneRef]
-    LaneConnections = Dict[LaneRef, Set[LaneRef]]
+WayConnections = Dict[OrientedWay, Set[OrientedWay]]
+LaneConnection = Tuple[LaneRef, LaneRef]
+LaneConnections = Dict[LaneRef, Set[LaneRef]]
 
 MERGE_RADIUS = 0.1
 NEIGHBOR_RADIUS = 1.8
@@ -33,24 +34,37 @@ NEIGHBOR_RADIUS_SQUARED = NEIGHBOR_RADIUS ** 2
 class Intersection:
     """Intersection information for a node.
 
-    Contains lane connections and conflict points.
+    Contains way and lane connections with their curves and conflict points.
+
+    Attributes:
+        lane_connections: Maps each lane to the set of lanes it connects to.
+        way_connections: Maps each incoming oriented way to a set of all
+            oriented ways it has lane connections to.
+        connection_map: Maps one source lane and one destination oriented way
+            to all the lane connections between them.
+        curves: Maps each lane connection to its `Curve` object.
+
     """
 
-    __slots__ = ('connections', 'connection_map', 'curves')
+    __slots__ = ('lane_connections', 'way_connections', 'connection_map',
+                 'curves')
 
-    connections: LaneConnections
+    lane_connections: LaneConnections
+    way_connections: WayConnections
     connection_map: Dict[Tuple[LaneRef, OrientedWay], LaneConnection]
     curves: Dict[LaneConnection, Curve]
 
     def __init__(self, node: Node):
-        self.connections = _build_lane_connections(node)
-        self.connection_map = _build_connection_map(node, self.connections)
-        self.curves = _build_bezier_curves(node, self.connections)
+        self.lane_connections = _build_lane_connections(node)
+        self.connection_map = _build_connection_map(node,
+                                                    self.lane_connections)
+        self.curves = _build_bezier_curves(node, self.lane_connections)
         _build_conflict_points(self.curves)
+        self._build_way_connections()
 
     def iterate_connections(self) -> Iterator[LaneConnection]:
         """Get iterator for connections as Tuple[LaneRef, LaneRef]s."""
-        for source, dests in self.connections.items():
+        for source, dests in self.lane_connections.items():
             yield from product((source,), dests)
 
     def curve_points(self, lane_connection: LaneConnection = None) \
@@ -65,13 +79,20 @@ class Intersection:
         yield from ((c, self.curve_points(c))
                     for c in self.iterate_connections())
 
+    def _build_way_connections(self):
+        connections = defaultdict(set)
+        for source, dests in self.lane_connections.items():
+            way = source.positive().oriented_way
+            connections[way].update(d.oriented_way for d in dests)
+        self.way_connections = dict(connections)
+
 
 class ConflictPointType(Enum):
     """Types of conflict point."""
 
-    DIVERGE = auto()
-    MERGE = auto()
-    CROSSING = auto()
+    DIVERGE = 0
+    MERGE = 1
+    CROSSING = 2
 
 
 @with_slots
@@ -143,7 +164,10 @@ class Curve:
 
     def intersect(self, other: Curve) -> numpy.ndarray:
         """Calculate intersection of bezier curves."""
-        return self.curve.intersect(other.curve)
+        try:
+            return self.curve.intersect(other.curve)
+        except NotImplementedError:
+            return numpy.array([])
 
     def evaluate(self, param: float) -> Point:
         """Evaluate bezier curve at t=param."""

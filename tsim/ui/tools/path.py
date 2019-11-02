@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import logging as log
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import NodePath, TextNode
 
 from tsim.model.index import INSTANCE as INDEX
-from tsim.model.network.node import Node
+from tsim.model.network.way import Way
+from tsim.model.position import OrientedWayPosition
 from tsim.ui.objects.path import create as create_path
 from tsim.ui.panda3d import LOADER, PIXEL2D, RENDER
 from tsim.ui.tools.tool import Tool
@@ -23,8 +24,8 @@ FONT = LOADER.load_font('cmtt12.egg')
 class PathTool(Tool):
     """Tool for finding and showing pathes."""
 
-    source: Node
-    dest: Node
+    source: Optional[OrientedWayPosition]
+    dest: Optional[OrientedWayPosition]
     path: Path
     hud_text: OnscreenText
     path_np: NodePath
@@ -36,9 +37,11 @@ class PathTool(Tool):
         self.source = None
         self.dest = None
         self.path = None
+        self.source_way_position = 0.0
+        self.dest_way_position = 0.0
         self.hud_text = OnscreenText(text='', pos=(5, -20), scale=22.0,
-                                     fg=(1.0, 1.0, 1.0, 1.0),
-                                     shadow=(0.0, 0.0, 0.0, 1.0),
+                                     fg=(1.0, 1.0, 1.0, 0.9),
+                                     shadow=(0.0, 0.0, 0.0, 0.9),
                                      align=TextNode.A_left, font=FONT,
                                      parent=PIXEL2D, mayChange=True)
         self.path_np = None
@@ -46,29 +49,31 @@ class PathTool(Tool):
 
     def on_button1_press(self):
         """Button 1 pressed callback."""
-        self._change_node('source')
+        self._change_way('source')
 
     def on_button2_press(self):
         """Button 2 pressed callback."""
-        self._swap_nodes()
+        self._swap_ways()
 
     def on_button3_press(self):
         """Button 3 pressed callback."""
-        self._change_node('dest')
+        self._change_way('dest')
 
     def cleanup(self):
         """Clean up before changing tool."""
         self._clear_path_np()
         self.hud_text.destroy()
 
-    def _change_node(self, node: str):
-        selected = next(iter(INDEX.get_at(self.cursor.position, of_type=Node)),
+    def _change_way(self, way: str):
+        selected = next(iter(INDEX.get_at(self.cursor.position, of_type=Way)),
                         None)
-        setattr(self, node, selected)
+        position = (None if selected is None else
+                    selected.oriented_position_at(self.cursor.position))
+        setattr(self, way, position)
         self._update_path_np()
         self._update_hud_text()
 
-    def _swap_nodes(self):
+    def _swap_ways(self):
         self.source, self.dest = self.dest, self.source
         self._update_path_np()
         self._update_hud_text()
@@ -83,11 +88,17 @@ class PathTool(Tool):
             self._clear_path_np()
             self.path = INDEX.path_map.path(self.source, self.dest)
             if self.path is not None:
-                self.path_np = create_path(RENDER, self.path)
+                points = self.path.oriented_points()
+                if len(points) >= 2:
+                    self.path_np = create_path(RENDER, points)
 
     def _update_hud_text(self):
-        source_text = self.source.id if self.source else '_'
-        dest_text = self.dest.id if self.dest else '_'
+        source_text = (f'{self.source.oriented_way.way_id}'
+                       f'{self.source.oriented_way.endpoint.name[0]}'
+                       if self.source else '_')
+        dest_text = (f'{self.dest.oriented_way.way_id}'
+                     f'{self.dest.oriented_way.endpoint.name[0]}'
+                     if self.dest else '_')
         info_text = (f'len: {self.path.length:6.1f}    '
                      f'weight: {self.path.weight:6.1f}    '
                      f'ways: {len(self.path.ways)}    '

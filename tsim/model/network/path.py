@@ -3,22 +3,27 @@
 from __future__ import annotations
 
 import sys
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass, field
 from itertools import islice
-from typing import TYPE_CHECKING, DefaultDict, Dict, Iterable, Iterator, List
+from operator import attrgetter
+from typing import (TYPE_CHECKING, DefaultDict, Dict, Iterator, List, Optional,
+                    Set, Tuple)
 
 from dataslots import with_slots
-from fibonacci_heap_mod import Fibonacci_heap as FibonacciHeap
+from fibonacci_heap_mod import (Fibonacci_heap as FibonacciHeap,
+                                Entry as FibonacciHeapEntry)
+
+from tsim.model.geometry import Vector, sec
+from tsim.model.network.way import LANE_WIDTH, OrientedWay
+from tsim.model.position import OrientedWayPosition
+from tsim.utils.iterators import window_iter
+
+SingleSourceMap = Dict[OrientedWay, Tuple[OrientedWay, int]]
+AllPairsMap = Dict[OrientedWay, SingleSourceMap]
 
 if TYPE_CHECKING:
-    from fibonacci_heap_mod import Entry
     from tsim.model.geometry import Point
-    from tsim.model.network.node import Node
-    from tsim.model.network.way import OrientedWay
-
-    SingleSourceMap = Dict[Node, OrientedWay]
-    AllPairsMap = Dict[Node, SingleSourceMap]
 
 INF = sys.float_info.max
 
@@ -28,63 +33,84 @@ INF = sys.float_info.max
 class _NodeInfo:
     dist: float = field(default=INF)
     prev: OrientedWay = field(default=None)
-    entry: Entry = field(default=None)
+    entry: FibonacciHeapEntry = field(default=None)
+    depth: int = field(default=0)
 
 
-def dijkstra(source: Node) -> SingleSourceMap:
+def dijkstra(source: OrientedWay) -> SingleSourceMap:
     """Dijkstra algorithm."""
+    info: DefaultDict[OrientedWay, _NodeInfo]
+    node: OrientedWay
+    visited: Set[OrientedWay]
+
     queue = FibonacciHeap()
     visited = set()
-    source_info = _NodeInfo(0.0, None, None)
+    source_info = _NodeInfo(0.0)
     source_info.entry = queue.enqueue(source, 0)
-    info: DefaultDict[Node, _NodeInfo] = defaultdict(_NodeInfo,
-                                                     {source: source_info})
+    info = defaultdict(_NodeInfo, {source: source_info})
 
     while queue:
         node = queue.dequeue_min().get_value()
         node_info = info[node]
         visited.add(node)
-        for neighbor, way in node.out_neighbors.items():
+        weight = node.weight
+        for neighbor in node.way_connections:
             if neighbor in visited:
                 continue
             neighbor_info = info[neighbor]
-            new_dist = node_info.dist + way.weight
+            new_dist = node_info.dist + weight
             if new_dist < neighbor_info.dist:
                 if neighbor_info.dist == INF:
                     neighbor_info.entry = queue.enqueue(neighbor, new_dist)
                 else:
                     queue.decrease_key_unchecked(neighbor_info.entry, new_dist)
                 neighbor_info.dist = new_dist
-                neighbor_info.prev = way
+                neighbor_info.prev = node
+                neighbor_info.depth = node_info.depth + 1
 
-    return {n: i.prev for n, i in info.items()}
+    return {n: (i.prev, i.depth) for n, i in info.items()}
 
 
 @with_slots
 @dataclass
 class Path:
-    """A path from a source node to a dest node."""
+    """A path between a source and a destination `OrientedWay`."""
 
     ways: List[OrientedWay]
+    offsets: Tuple[float, float]
 
-    @property
-    def source(self) -> Node:
-        """Get the path's source node."""
-        return self.ways[0].start
-
-    @property
-    def dest(self) -> Node:
-        """Get the path's destination node."""
-        return self.ways[-1].end
+    @staticmethod
+    def build(single_source: SingleSourceMap, dest: OrientedWay,
+              start_offset: float = 0.0, end_offset: float = 0.0,
+              source: Optional[OrientedWay] = None) -> Path:
+        """Create a new Path from a single source map and the destination."""
+        empty = (None, None)
+        way, index = single_source.get(dest, (None, 0))
+        result = [None] * (index + (1 if source is None else 2))
+        result[-1] = dest
+        if source is None:
+            index -= 1
+        while way:
+            result[index] = way
+            way, _ = single_source.get(way, empty)
+            index -= 1
+        if source is not None:
+            result[0] = source
+        return Path(result, (start_offset, end_offset)) if result else None
 
     @property
     def length(self) -> float:
         """Get the total length of the path."""
-        return sum(w.length for w in self.ways)
+        return (sum(w.length for w in self.ways)
+                - self.offsets[0] + self.offsets[1])
 
     @property
     def weight(self) -> float:
-        """Get the total weight of the path."""
+        """Get the total weight of the path.
+
+        This property is not taking into account the start and end offsets,
+        counting the full weight of both oriented ways.
+        """
         return sum(w.weight for w in self.ways)
 
     def points(self) -> Iterator[Point]:
@@ -94,34 +120,88 @@ class Path:
         """
         if not self.ways:
             return
-        yield from self.ways[0].points()
-        for way in islice(self.ways, 1, None):
-            yield from way.points(1)
+        if len(self.ways) == 1:
+            yield from self.ways[0].points(offsets=self.offsets)
+            return
+
+        yield from self.ways[0].points(offsets=(self.offsets[0], None))
+        for last_way, way in window_iter(islice(self.ways,
+                                                len(self.ways) - 1)):
+            skip = 0 if way == last_way.flipped() else 1
+            yield from way.points(skip=skip)
+        last_way, way = self.ways[-2:]
+        skip = 0 if way == last_way.flipped() else 1
+        yield from way.points(offsets=(0.0, self.offsets[1]), skip=skip)
+
+    def oriented_points(self, offset=LANE_WIDTH) -> List[Point]:
+        """Get points shifted by orientation to help drawing path."""
+        def width2(point1: Point, point2: Point) -> Vector:
+            return (point2 - point1).normalized().rotated_right() * offset
+
+        def width3(point1: Point, point2: Point, point3: Point) -> Vector:
+            last = (point2 - point1).normalized()
+            vector = (point3 - point2).normalized()
+            bisector = (last + vector).normalized()
+            return sec(bisector, vector) * offset * bisector.rotated_right()
+
+        points = list(self.points())
+        if len(points) < 2:
+            return points
+
+        points_ = [points[0] + width2(points[0], points[1])]
+        for point1, point2, point3 in window_iter(points, size=3):
+            if point1.close_to(point2):
+                points_.append(point2 + width2(point2, point3))
+            elif point2.close_to(point3):
+                points_.append(point2 + width2(point1, point2))
+            else:
+                points_.append(point2 + width3(point1, point2, point3))
+        points_.append(points[-1] + width2(points[-2], points[-1]))
+        return points_
 
 
+@with_slots
+@dataclass
 class PathMap:
-    """Contains the shortest path between all pairs of nodes."""
+    """Contains the shortest path between all pairs of oriented ways."""
 
-    all_pairs: AllPairsMap
+    all_pairs: AllPairsMap = field(default_factory=dict)
 
-    def __init__(self, nodes: Iterable[Node] = None):
-        self.all_pairs = {n: dijkstra(n) for n in (nodes or ())}
+    def path(self,
+             source: OrientedWayPosition,
+             dest: OrientedWayPosition) -> Path:
+        """Get path from `source` to `dest`.
 
-    def path(self, source: Node, dest: Node) -> Path:
-        """Get path from source node to dest node.
-
-        Can return None if there is no path between the given nodes.
+        Can return None if there is no path between the given oriented ways.
         """
-        try:
-            single_source = self.all_pairs[source]
-        except KeyError:
+        if source.oriented_way == dest.oriented_way \
+                and source.position > dest.position:
+            return self._path_to_same(source.oriented_way,
+                                      source.position, dest.position)
+
+        single_source = self.single_source(source.oriented_way)
+        return Path.build(single_source, dest.oriented_way,
+                          source.position, dest.position)
+
+    def single_source(self, source: OrientedWay) -> SingleSourceMap:
+        """Get the single source map from the `source` oriented way."""
+        single_source = self.all_pairs.get(source, None)
+        if single_source is None:
             single_source = dijkstra(source)
             self.all_pairs[source] = single_source
+        return single_source
 
-        # Get last way of the path and build it backwards
-        result = deque()
-        way = single_source.get(dest, None)
-        while way:
-            result.appendleft(way)
-            way = single_source.get(way.start, None)
-        return Path(list(result)) if result else None
+    def _path_to_same(self, oriented_way: OrientedWay,
+                      source: float, dest: float) -> Path:
+        """Get a path between two points on the same way.
+
+        This method is specifically for the case where the destination is
+        behind the source, so a path must be found to reach the same oriented
+        way from the other side.
+        """
+        paths = []
+        for way in oriented_way.way_connections:
+            single_source = self.single_source(way)
+            paths.append(Path.build(single_source, oriented_way, source, dest,
+                                    source=oriented_way))
+        return min(paths, key=attrgetter('length'))

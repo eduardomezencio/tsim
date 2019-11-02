@@ -3,22 +3,24 @@
 from __future__ import annotations
 
 from itertools import islice
+from typing import List
 
 from panda3d.core import (Geom, GeomNode, GeomTristrips, GeomVertexData,
                           GeomVertexFormat, GeomVertexWriter, NodePath)
 
-from tsim.model.geometry import sec
-from tsim.model.network.path import Path
+from tsim.model.geometry import Point, sec
 from tsim.model.network.way import LANE_WIDTH
 from tsim.ui.objects.way import LEVEL_HEIGHT
+from tsim.utils.iterators import window_iter
 
 VERTEX_FORMAT = GeomVertexFormat.get_v3n3c4()
 HEIGHT = LEVEL_HEIGHT + 1.0
+SHIFT = LANE_WIDTH
 
 
-def create(parent: NodePath, path: Path) -> NodePath:
+def create(parent: NodePath, points: List[Point]) -> NodePath:
     """Create node for given path and attach it to the parent."""
-    geom = _generate_mesh(path)
+    geom = _generate_mesh(points)
     node = GeomNode('path')
     node.add_geom(geom)
     node.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
@@ -26,10 +28,8 @@ def create(parent: NodePath, path: Path) -> NodePath:
     return node_path
 
 
-def _generate_mesh(path: Path) -> Geom:
+def _generate_mesh(points: List[Point]) -> Geom:
     """Generate mesh for a Path."""
-    points = list(path.points())
-
     if len(points) < 2:
         return Geom()
 
@@ -39,13 +39,13 @@ def _generate_mesh(path: Path) -> Geom:
     normal_writer = GeomVertexWriter(vertex_data, 'normal')
     color_writer = GeomVertexWriter(vertex_data, 'color')
 
-    length = path.length
+    length = sum(p1.distance(p2) for p1, p2 in window_iter(points))
     vector = points[1] - points[0]
     distance = vector.norm()
     position = distance / length
     vector = vector.normalized()
 
-    color = [0.0, 0.0, 1.0, 1.0]
+    color = [0.0, 0.2, 1.0, 1.0]
 
     width_vector = LANE_WIDTH * 0.5 * vector.rotated_left()
     for vertex in (points[0] + width_vector, points[0] - width_vector):
@@ -58,9 +58,12 @@ def _generate_mesh(path: Path) -> Geom:
         vector = next_ - point
         distance = vector.norm()
         vector = vector.normalized()
-        bisector = (last_vector + vector).normalized()
-        width_vector = (sec(bisector, vector) * 0.5 * LANE_WIDTH
-                        * bisector.rotated_left())
+        try:
+            bisector = (last_vector + vector).normalized()
+            width_vector = (sec(bisector, vector) * 0.5 * LANE_WIDTH
+                            * bisector.rotated_left())
+        except ZeroDivisionError:
+            width_vector = vector.rotated_right() * 0.5 * LANE_WIDTH
         for vertex in (point + width_vector, point - width_vector):
             vertex_writer.add_data3f(vertex.x, vertex.y, HEIGHT)
             normal_writer.add_data3f(0.0, 0.0, 1.0)
@@ -72,8 +75,7 @@ def _generate_mesh(path: Path) -> Geom:
 
     point = points[-1]
     width_vector = 0.5 * LANE_WIDTH * last_vector.rotated_left()
-    color[0] = 1.0
-    color[1] = 0.0
+    color = [1.0, 0.0, 0.2, 1.0]
 
     distance = LANE_WIDTH if distance > LANE_WIDTH else distance / 2
     vector = -last_vector * distance

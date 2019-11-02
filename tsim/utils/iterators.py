@@ -4,13 +4,30 @@ from __future__ import annotations
 
 from collections import deque
 from itertools import chain
-from typing import Iterable, Tuple, TypeVar
+from typing import Iterable, Iterator, Tuple, TypeVar
 
+_NULL = object()
 T = TypeVar('T')  # pylint: disable=invalid-name
 
 
+def drop_duplicates(iterable: Iterable[T]) -> Iterator[T]:
+    """Create an iterator that drops consecutive duplicate values.
+
+    Examples::
+        drop_duplicates([1, 1, 2, 3, 3, 3, 2]) --> 1 2 3 2
+    """
+    iterator = iter(iterable)
+    last = next(iterator, _NULL)
+    if last is not _NULL:
+        yield last
+    for item in iterator:
+        if item != last:
+            yield item
+        last = item
+
+
 def window_iter(iterable: Iterable[T], size: int = 2,
-                extend: bool = False) -> Iterable[Tuple[T]]:
+                extend: bool = False) -> Iterator[Tuple[T]]:
     """Create a moving window iterator of given size.
 
     Each element returned by this iterator is a tuple of length size (default

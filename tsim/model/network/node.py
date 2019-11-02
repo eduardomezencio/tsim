@@ -1,11 +1,11 @@
-"""Node and related classes."""
+"""`Node` and related classes."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import chain, repeat
-from typing import (TYPE_CHECKING, ClassVar, Dict, Iterable, Iterator, List,
-                    NamedTuple, Optional, Set, Tuple)
+from typing import (ClassVar, Dict, Iterable, Iterator, List, Optional, Set,
+                    Tuple)
 
 from dataslots import with_slots
 
@@ -14,13 +14,10 @@ from tsim.model.entity import DeleteResult, Entity, EntityRef
 from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
                                  calc_bounding_rect, line_intersection,
                                  midpoint)
-from tsim.model.network.intersection import Intersection
+from tsim.model.network.intersection import Intersection, LaneConnection
 from tsim.model.network.way import (LANE_WIDTH, Endpoint, LaneRef, OrientedWay,
                                     Way)
 from tsim.utils.cached_property import cached_property
-
-if TYPE_CHECKING:
-    from tsim.model.network.intersection import Curve, LaneConnection
 
 
 @with_slots
@@ -28,11 +25,14 @@ if TYPE_CHECKING:
 class Node(Entity):
     """A node of the network.
 
-    A Node can be the endpoint of a Way or a junction of 3 or more Ways.
+    A `Node` can be the endpoint of a `Way` or a junction of 3 or more ways. A
+    node that connects two ways can be dissolved into a waypoint with the
+    `dissolve` method, unless the two ways have different lane configurations
+    and can't be merged.
     """
 
-    cached: ClassVar[Iterable[str]] = (
-        Entity.cached + ('geometry', 'intersection', 'out_neighbors'))
+    cached: ClassVar[Iterable[str]] = (Entity.cached +
+                                       ('geometry', 'intersection'))
 
     position: Point
     level: int = field(default_factory=int)
@@ -48,22 +48,6 @@ class Node(Entity):
     def intersection(self) -> Intersection:
         """Get intersection info for the node."""
         return Intersection(self)
-
-    @cached_property
-    def out_neighbors(self) -> Dict[Node, OrientedWay]:
-        """Get the outgoing connections to other nodes.
-
-        Each node that is an out-neighbor of this node is returned as a key in
-        the dictionary, with the oriented way that connects to this node with
-        minimum weight as the value.
-        """
-        neighbors: Dict[Node, OrientedWay] = {}
-        for way in filter(lambda w: w.lane_count, self.oriented_ways):
-            other = way.way.other(self)
-            existing = neighbors.get(other, None)
-            if not existing or existing.weight < way.weight:
-                neighbors[other] = way
-        return neighbors
 
     @property
     def neighbors(self) -> Iterable[Entity]:
@@ -109,6 +93,10 @@ class Node(Entity):
             return self.position.distance_squared(point)
         return self.position.distance(point)
 
+    def way_connections(self, source: OrientedWay) -> Set[OrientedWay]:
+        """Get the outgoing way connections coming from `source`."""
+        return self.intersection.way_connections[source]
+
     def sorted_ways(self) -> List[OrientedWay]:
         """Get incident ways sorted in counterclockwise order."""
         return sorted(
@@ -116,8 +104,8 @@ class Node(Entity):
             key=lambda t: (t.way.direction_from_node(self, t.endpoint)
                            .sorting_key()))
 
-    def ways_closest_to(self, oriented_way: OrientedWay
-                        ) -> Tuple[OrientedWay, OrientedWay]:
+    def ways_closest_to(self, oriented_way: OrientedWay) \
+            -> Tuple[OrientedWay, OrientedWay]:
         """Get incident way closest to given way in each direction.
 
         Returns a tuple where the first value is the closest way in the
@@ -132,7 +120,7 @@ class Node(Entity):
                 sorted_ways[(index + 1) % len(sorted_ways)])
 
     def get_lane_connection(self, source: LaneRef, dest: OrientedWay) \
-            -> Optional[NodeLaneConnection]:
+            -> Optional[LaneConnection]:
         """Get the lane connection leading to the given destination.
 
         The source is a LaneRef, representing the current position for an
@@ -242,7 +230,7 @@ class NodeGeometry:
 
     def _build_polygon(self, ways: List[OrientedWay]):
         """Calculate points for the geometric bounds of the node."""
-        polygon = [None for _ in range(2 * len(ways))]
+        polygon = [None] * (2 * len(ways))
         directions = tuple(w().direction_from_node(self.node, e).normalized()
                            for w, e in ways)
         for i, (way, _) in enumerate(ways):
@@ -271,24 +259,3 @@ class NodeGeometry:
             self.way_distances[i] = projection.norm()
             polygon[2 * i] = reflection
         self.polygon = [p + self.node.position for p in polygon]
-
-
-class NodeLaneConnection(NamedTuple):
-    """Information about a lane connection on a node.
-
-    Contains the node itself and a tuple with the source and destination lanes.
-    Can be used to identify the position of something on this path.
-    """
-
-    node: Node
-    lanes: LaneConnection
-
-    @property
-    def curve(self) -> Curve:
-        """Get the curve of this lane connection."""
-        return self.node.intersection.curves[self.lanes]
-
-    def __repr__(self):
-        return (f'{NodeLaneConnection.__name__}(node_id={self.node.id}, '
-                f'lanes=(({self.lanes[0].way.id}, {self.lanes[0].index}), '
-                f'({self.lanes[1].way.id}, {self.lanes[1].index})))')
