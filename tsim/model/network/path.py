@@ -7,8 +7,8 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from itertools import islice
 from operator import attrgetter
-from typing import (TYPE_CHECKING, DefaultDict, Dict, Iterator, List, Optional,
-                    Set, Tuple)
+from typing import (TYPE_CHECKING, DefaultDict, Dict, Iterator, List, Set,
+                    Tuple)
 
 from dataslots import with_slots
 from fibonacci_heap_mod import (Fibonacci_heap as FibonacciHeap,
@@ -80,28 +80,36 @@ class Path:
     offsets: Tuple[float, float]
 
     @staticmethod
-    def build(single_source: SingleSourceMap, dest: OrientedWay,
+    def build(single_source: SingleSourceMap,
+              source: OrientedWay, dest: OrientedWay,
               start_offset: float = 0.0, end_offset: float = 0.0,
-              source: Optional[OrientedWay] = None) -> Path:
+              prepend_source: bool = False) -> Path:
         """Create a new Path from a single source map and the destination."""
         empty = (None, None)
         way, index = single_source.get(dest, (None, 0))
-        result = [None] * (index + (1 if source is None else 2))
-        result[-1] = dest
-        if source is None:
+        result = [None] * (index + 1)
+
+        if prepend_source:
+            result.append(None)
+            result[0] = source
+        else:
             index -= 1
+
+        result[-1] = dest
         while way:
             result[index] = way
             way, _ = single_source.get(way, empty)
             index -= 1
-        if source is not None:
-            result[0] = source
+
+        if not prepend_source and result[0] != source:
+            result = []
+
         return Path(result, (start_offset, end_offset)) if result else None
 
     @property
     def length(self) -> float:
         """Get the total length of the path."""
-        return (sum(w.length for w in self.ways)
+        return (sum(w.length for w in islice(self.ways, len(self.ways) - 1))
                 - self.offsets[0] + self.offsets[1])
 
     @property
@@ -180,7 +188,8 @@ class PathMap:
                                       source.position, dest.position)
 
         single_source = self.single_source(source.oriented_way)
-        return Path.build(single_source, dest.oriented_way,
+        return Path.build(single_source,
+                          source.oriented_way, dest.oriented_way,
                           source.position, dest.position)
 
     def single_source(self, source: OrientedWay) -> SingleSourceMap:
@@ -202,6 +211,6 @@ class PathMap:
         paths = []
         for way in oriented_way.way_connections:
             single_source = self.single_source(way)
-            paths.append(Path.build(single_source, oriented_way, source, dest,
-                                    source=oriented_way))
+            paths.append(Path.build(single_source, oriented_way, oriented_way,
+                                    source, dest, prepend_source=True))
         return min(paths, key=attrgetter('length'))
