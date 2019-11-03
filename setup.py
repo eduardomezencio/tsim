@@ -14,7 +14,7 @@ setup(
     description='Agent based traffic simulator.',
     long_description=LONG_DESCRIPTION,
     long_description_content_type='text/markdown',
-    url='https://github.com/eduardomezencio/tsim',
+    url='https://gitlab.com/eduardomezencio/tsim',
     author='Eduardo Mezêncio',
     author_email='eduardomezencio@protonmail.com',
     classifiers=[  # https://pypi.org/classifiers/
