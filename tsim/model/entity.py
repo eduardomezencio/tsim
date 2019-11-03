@@ -98,7 +98,7 @@ class EntityRef(Generic[T]):
     must not be used as dict keys or in sets.
     """
 
-    __slots__ = ('_id', '_value')
+    __slots__ = '_id', '_value'
 
     _id: int
     _value: ReferenceType

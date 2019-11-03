@@ -6,7 +6,8 @@ from itertools import islice
 from typing import List
 
 from panda3d.core import (Geom, GeomNode, GeomTristrips, GeomVertexData,
-                          GeomVertexFormat, GeomVertexWriter, NodePath)
+                          GeomVertexFormat, GeomVertexWriter, NodePath,
+                          TransparencyAttrib)
 
 from tsim.model.geometry import Point, sec
 from tsim.model.network.way import LANE_WIDTH
@@ -25,6 +26,7 @@ def create(parent: NodePath, points: List[Point]) -> NodePath:
     node.add_geom(geom)
     node.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
     node_path = parent.attach_new_node(node)
+    node_path.set_transparency(TransparencyAttrib.M_alpha)
     return node_path
 
 
@@ -45,7 +47,7 @@ def _generate_mesh(points: List[Point]) -> Geom:
     position = distance / length
     vector = vector.normalized()
 
-    color = [0.0, 0.2, 1.0, 1.0]
+    color = [0.0, 0.2, 1.0, 0.8]
 
     width_vector = LANE_WIDTH * 0.5 * vector.rotated_left()
     for vertex in (points[0] + width_vector, points[0] - width_vector):
@@ -75,7 +77,7 @@ def _generate_mesh(points: List[Point]) -> Geom:
 
     point = points[-1]
     width_vector = 0.5 * LANE_WIDTH * last_vector.rotated_left()
-    color = [1.0, 0.0, 0.2, 1.0]
+    color = [1.0, 0.0, 0.2, 0.8]
 
     distance = LANE_WIDTH if distance > LANE_WIDTH else distance / 2
     vector = -last_vector * distance

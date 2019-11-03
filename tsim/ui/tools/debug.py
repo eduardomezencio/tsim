@@ -23,6 +23,7 @@ LINES = 3
 class Debug(Tool):
     """Tool for debugging."""
 
+    pressed: bool
     hud_text: OnscreenText
     card: NodePath
     text_lines: List[str]
@@ -31,6 +32,7 @@ class Debug(Tool):
 
     def prepare(self):
         """Initialize tool."""
+        self.pressed = False
         self.hud_text = OnscreenText(text='', pos=(5, -20), scale=22.0,
                                      fg=(1.0, 1.0, 1.0, 0.9),
                                      shadow=(0.0, 0.0, 0.0, 0.9),
@@ -43,6 +45,7 @@ class Debug(Tool):
 
     def on_button1_press(self):
         """Button 1 pressed callback."""
+        self.pressed = True
         log.debug('%.2f, %.2f', self.cursor.position.x, self.cursor.position.y)
         self._clear_selection()
         selected = INDEX.get_at(self.cursor.position, of_type=Node)
@@ -75,8 +78,14 @@ class Debug(Tool):
 
         self._update_hud_text()
 
+    def on_button1_release(self):
+        """Button 1 released callback."""
+        self.pressed = False
+
     def on_cursor_move(self):
         """Cursor moved callback."""
+        if self.pressed:
+            self.on_button1_press()
         self._update_position()
         self._update_hud_text()
 

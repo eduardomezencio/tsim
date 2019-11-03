@@ -42,8 +42,7 @@ def _generate_mesh(way: Way) -> Geom:
     lanes_float = float(way.total_lane_count)
 
     segment = geometry.segments[0]
-    for vertex in (segment.start_left(geometry.half_width),
-                   segment.start_right(geometry.half_width)):
+    for vertex in (segment.start_left, segment.start_right):
         vertex_writer.add_data3f(vertex.x, vertex.y, start_z)
         normal_writer.add_data3f(0.0, 0.0, 1.0)
     texture_v = 0.0
@@ -55,8 +54,7 @@ def _generate_mesh(way: Way) -> Geom:
 
     for segment, acc_len in zip(geometry.segments, accumulate(lengths)):
         height = start_z + (end_z - start_z) * acc_len / total_len
-        for vertex in (segment.end_left(geometry.half_width),
-                       segment.end_right(geometry.half_width)):
+        for vertex in (segment.end_left, segment.end_right):
             vertex_writer.add_data3f(vertex.x, vertex.y, height)
             normal_writer.add_data3f(0.0, 0.0, 1.0)
         texture_v = acc_len / LANE_WIDTH

@@ -116,7 +116,7 @@ class Curve:
     points that intersect with this curve.
     """
 
-    __slots__ = ('curve', 'length', '_conflict_points', '_sorted')
+    __slots__ = 'curve', 'length', '_conflict_points', '_sorted'
 
     curve: bezier.Curve
     length: float
