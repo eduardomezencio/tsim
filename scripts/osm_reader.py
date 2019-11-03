@@ -7,7 +7,7 @@ from collections import namedtuple
 from itertools import islice
 from math import asin, cos, radians, sin, sqrt
 from textwrap import wrap
-from typing import Dict
+from typing import Dict, Tuple
 from xml.etree import ElementTree
 
 from tsim.model.geometry import Point
@@ -79,11 +79,13 @@ def main():
             way.xid = highway.xid
 
     dissolve_nodes(nodes_inv)
+    filter_waypoints()
+
     INDEX.name = sys.argv[1]
     INDEX.save()
 
 
-def calculate_bounds(root) -> Dict[str, float]:
+def calculate_bounds(root: ElementTree.Element) -> Dict[str, float]:
     """Calculate map bounds from node coordinates."""
     bounds = {'minlon': 180.0, 'minlat': 90.0,
               'maxlon': -180.0, 'maxlat': -90.0}
@@ -97,7 +99,8 @@ def calculate_bounds(root) -> Dict[str, float]:
     return bounds
 
 
-def coord_meters(center_lat, center_lon, lat, lon):
+def coord_meters(center_lat: float, center_lon: float,
+                 lat: float, lon: float) -> Tuple[float, float]:
     """Coordinates in meters relative to coordinates given as center."""
     x = distance_meters(center_lat, center_lon, center_lat, lon)
     if lon < center_lon:
@@ -108,7 +111,8 @@ def coord_meters(center_lat, center_lon, lat, lon):
     return x, y
 
 
-def distance_meters(lat1, lon1, lat2, lon2):
+def distance_meters(lat1: float, lon1: float,
+                    lat2: float, lon2: float) -> float:
     """Calculate the distance in meters between two points on the earth."""
     lon1, lat1, lon2, lat2 = map(radians, (lon1, lat1, lon2, lat2))
     dlon, dlat = lon2 - lon1, lat2 - lat1
@@ -128,6 +132,13 @@ def dissolve_nodes(nodes_inv: Dict[int, int]):
             pass
     log.info('Nodes dissolved:\n%s',
              '\n'.join(wrap(', '.join(map(str, dissolved)), 79)))
+
+
+def filter_waypoints():
+    """Remove waypoints that are too close to nodes."""
+    cleared = sum(n.clear_intersecting_waypoints()
+                  for n in INDEX.get_all(of_type=Node))
+    log.info('Waypoints cleared: %d', cleared)
 
 
 def log_config():

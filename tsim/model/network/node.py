@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from itertools import chain, repeat
+from itertools import chain, count, repeat
 from typing import (ClassVar, Dict, Iterable, Iterator, List, Optional, Set,
                     Tuple)
 
@@ -13,7 +13,7 @@ import tsim.model.index as Index
 from tsim.model.entity import DeleteResult, Entity, EntityRef
 from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
                                  calc_bounding_rect, line_intersection,
-                                 midpoint)
+                                 midpoint, point_in_polygon)
 from tsim.model.network.intersection import Intersection, LaneConnection
 from tsim.model.network.way import (LANE_WIDTH, Endpoint, LaneRef, OrientedWay,
                                     Way)
@@ -162,12 +162,21 @@ class Node(Entity):
                     and ways[0].lane_count != ways[1].swapped_lane_count)):
             raise ValueError('Can not dissolve nodes with lane changes.')
 
-        waypoints = []
-        waypoints.extend(ways[0].waypoints if ways[0].end is self
-                         else reversed(ways[0].waypoints))
-        waypoints.append(self.position)
-        waypoints.extend(ways[1].waypoints if ways[1].start is self
-                         else reversed(ways[1].waypoints))
+        waypoints1 = list(ways[0].waypoints if ways[0].end is self
+                          else reversed(ways[0].waypoints))
+        waypoints2 = list(ways[1].waypoints if ways[1].start is self
+                          else reversed(ways[1].waypoints))
+
+        # Only add node as waypoint if it's far enough from neighbors
+        if waypoints1 and waypoints2 and any(
+                p1.close_to(p2, threshold=0.5)
+                for p1, p2 in ((waypoints1[-1], self.position),
+                               (waypoints2[0], self.position))):
+            waypoint = []
+        else:
+            waypoint = [self.position]
+
+        waypoints = chain(waypoints1, waypoint, waypoints2)
 
         ways[0].disconnect(start)
         ways[1].disconnect(end)
@@ -180,6 +189,29 @@ class Node(Entity):
 
         if delete_if_dissolved:
             Index.INSTANCE.delete(self)
+
+    def clear_intersecting_waypoints(self) -> int:
+        """Clear waypoints from incident ways intersecting the node polygon.
+
+        With each waypoint removed, the geometry is updated for the node and
+        for the incident ways. Returns the number of waypoints cleared.
+        """
+        def clear_waypoint():
+            for way in self.ways:
+                if not way.waypoints:
+                    continue
+                for index in (0, -1):
+                    if point_in_polygon(way.waypoints[index], self.polygon):
+                        waypoints = list(way.waypoints)
+                        del waypoints[index]
+                        way.waypoints = tuple(waypoints)
+                        self.clear_cache(True)
+                        return True
+            return False
+
+        for i in count():
+            if not clear_waypoint():
+                return i
 
     def on_delete(self) -> DeleteResult:
         """Disconnect this node from the network.

@@ -81,7 +81,7 @@ class Entity(ABC):
     __setstate__ = pickling.setstate
 
 
-T = TypeVar('T', bound=Entity)  # pylint: disable=invalid-name
+T = TypeVar('T', bound=Entity)
 
 
 class EntityRef(Generic[T]):

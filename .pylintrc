@@ -427,6 +427,7 @@ good-names=i,j,k,
            t,
            dx,dy,dz,
            id,
+           T,
            _
 
 # Include a hint for the correct naming format with invalid-name.

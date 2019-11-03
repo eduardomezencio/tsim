@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from collections import deque
 from itertools import chain
-from typing import Iterable, Iterator, Tuple, TypeVar
+from typing import Callable, Iterable, Iterator, Tuple, TypeVar
 
 _NULL = object()
-T = TypeVar('T')  # pylint: disable=invalid-name
+T = TypeVar('T')
 
 
 def drop_duplicates(iterable: Iterable[T]) -> Iterator[T]:
@@ -24,6 +24,34 @@ def drop_duplicates(iterable: Iterable[T]) -> Iterator[T]:
         if item != last:
             yield item
         last = item
+
+
+def window_filter(function: Callable[..., bool], iterable: Iterable[T],
+                  size: int = 2) -> Iterator[T]:
+    """Filter based on previous items.
+
+    The created iterator always returns the first `size - 1` items, then it
+    calls `function` for each tuple with the last `size` items, returning the
+    last element of the tuple only if `function` returns `True`.
+
+    Examples::
+        window_filter(operator.le, [1, 3, 2, 4, 3, 2, 4, 5]) --> 1 3 4 4 5
+    """
+    window = deque(maxlen=size)
+    iterator = iter(iterable)
+
+    for item in iterator:
+        window.append(item)
+        if len(window) >= size:
+            if function(*window):
+                yield item
+            break
+        yield item
+
+    for item in iterator:
+        window.append(item)
+        if function(*window):
+            yield item
 
 
 def window_iter(iterable: Iterable[T], size: int = 2,
