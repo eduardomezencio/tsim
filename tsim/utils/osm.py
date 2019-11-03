@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from tsim.model.entity import Entity
+    from tsim.model.network.entity import Entity
 
 BASE_URL = 'https://www.openstreetmap.org'
 

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 from dataslots import with_slots
 
 if TYPE_CHECKING:
-    from tsim.model.entity import EntityRef
+    from tsim.model.network.entity import EntityRef
     from tsim.model.network.way import Lane, OrientedWay, Way
 
 

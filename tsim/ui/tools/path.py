@@ -9,8 +9,8 @@ from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import NodePath, TextNode
 
 from tsim.model.index import INSTANCE as INDEX
+from tsim.model.network.position import OrientedWayPosition
 from tsim.model.network.way import Way
-from tsim.model.position import OrientedWayPosition
 from tsim.ui.objects.path import create as create_path
 from tsim.ui.panda3d import LOADER, PIXEL2D, RENDER
 from tsim.ui.tools.tool import Tool

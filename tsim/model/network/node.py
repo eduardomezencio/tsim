@@ -10,10 +10,10 @@ from typing import (ClassVar, Dict, Iterable, Iterator, List, Optional, Set,
 from dataslots import with_slots
 
 import tsim.model.index as Index
-from tsim.model.entity import DeleteResult, Entity, EntityRef
 from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
                                  calc_bounding_rect, line_intersection,
                                  midpoint, point_in_polygon)
+from tsim.model.network.entity import DeleteResult, Entity, EntityRef
 from tsim.model.network.intersection import Intersection, LaneConnection
 from tsim.model.network.way import (LANE_WIDTH, Endpoint, LaneRef, OrientedWay,
                                     Way)

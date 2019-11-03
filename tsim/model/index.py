@@ -10,8 +10,8 @@ import shelve
 
 from rtree.index import Rtree
 
-from tsim.model.entity import Entity
 from tsim.model.geometry import BoundingRect, Point, point_in_polygon
+from tsim.model.network.entity import Entity
 from tsim.model.network.path import PathMap
 
 

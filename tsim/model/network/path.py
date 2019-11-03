@@ -15,8 +15,8 @@ from fibonacci_heap_mod import (Fibonacci_heap as FibonacciHeap,
                                 Entry as FibonacciHeapEntry)
 
 from tsim.model.geometry import Vector, sec
+from tsim.model.network.position import OrientedWayPosition
 from tsim.model.network.way import LANE_WIDTH, OrientedWay
-from tsim.model.position import OrientedWayPosition
 from tsim.utils.iterators import window_iter
 
 SingleSourceMap = Dict[OrientedWay, Tuple[OrientedWay, int]]

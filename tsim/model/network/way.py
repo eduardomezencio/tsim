@@ -12,11 +12,11 @@ from typing import (TYPE_CHECKING, ClassVar, Iterable, Iterator, List,
 
 from dataslots import with_slots
 
-from tsim.model.entity import DeleteResult, Entity, EntityRef
 from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
                                  calc_bounding_rect, line_intersection,
                                  point_in_polygon, sec)
-from tsim.model.position import WayPosition, OrientedWayPosition, LanePosition
+from tsim.model.network.entity import DeleteResult, Entity, EntityRef
+from tsim.model.network.position import WayPosition, OrientedWayPosition, LanePosition
 from tsim.utils.cached_property import cached_property
 from tsim.utils.iterators import drop_duplicates, window_iter
 
