@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Reader for openstreetmap xml files."""
 
+from __future__ import annotations
+
 import logging as log
 import sys
 from collections import namedtuple
@@ -17,10 +19,17 @@ from tsim.model.network.way import Way
 
 
 def main():
-    """Run the osm reader."""
+    """Call osm_reader for each name in command line arguments."""
     log_config()
+    for name in sys.argv[1:]:
+        osm_reader(name)
 
-    tree = ElementTree.parse(sys.argv[1])
+
+def osm_reader(name):
+    """Run the osm reader."""
+    INDEX.reset(name)
+
+    tree = ElementTree.parse(name)
     root = tree.getroot()
     try:
         bounds = {k: float(v) for k, v in root.find('bounds').attrib.items()
@@ -81,7 +90,6 @@ def main():
     dissolve_nodes(nodes_inv)
     filter_waypoints()
 
-    INDEX.name = sys.argv[1]
     INDEX.save()
 
 

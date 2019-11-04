@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from itertools import count
-from typing import (Callable, ClassVar, Dict, Iterator, List, Optional, Tuple,
-                    Type, Union)
+from typing import (Callable, ClassVar, Dict, Iterator, List, Optional, Set,
+                    Tuple, Type, Union)
 import logging as log
 import shelve
 
@@ -35,8 +35,20 @@ class EntityIndex:
     rtree: Rtree
     path_map: PathMap
     register_updates: bool
+    _updates: Set[int]
 
-    def __init__(self, name: str = None):
+    def __init__(self, name: Optional[str] = None):
+        self.reset(name)
+
+    @property
+    def filename(self) -> str:
+        """Name with extension added."""
+        if self.name.endswith(f'.{EntityIndex.extension}'):
+            return self.name
+        return f'{self.name}.{EntityIndex.extension}'
+
+    def reset(self, name: Optional[str] = None):
+        """Reset index and set name."""
         self.name = name
         self.id_count = count()
         self.entities = {}
@@ -45,13 +57,6 @@ class EntityIndex:
         self.path_map = PathMap()
         self.register_updates = False
         self._updates = set()
-
-    @property
-    def filename(self) -> str:
-        """Name with extension added."""
-        if self.name.endswith(f'.{EntityIndex.extension}'):
-            return self.name
-        return f'{self.name}.{EntityIndex.extension}'
 
     def add(self, entity: Entity):
         """Add entity to index."""

@@ -26,6 +26,15 @@
             "args": ["data/custom.osm"]
         },
         {
+            "name": "Python: osm_reader [*]",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/osm_reader.py",
+            "console": "integratedTerminal",
+            "args": ["data/*.osm"],
+            "env": {"PYTHONPATH": "${workspaceFolder}"}
+        },
+        {
             "name": "Python: osm_reader [formiga]",
             "type": "python",
             "request": "launch",

@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from math import acos, copysign, cos, pi, sin, sqrt
-from typing import Iterable, NamedTuple, Sequence, Tuple
+from typing import Iterable, Sequence, Tuple
+
+from dataslots import with_slots
 
 from tsim.utils.iterators import window_iter
 
@@ -117,7 +120,9 @@ sec3 = sec
 # pylint: enable=invalid-name
 
 
-class Vector(NamedTuple):
+@with_slots
+@dataclass(frozen=True)
+class Vector:
     """A vector in space, that doubles as a point."""
 
     x: float
@@ -235,6 +240,10 @@ class Vector(NamedTuple):
     def __neg__(self):
         return Vector(-self.x, -self.y)
 
+    def __iter__(self):
+        yield self.x
+        yield self.y
+
     angle = angle
     bounding_rect = property(calc_bounding_rect)
     distance = distance
@@ -247,6 +256,14 @@ class Vector(NamedTuple):
     __mul__ = multiply
     __rmul__ = multiply
     __sub__ = subtract
+
+    def __getstate__(self):
+        return {slot: getattr(self, slot)
+                for slot in getattr(self, '__slots__')}
+
+    def __setstate__(self, state):
+        for slot, value in state.items():
+            object.__setattr__(self, slot, value)
 
 
 Point = Vector
