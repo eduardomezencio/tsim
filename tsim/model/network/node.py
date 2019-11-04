@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from itertools import chain, count, repeat
-from typing import (ClassVar, Dict, Iterable, Iterator, List, Optional, Set,
-                    Tuple)
+from typing import Dict, Iterable, Iterator, List, Optional, Set, Tuple
 
 from dataslots import with_slots
 
@@ -17,9 +16,10 @@ from tsim.model.network.entity import DeleteResult, Entity, EntityRef
 from tsim.model.network.intersection import Intersection, LaneConnection
 from tsim.model.network.way import (LANE_WIDTH, Endpoint, LaneRef, OrientedWay,
                                     Way)
-from tsim.utils.cached_property import cached_property
+from tsim.utils.cached_property import add_cached, cached_property
 
 
+@add_cached
 @with_slots
 @dataclass(eq=False)
 class Node(Entity):
@@ -30,9 +30,6 @@ class Node(Entity):
     `dissolve` method, unless the two ways have different lane configurations
     and can't be merged.
     """
-
-    cached: ClassVar[Iterable[str]] = (Entity.cached +
-                                       ('geometry', 'intersection'))
 
     position: Point
     level: int = field(default_factory=int)

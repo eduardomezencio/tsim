@@ -7,8 +7,8 @@ from enum import Enum
 from itertools import accumulate, chain, islice
 from math import floor, sqrt
 from operator import itemgetter
-from typing import (TYPE_CHECKING, ClassVar, Iterable, Iterator, List,
-                    NamedTuple, Optional, Tuple)
+from typing import (TYPE_CHECKING, Iterable, Iterator, List, NamedTuple,
+                    Optional, Tuple)
 
 from dataslots import with_slots
 
@@ -19,7 +19,7 @@ from tsim.model.network.entity import DeleteResult, Entity, EntityRef
 from tsim.model.network.position import (LanePosition, OrientedWayPosition,
                                          WayPosition)
 from tsim.model.units import kph_to_mps
-from tsim.utils.cached_property import cached_property
+from tsim.utils.cached_property import add_cached, cached_property
 from tsim.utils.iterators import drop_duplicates, window_iter
 
 if TYPE_CHECKING:
@@ -43,6 +43,7 @@ class Endpoint(Enum):
         return Endpoint.END if self is Endpoint.START else Endpoint.START
 
 
+@add_cached
 @with_slots
 @dataclass(eq=False)
 class Way(Entity):
@@ -51,9 +52,6 @@ class Way(Entity):
     A Way connects two Nodes and can have a list of intermediary points, called
     waypoints.
     """
-
-    cached: ClassVar[Iterable[str]] = \
-        Entity.cached + ('geometry', 'lanes', 'length', 'weight')
 
     start: Node
     end: Node

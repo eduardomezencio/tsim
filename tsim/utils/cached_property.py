@@ -1,5 +1,7 @@
 """Cached property implementation."""
 
+from functools import partial
+
 
 class CachedProperty:
     """A cached property.
@@ -14,13 +16,13 @@ class CachedProperty:
         self.func = func
         self._on_update = None
 
-    def __get__(self, obj, cls):
-        if obj is None:
+    def __get__(self, instance, owner=None):
+        if instance is None:
             return self
 
-        value = obj.__dict__[self.func.__name__] = self.func(obj)
+        value = instance.__dict__[self.func.__name__] = self.func(instance)
         if self._on_update is not None:
-            self._on_update(obj)
+            self._on_update(instance)
         return value
 
     def on_update(self, func):
@@ -47,3 +49,24 @@ class CachedProperty:
 def cached_property(func):
     """Get a cached property from `func` (CachedProperty wrapper)."""
     return CachedProperty(func)
+
+
+def add_cached(cls=None, attr_name='_cached'):
+    """Add attribute to the class with all cached property names."""
+    if cls is None:
+        return partial(add_cached, attr_name=attr_name)
+    setattr(cls, attr_name,
+            tuple(a for a in dir(cls) if not a.startswith('__')
+                  and isinstance(getattr(cls, a), CachedProperty)))
+    return cls
+
+
+def clear_cache(instance, attr_name='_cached'):
+    """Delete all cached values of given instance.
+
+    Assumes the name of all cached properties are kept in the attribute with
+    name `attr_name`. This attribute can be filled by decorating the class with
+    `@add_cached`.
+    """
+    for key in getattr(type(instance), attr_name, ()):
+        instance.__dict__.pop(key, None)

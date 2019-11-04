@@ -4,24 +4,22 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod, abstractproperty
 from dataclasses import dataclass, field
-from typing import (ClassVar, Generic, Iterable, NamedTuple, Optional, TypeVar,
-                    Union)
+from typing import Generic, Iterable, NamedTuple, Optional, TypeVar, Union
 from weakref import ref, ReferenceType
 
 from dataslots import with_slots
 
 from tsim.model.geometry import BoundingRect, Point, Polygon
 from tsim.utils import osm as xurl_provider, pickling
-from tsim.utils.cached_property import cached_property
+from tsim.utils.cached_property import add_cached, cached_property, clear_cache
 import tsim.model.index as Index
 
 
+@add_cached
 @with_slots(add_dict=True, add_weakref=True)
 @dataclass(eq=False)
 class Entity(ABC):
     """Base class for network entities."""
-
-    cached: ClassVar[Iterable[str]] = ('bounding_rect',)
 
     id: int = field(init=False, default_factory=type(None))
     xid: int = field(init=False, default_factory=type(None))
@@ -64,11 +62,10 @@ class Entity(ABC):
 
     def clear_cache(self, clear_neighbors: bool = False):
         """Delete cached properties listed in class var `_cached`."""
-        for key in type(self).cached:
-            self.__dict__.pop(key, None)
+        clear_cache(self)
         if clear_neighbors:
             for neighbor in self.neighbors:
-                neighbor.clear_cache()
+                clear_cache(neighbor)
 
     def on_delete(self) -> DeleteResult:
         """Cleanup when deleting entity.
