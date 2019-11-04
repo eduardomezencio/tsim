@@ -9,6 +9,7 @@ from typing import List
 from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import NodePath, TextNode
 
+from tsim.model.geometry import Point
 from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network.node import Node
 from tsim.model.network.way import Way
@@ -17,13 +18,14 @@ from tsim.ui.panda3d import LOADER, PIXEL2D, RENDER
 from tsim.ui.tools.tool import Tool
 
 FONT = LOADER.load_font('cmtt12.egg')
-LINES = 3
+LINES = 4
 
 
 class Debug(Tool):
     """Tool for debugging."""
 
     pressed: bool
+    last_point: Point
     hud_text: OnscreenText
     card: NodePath
     text_lines: List[str]
@@ -33,6 +35,7 @@ class Debug(Tool):
     def prepare(self):
         """Initialize tool."""
         self.pressed = False
+        self.last_point = None
         self.hud_text = OnscreenText(text='', pos=(5, -20), scale=22.0,
                                      fg=(1.0, 1.0, 1.0, 0.9),
                                      shadow=(0.0, 0.0, 0.0, 0.9),
@@ -46,7 +49,36 @@ class Debug(Tool):
     def on_button1_press(self):
         """Button 1 pressed callback."""
         self.pressed = True
-        log.debug('%.2f, %.2f', self.cursor.position.x, self.cursor.position.y)
+        self._update_selection()
+        point = self.cursor.position
+
+        if self.last_point is not None:
+            distance = self.last_point.distance(point)
+            self.text_lines[3] = f'Distance: {distance:.2f}'
+        self.last_point = point
+
+        log.debug('%.2f, %.2f', point.x, point.y)
+        log.debug('\n'.join(l for l in islice(self.text_lines, 1, None)
+                            if l is not None))
+        self._update_hud_text()
+
+    def on_button1_release(self):
+        """Button 1 released callback."""
+        self.pressed = False
+
+    def on_cursor_move(self):
+        """Cursor moved callback."""
+        if self.pressed:
+            self._update_selection()
+        self._update_position()
+        self._update_hud_text()
+
+    def cleanup(self):
+        """Clean up before changing tool."""
+        self.hud_text.destroy()
+        self._clear_selection()
+
+    def _update_selection(self):
         self._clear_selection()
         selected = INDEX.get_at(self.cursor.position, of_type=Node)
         if selected:
@@ -57,7 +89,6 @@ class Debug(Tool):
         try:
             selected = selected[0]
         except IndexError:
-            self._update_hud_text()
             return
 
         self.text_lines[1] = f'{selected} - {selected.xurl}'
@@ -72,27 +103,6 @@ class Debug(Tool):
                 f'oriented_position={oriented_position:.2f}, '
                 f'lane_position={lane_position:.2f}, '
                 f'lane={lane_index}')
-
-        log.debug('\n'.join(l for l in islice(self.text_lines, 1, None)
-                            if l is not None))
-
-        self._update_hud_text()
-
-    def on_button1_release(self):
-        """Button 1 released callback."""
-        self.pressed = False
-
-    def on_cursor_move(self):
-        """Cursor moved callback."""
-        if self.pressed:
-            self.on_button1_press()
-        self._update_position()
-        self._update_hud_text()
-
-    def cleanup(self):
-        """Clean up before changing tool."""
-        self.hud_text.destroy()
-        self._clear_selection()
 
     def _clear_selection(self):
         """Clear current selection and free related resources."""

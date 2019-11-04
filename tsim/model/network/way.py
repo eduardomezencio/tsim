@@ -16,7 +16,8 @@ from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
                                  calc_bounding_rect, line_intersection,
                                  point_in_polygon, sec)
 from tsim.model.network.entity import DeleteResult, Entity, EntityRef
-from tsim.model.network.position import WayPosition, OrientedWayPosition, LanePosition
+from tsim.model.network.position import (LanePosition, OrientedWayPosition,
+                                         WayPosition)
 from tsim.utils.cached_property import cached_property
 from tsim.utils.iterators import drop_duplicates, window_iter
 
@@ -56,7 +57,7 @@ class Way(Entity):
     end: Node
     lane_count: Tuple[int, int]
     waypoints: Tuple[Point] = field(default_factory=tuple)
-    max_speed: float = field(default=DEFAULT_MAX_SPEED_KPH)
+    max_speed: float = field(default_factory=lambda: DEFAULT_MAX_SPEED_KPH)
 
     def __post_init__(self):
         self.start.starts.append(EntityRef(self))
@@ -423,6 +424,8 @@ class Way(Entity):
         updated = set()
         for node in nodes:
             self.disconnect(node)
+
+        for node in nodes:
             updated.add(node)
             for way in node.ways:
                 updated.add(way)
