@@ -213,4 +213,4 @@ class PathMap:
             single_source = self.single_source(way)
             paths.append(Path.build(single_source, oriented_way, oriented_way,
                                     source, dest, prepend_source=True))
-        return min(paths, key=attrgetter('length'))
+        return min(paths, key=attrgetter('length'), default=None)

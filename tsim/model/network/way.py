@@ -18,6 +18,7 @@ from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
 from tsim.model.network.entity import DeleteResult, Entity, EntityRef
 from tsim.model.network.position import (LanePosition, OrientedWayPosition,
                                          WayPosition)
+from tsim.model.units import kph_to_mps
 from tsim.utils.cached_property import cached_property
 from tsim.utils.iterators import drop_duplicates, window_iter
 
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
     from tsim.model.network.node import Node
 
 DEFAULT_MAX_SPEED_KPH = 60.0
+DEFAULT_MAX_SPEED_MPH = kph_to_mps(DEFAULT_MAX_SPEED_KPH)
 LANE_WIDTH = 3.0
 HALF_LANE_WIDTH = 0.5 * LANE_WIDTH
 
@@ -57,7 +59,7 @@ class Way(Entity):
     end: Node
     lane_count: Tuple[int, int]
     waypoints: Tuple[Point] = field(default_factory=tuple)
-    max_speed: float = field(default_factory=lambda: DEFAULT_MAX_SPEED_KPH)
+    max_speed: float = field(default_factory=lambda: DEFAULT_MAX_SPEED_MPH)
 
     def __post_init__(self):
         self.start.starts.append(EntityRef(self))

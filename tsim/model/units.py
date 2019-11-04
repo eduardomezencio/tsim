@@ -1,4 +1,4 @@
-"""Time values and functions."""
+"""Units, values and functions for space and time."""
 
 from __future__ import annotations
 
@@ -19,3 +19,13 @@ def normalized_hours(timestamp: Timestamp) -> float:
 def whole_days(timestamp: Timestamp) -> int:
     """Get whole number of days since epoch from timestamp."""
     return timestamp // DAY
+
+
+def kph_to_mps(speed_kph: float) -> float:
+    """Convert kilometers per hour to meters per second."""
+    return 1000.0 * speed_kph / HOUR
+
+
+def mps_tp_kph(speed_mps: float) -> float:
+    """Convert meters per second to kilometers per hour."""
+    return HOUR * speed_mps / 1000.0
