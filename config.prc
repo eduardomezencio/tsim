@@ -1,4 +1,4 @@
-cursor-hidden            false
+cursor-hidden            true
 framebuffer-multisample  false
 show-frame-rate-meter    true
 threading-model          Cull/Draw 
