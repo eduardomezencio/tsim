@@ -12,11 +12,14 @@ from panda3d.core import (Geom, GeomNode, GeomTristrips, GeomVertexData,
 from tsim.model.geometry import Point, sec
 from tsim.model.network.way import LANE_WIDTH
 from tsim.ui.objects.way import LEVEL_HEIGHT
+from tsim.utils.color import interpolate_rgb
 from tsim.utils.iterators import window_iter
 
 VERTEX_FORMAT = GeomVertexFormat.get_v3n3c4()
 HEIGHT = LEVEL_HEIGHT + 1.0
 SHIFT = LANE_WIDTH
+START_COLOR = (0.2, 0.2, 1.0, 0.8)
+END_COLOR = (1.0, 0.0, 0.6, 0.8)
 
 
 def create(parent: NodePath, points: List[Point]) -> NodePath:
@@ -32,6 +35,9 @@ def create(parent: NodePath, points: List[Point]) -> NodePath:
 
 def _generate_mesh(points: List[Point]) -> Geom:
     """Generate mesh for a Path."""
+    def calc_color(param):
+        return interpolate_rgb(START_COLOR, END_COLOR, param)
+
     if len(points) < 2:
         return Geom()
 
@@ -47,13 +53,11 @@ def _generate_mesh(points: List[Point]) -> Geom:
     position = distance / length
     vector = vector.normalized()
 
-    color = [0.0, 0.2, 1.0, 0.8]
-
     width_vector = LANE_WIDTH * 0.5 * vector.rotated_left()
     for vertex in (points[0] + width_vector, points[0] - width_vector):
         vertex_writer.add_data3f(vertex.x, vertex.y, HEIGHT)
         normal_writer.add_data3f(0.0, 0.0, 1.0)
-        color_writer.add_data4f(*color)
+        color_writer.add_data4f(*START_COLOR)
 
     last_vector = vector
     for point, next_ in zip(islice(points, 1, None), islice(points, 2, None)):
@@ -66,18 +70,16 @@ def _generate_mesh(points: List[Point]) -> Geom:
                             * bisector.rotated_left())
         except ZeroDivisionError:
             width_vector = vector.rotated_right() * 0.5 * LANE_WIDTH
+        color = calc_color(position)
         for vertex in (point + width_vector, point - width_vector):
             vertex_writer.add_data3f(vertex.x, vertex.y, HEIGHT)
             normal_writer.add_data3f(0.0, 0.0, 1.0)
-            color[0] = position ** 2
-            color[1] = (1 - position) ** 2
             color_writer.add_data4f(*color)
         position = position + distance / length
         last_vector = vector
 
     point = points[-1]
     width_vector = 0.5 * LANE_WIDTH * last_vector.rotated_left()
-    color = [1.0, 0.0, 0.2, 0.8]
 
     distance = LANE_WIDTH if distance > LANE_WIDTH else distance / 2
     vector = -last_vector * distance
@@ -87,7 +89,7 @@ def _generate_mesh(points: List[Point]) -> Geom:
                    point):
         vertex_writer.add_data3f(vertex.x, vertex.y, HEIGHT)
         normal_writer.add_data3f(0.0, 0.0, 1.0)
-        color_writer.add_data4f(*color)
+        color_writer.add_data4f(*END_COLOR)
 
     primitive = GeomTristrips(Geom.UH_static)
     primitive.add_consecutive_vertices(0, 2 * len(points) + 1)

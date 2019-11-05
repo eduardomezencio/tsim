@@ -7,10 +7,9 @@ from math import pi
 from itertools import chain, cycle
 
 import aggdraw
-from panda3d.core import (CardMaker, ConfigVariableDouble, Geom, GeomNode,
-                          GeomTriangles, GeomTristrips, GeomVertexData,
-                          GeomVertexFormat, GeomVertexWriter, NodePath,
-                          TransparencyAttrib)
+from panda3d.core import (CardMaker, Geom, GeomNode, GeomTriangles,
+                          GeomTristrips, GeomVertexData, GeomVertexFormat,
+                          GeomVertexWriter, NodePath, TransparencyAttrib)
 from PIL import Image
 
 from tsim.model.geometry import Vector
@@ -18,13 +17,13 @@ from tsim.model.network.intersection import ConflictPointType
 from tsim.model.network.node import Node
 from tsim.model.network.way import LANE_WIDTH
 from tsim.ui import textures
+from tsim.ui.objects.way import LEVEL_HEIGHT
 from tsim.ui.textures import create_texture
 
 CARD_MAKER = CardMaker('lane_connections_card_maker')
 CARD_MAKER.set_frame((-16, 16, -16, 16))
 COLORS = ('crimson', 'orange', 'gold', 'limegreen',
           'turquoise', 'deepskyblue', 'blueviolet', 'hotpink')
-LEVEL_HEIGHT = ConfigVariableDouble('level-height').get_value()
 RESOLUTION = 1024
 MIDDLE = Vector(RESOLUTION // 2, -RESOLUTION // 2)
 PPM = RESOLUTION // 32

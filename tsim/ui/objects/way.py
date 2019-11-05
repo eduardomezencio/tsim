@@ -4,14 +4,13 @@ from __future__ import annotations
 
 from itertools import accumulate
 
-from panda3d.core import (ConfigVariableDouble, Geom, GeomNode, GeomTristrips,
-                          GeomVertexData, GeomVertexFormat, GeomVertexWriter,
-                          NodePath)
+from panda3d.core import (Geom, GeomNode, GeomTristrips, GeomVertexData,
+                          GeomVertexFormat, GeomVertexWriter, NodePath)
 
 from tsim.model.network.way import LANE_WIDTH, Way
 from tsim.ui import textures
 
-LEVEL_HEIGHT = ConfigVariableDouble('level-height').get_value()
+LEVEL_HEIGHT = 5.0
 VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
 
 
