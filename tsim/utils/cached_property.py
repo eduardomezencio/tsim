@@ -70,3 +70,15 @@ def clear_cache(instance, attr_name='_cached'):
     """
     for key in getattr(type(instance), attr_name, ()):
         instance.__dict__.pop(key, None)
+
+
+def touch_cache(instance, attr_name='_cached'):
+    """Access all cached properties of given instance.
+
+    This forces all cached properties to compute and store results. Assumes the
+    name of all cached properties are kept in the attribute with name
+    `attr_name`. This attribute can be filled by decorating the class with
+    `@add_cached`.
+    """
+    for key in getattr(type(instance), attr_name, ()):
+        getattr(instance, key)

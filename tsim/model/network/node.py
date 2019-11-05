@@ -235,16 +235,26 @@ class NodeGeometry:
     are adjacent to this node.
     """
 
-    node: Node
+    node_ref: EntityRef[Node]
     way_indexes: Dict[OrientedWay, int] = field(init=False)
     way_distances: List[float] = field(init=False)
     polygon: Polygon = field(init=False, default_factory=list)
 
-    def __post_init__(self):
-        ways = self.node.sorted_ways()
+    def __post_init__(self) -> NodeGeometry:
+        """Create a new `NodeGeometry` instance for the given node."""
+        if not isinstance(self.node_ref, EntityRef):
+            self.node_ref = EntityRef(self.node_ref)
+        node = self.node_ref()
+
+        ways = node.sorted_ways()
         self.way_indexes = {w: i for i, w in enumerate(ways)}
         self.way_distances = [None for _ in ways]
-        self._build_polygon(ways)
+        self.polygon = build_polygon(node, ways, self.way_distances)
+
+    @property
+    def node(self):
+        """Get the referenced node."""
+        return self.node_ref()
 
     def distance(self, oriented_way: OrientedWay) -> float:
         """Get distance from node center to where way should start or end."""
@@ -257,34 +267,37 @@ class NodeGeometry:
             return self.node.position.calc_bounding_rect(accumulated)
         return calc_bounding_rect(self.polygon, accumulated)
 
-    def _build_polygon(self, ways: List[OrientedWay]):
-        """Calculate points for the geometric bounds of the node."""
-        polygon = [None] * (2 * len(ways))
-        directions = tuple(w().direction_from_node(self.node, e).normalized()
-                           for w, e in ways)
-        for i, (way, _) in enumerate(ways):
-            half_widths = tuple(w().total_lane_count * LANE_WIDTH / 2
-                                for w in (ways[i - 1][0], way))
-            # Points relative to the node position.
-            points = (directions[i - 1].rotated_left() * half_widths[0],
-                      directions[i].rotated_right() * half_widths[1])
-            try:
-                point = line_intersection(points[0], directions[i - 1],
-                                          points[1], directions[i])
-                proportion = (points[0].distance(point)
-                              / points[0].distance(points[1]))
-                if ((len(directions) == 2 and proportion > 2.0)
-                        or proportion > 5.0):
-                    point = midpoint(*points)
-            except ZeroDivisionError:
-                point = midpoint(*points)
 
-            polygon[2 * i - 1] = point
-        for i, (_, direction) in enumerate(zip(ways, directions)):
-            farthest: Vector = max(
-                polygon[2 * i - 1], polygon[2 * i + 1],
-                key=lambda v, d=direction: v.dot_product(d))
-            projection, reflection = farthest.projection_reflection(direction)
-            self.way_distances[i] = projection.norm()
-            polygon[2 * i] = reflection
-        self.polygon = [p + self.node.position for p in polygon]
+def build_polygon(node: Node, ways: List[OrientedWay],
+                  way_distances: List[float]) -> Polygon:
+    """Calculate points for the geometric bounds of the node."""
+    polygon = [None] * (2 * len(ways))
+    directions = tuple(w().direction_from_node(node, e).normalized()
+                       for w, e in ways)
+    for i, (way, _) in enumerate(ways):
+        half_widths = tuple(w().total_lane_count * LANE_WIDTH / 2
+                            for w in (ways[i - 1][0], way))
+        # Points relative to the node position.
+        points = (directions[i - 1].rotated_left() * half_widths[0],
+                  directions[i].rotated_right() * half_widths[1])
+        try:
+            point = line_intersection(points[0], directions[i - 1],
+                                      points[1], directions[i])
+            proportion = (points[0].distance(point)
+                          / points[0].distance(points[1]))
+            if ((len(directions) == 2 and proportion > 2.0)
+                    or proportion > 5.0):
+                point = midpoint(*points)
+        except ZeroDivisionError:
+            point = midpoint(*points)
+
+        polygon[2 * i - 1] = point
+    for i, (_, direction) in enumerate(zip(ways, directions)):
+        farthest: Vector = max(
+            polygon[2 * i - 1], polygon[2 * i + 1],
+            key=lambda v, d=direction: v.dot_product(d))
+        projection, reflection = farthest.projection_reflection(direction)
+        way_distances[i] = projection.norm()
+        polygon[2 * i] = reflection
+
+    return [p + node.position for p in polygon]

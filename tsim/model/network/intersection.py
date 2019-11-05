@@ -22,9 +22,9 @@ from tsim.model.network.way import LANE_WIDTH, LaneRef, OrientedWay
 if TYPE_CHECKING:
     from tsim.model.network.node import Node
 
-WayConnections = Dict[OrientedWay, Set[OrientedWay]]
 LaneConnection = Tuple[LaneRef, LaneRef]
 LaneConnections = Dict[LaneRef, Set[LaneRef]]
+WayConnections = Dict[OrientedWay, Set[OrientedWay]]
 
 MERGE_RADIUS = 0.1
 NEIGHBOR_RADIUS = 1.8
@@ -86,6 +86,21 @@ class Intersection:
             connections[way].update(d.oriented_way for d in dests)
         self.way_connections = dict(connections)
 
+    def __getstate__(self):
+        points = {id(p): p for _, p in
+                  chain.from_iterable(c.conflict_points
+                                      for c in self.curves.values())}
+        neighbors = {k: {id(p) for p in v.neighbors}
+                     for k, v in points.items()}
+        return (self.lane_connections, self.way_connections,
+                self.connection_map, self.curves, points, neighbors)
+
+    def __setstate__(self, state):
+        (self.lane_connections, self.way_connections,
+         self.connection_map, self.curves, points, neighbors) = state
+        for id_, neighbor_ids in neighbors.items():
+            points[id_].neighbors.update(points[i] for i in neighbor_ids)
+
 
 class ConflictPointType(Enum):
     """Types of conflict point."""
@@ -107,6 +122,14 @@ class ConflictPoint:
     type: ConflictPointType
     neighbors: Set[ConflictPoint] = field(default_factory=set, repr=False)
     curves: Set[Curve] = field(default_factory=set, repr=False)
+
+    def __getstate__(self):
+        return self.point, self.type
+
+    def __setstate__(self, state):
+        self.point, self.type = state
+        self.neighbors = set()
+        self.curves = set()
 
 
 class Curve:
@@ -172,6 +195,14 @@ class Curve:
     def evaluate(self, param: float) -> Point:
         """Evaluate bezier curve at t=param."""
         return Point(*chain.from_iterable(self.curve.evaluate(param)))
+
+    def __getstate__(self):
+        return self.curve, self.length, self._conflict_points, self._sorted
+
+    def __setstate__(self, state):
+        self.curve, self.length, self._conflict_points, self._sorted = state
+        for _, point in self._conflict_points:
+            point.curves.add(self)
 
 
 def _build_lane_connections(node: Node) -> LaneConnections:

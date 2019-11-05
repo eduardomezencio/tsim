@@ -53,13 +53,18 @@ class Way(Entity):
     waypoints.
     """
 
-    start: Node
-    end: Node
+    start_ref: EntityRef[Node]
+    end_ref: EntityRef[Node]
     lane_count: Tuple[int, int]
     waypoints: Tuple[Point] = field(default_factory=tuple)
     max_speed: float = field(default_factory=lambda: DEFAULT_MAX_SPEED_MPH)
 
     def __post_init__(self):
+        if not isinstance(self.start_ref, EntityRef):
+            self.start_ref = EntityRef(self.start_ref)
+        if not isinstance(self.end_ref, EntityRef):
+            self.end_ref = EntityRef(self.end_ref)
+
         self.start.starts.append(EntityRef(self))
         self.start.clear_cache(True)
         self.end.ends.append(EntityRef(self))
@@ -96,6 +101,34 @@ class Way(Entity):
         """Weight of the Way in each direction, for path finding."""
         weight = self.length / self.max_speed
         return (weight, weight)
+
+    @property
+    def start(self) -> Node:
+        """Get or set the referenced start node."""
+        if self.start_ref is not None:
+            return self.start_ref()
+        return None
+
+    @start.setter
+    def start(self, value):
+        if value is None:
+            self.start_ref = None
+        else:
+            self.start_ref = EntityRef(value)
+
+    @property
+    def end(self) -> Node:
+        """Get or set the referenced end node."""
+        if self.end_ref is not None:
+            return self.end_ref()
+        return None
+
+    @end.setter
+    def end(self, value):
+        if value is None:
+            self.end_ref = None
+        else:
+            self.end_ref = EntityRef(value)
 
     @property
     def neighbors(self) -> Iterable[Entity]:
@@ -547,15 +580,23 @@ class WaySegment:
 class WayGeometry:
     """Information on the geometric shape of a way."""
 
-    way: Way
+    way_ref: EntityRef[Way]
     half_width: float = field(init=False)
     segments: List[WaySegment] = field(init=False, default_factory=list)
     polygon: Polygon = field(init=False, default_factory=list)
 
     def __post_init__(self):
-        self.half_width = self.way.total_lane_count * HALF_LANE_WIDTH
+        if not isinstance(self.way_ref, EntityRef):
+            self.way_ref = EntityRef(self.way_ref)
+
+        self.half_width = self.way_ref().total_lane_count * HALF_LANE_WIDTH
         self._build_segments()
         self._build_polygon()
+
+    @property
+    def way(self):
+        """Get the referenced way."""
+        return self.way_ref()
 
     @property
     def start_offset(self):

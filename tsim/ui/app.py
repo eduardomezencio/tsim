@@ -23,15 +23,18 @@ from tsim.ui.sky import Sky
 class App:
     """Graphic UI application, using Panda3D."""
 
-    def __init__(self):
+    def __init__(self, index_name: str):
         log_config()
         panda3d_config()
 
+        init_index(index_name)
+
         INPUT.init()
 
+        self.scene = NodePath('scene')
         self.camera = Camera()
-        self.world = world.create(p3d.RENDER, 10000, 16)
-        self.sky = Sky(p3d.RENDER, self.camera)
+        self.world = world.create(self.scene, 10000, 16)
+        self.sky = Sky(self.scene, self.camera)
         self.sky.set_time(8.0)
         self.cursor = Cursor(self.world)
         self.grid = Grid(50.0, 1000.0, self.world, self.cursor.cursor)
@@ -43,6 +46,8 @@ class App:
 
         p3d.BASE.accept('entities_changed', self.on_entities_changed)
         p3d.TASK_MGR.add(self.update)
+
+        self.scene.reparent_to(p3d.RENDER)
 
     def run(self):
         """Start the main loop."""
@@ -101,3 +106,9 @@ def panda3d_config():
     p3d.RENDER.set_antialias(AntialiasAttrib.M_auto)
     if ConfigVariableBool('use-shaders'):
         p3d.RENDER.set_shader_auto()
+
+
+def init_index(name: str):
+    """Initialize index from given index name."""
+    INDEX.load(name)
+    INDEX.register_updates = True

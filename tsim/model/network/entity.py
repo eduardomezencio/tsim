@@ -100,15 +100,19 @@ class EntityRef(Generic[T]):
     _id: int
     _value: ReferenceType
 
-    def __init__(self, entity: Union[ReferenceType, Entity, int]):
-        if isinstance(entity, ReferenceType):
-            self._id = entity().id
-            self._value = entity
-        elif isinstance(entity, Entity):
+    def __init__(self, entity: Union[EntityRef, ReferenceType, Entity, int]):
+        # TODO: change to singledispatchmethod methods in Python 3.8
+        if isinstance(entity, Entity):
             self._id = entity.id
             self._value = ref(entity)
+        elif isinstance(entity, ReferenceType):
+            self._id = entity().id
+            self._value = entity
+        elif isinstance(entity, EntityRef):
+            self._id = entity.id
+            self._value = entity.value
         else:
-            self._id = entity
+            self._id = entity.id
             self._value = None
         assert (isinstance(self._value, ReferenceType) or
                 (self._value is None and isinstance(self._id, int)))

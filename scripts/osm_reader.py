@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging as log
 import sys
 from collections import namedtuple
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import islice
 from math import asin, cos, radians, sin, sqrt
 from textwrap import wrap
@@ -16,17 +17,20 @@ from tsim.model.geometry import Point
 from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network.node import Node
 from tsim.model.network.way import Way
+from tsim.utils.cached_property import touch_cache
 
 
 def main():
     """Call osm_reader for each name in command line arguments."""
-    log_config()
-    for name in sys.argv[1:]:
-        osm_reader(name)
+    with ProcessPoolExecutor() as executor:
+        futures = [executor.submit(osm_reader, name) for name in sys.argv[1:]]
+        for _ in as_completed(futures):
+            pass
 
 
-def osm_reader(name):
+def osm_reader(name: str):
     """Run the osm reader."""
+    log_config(name)
     INDEX.reset(name)
 
     tree = ElementTree.parse(name)
@@ -89,6 +93,7 @@ def osm_reader(name):
 
     dissolve_nodes(nodes_inv)
     filter_waypoints()
+    compute_cached()
 
     INDEX.save()
 
@@ -138,8 +143,9 @@ def dissolve_nodes(nodes_inv: Dict[int, int]):
             dissolved.append(nodes_inv[node])
         except ValueError:
             pass
-    log.info('Nodes dissolved:\n%s',
-             '\n'.join(wrap(', '.join(map(str, dissolved)), 79)))
+    log.info('Nodes dissolved: %d', len(dissolved))
+    log.debug('Nodes dissolved:\n%s',
+              '\n'.join(wrap(', '.join(map(str, dissolved)), 79)))
 
 
 def filter_waypoints():
@@ -149,9 +155,16 @@ def filter_waypoints():
     log.info('Waypoints cleared: %d', cleared)
 
 
-def log_config():
+def compute_cached():
+    """Compute all cached properties."""
+    for entity in INDEX.entities.values():
+        touch_cache(entity)
+
+
+def log_config(name: str):
     """Configure logging."""
-    log.basicConfig(level=log.INFO)
+    log.basicConfig(format=f'%(levelname)s: {name}: %(message)s',
+                    level=log.INFO)
 
 
 if __name__ == '__main__':
