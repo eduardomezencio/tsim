@@ -12,10 +12,12 @@ from typing import (TYPE_CHECKING, Iterable, Iterator, List, NamedTuple,
 
 from dataslots import with_slots
 
+import tsim.model.index as Index
+from tsim.model.entity import DeleteResult, EntityRef
 from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
                                  calc_bounding_rect, line_intersection,
                                  point_in_polygon, sec)
-from tsim.model.network.entity import DeleteResult, Entity, EntityRef
+from tsim.model.network.entity import NetworkEntity
 from tsim.model.network.position import (LanePosition, OrientedWayPosition,
                                          WayPosition)
 from tsim.model.units import kph_to_mps
@@ -46,7 +48,7 @@ class Endpoint(Enum):
 @add_cached
 @with_slots
 @dataclass(eq=False)
-class Way(Entity):
+class Way(NetworkEntity):
     """A connection between two Nodes.
 
     A Way connects two Nodes and can have a list of intermediary points, called
@@ -76,7 +78,7 @@ class Way(Entity):
         """Get the geometry info for the way."""
         return WayGeometry(self)
 
-    geometry.on_update(Entity.update_index_bounding_rect)
+    geometry.on_update(NetworkEntity.update_index_bounding_rect)
 
     @cached_property
     def lanes(self) -> Tuple[Lane]:
@@ -131,7 +133,7 @@ class Way(Entity):
             self.end_ref = EntityRef(value)
 
     @property
-    def neighbors(self) -> Iterable[Entity]:
+    def neighbors(self) -> Iterable[NetworkEntity]:
         """Get iterable with entities directly connected to this way."""
         return (self.start, self.end)
 
@@ -473,6 +475,7 @@ class Way(Entity):
                     to_delete.add(node)
                 except ValueError:
                     pass
+        Index.INSTANCE.rebuild_path_map()
         return DeleteResult(to_delete, updated)
 
     def __repr__(self):

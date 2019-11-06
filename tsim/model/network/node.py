@@ -9,10 +9,11 @@ from typing import Dict, Iterable, Iterator, List, Optional, Set, Tuple
 from dataslots import with_slots
 
 import tsim.model.index as Index
+from tsim.model.entity import DeleteResult, EntityRef
 from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
                                  calc_bounding_rect, line_intersection,
                                  midpoint, point_in_polygon)
-from tsim.model.network.entity import DeleteResult, Entity, EntityRef
+from tsim.model.network.entity import NetworkEntity
 from tsim.model.network.intersection import Intersection, LaneConnection
 from tsim.model.network.way import (LANE_WIDTH, Endpoint, LaneRef, OrientedWay,
                                     Way)
@@ -22,7 +23,7 @@ from tsim.utils.cached_property import add_cached, cached_property
 @add_cached
 @with_slots
 @dataclass(eq=False)
-class Node(Entity):
+class Node(NetworkEntity):
     """A node of the network.
 
     A `Node` can be the endpoint of a `Way` or a junction of 3 or more ways. A
@@ -47,7 +48,7 @@ class Node(Entity):
         return Intersection(self)
 
     @property
-    def neighbors(self) -> Iterable[Entity]:
+    def neighbors(self) -> Iterable[NetworkEntity]:
         """Get iterable with entities directly connected to this node."""
         return self.ways
 
@@ -220,6 +221,7 @@ class Node(Entity):
         for way in map(lambda r: r.value, self.ends):
             way.end = None
         to_delete = {r.value for r in set(chain(self.starts, self.ends))}
+        Index.INSTANCE.rebuild_path_map()
         return DeleteResult(to_delete, ())
 
     def __repr__(self):

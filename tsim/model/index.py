@@ -10,8 +10,8 @@ import shelve
 
 from rtree.index import Rtree
 
+from tsim.model.entity import Entity
 from tsim.model.geometry import BoundingRect, Point, point_in_polygon
-from tsim.model.network.entity import Entity
 from tsim.model.network.path import PathMap
 
 
@@ -60,14 +60,32 @@ class EntityIndex:
 
     def add(self, entity: Entity):
         """Add entity to index."""
+        if entity.id is not None:
+            raise ValueError('Entity already has an id.')
+        entity.id = next(self.id_count)
+        self.entities[entity.id] = entity
+        log.debug('[index] Added %s', entity)
+
+    def add_static(self, entity: Entity):
+        """Add entity as static.
+
+        Entity may or not have already been added with the `add` method. It
+        will be added in case it was not already.
+
+        A static entity is an entity with geometric information
+        (`bounding_rect`) that will rarely change. A spatial index is used to
+        allow for quick spatial queries. These entities are added to the
+        updated queue when something about them changes. This queue can be
+        consumed by a front end application with `consume_updates` to update
+        the representation only when needed.
+        """
         if entity.id is None:
-            entity.id = next(self.id_count)
-            self.entities[entity.id] = entity
-            self.bounding_rects[entity.id] = entity.bounding_rect
-            self.rtree.insert(entity.id, entity.bounding_rect)
-            self.updated(entity)
-            self.rebuild_path_map()
-            log.debug('[index] Added %s', entity)
+            self.add(entity)
+        if entity.id in self.bounding_rects:
+            raise ValueError('Entity already added as static.')
+        self.bounding_rects[entity.id] = entity.bounding_rect
+        self.rtree.insert(entity.id, entity.bounding_rect)
+        self.updated(entity)
 
     def delete(self, entity: Entity):
         """Delete entity from index."""
@@ -75,14 +93,15 @@ class EntityIndex:
         while to_remove:
             entity = to_remove.pop()
             assert self.entities[entity.id] is entity
-            self.rtree.delete(entity.id, self.bounding_rects[entity.id])
             del self.entities[entity.id]
-            del self.bounding_rects[entity.id]
             delete_result = entity.on_delete()
             to_remove.update(delete_result.cascade)
             for updated in delete_result.updated:
                 self.updated(updated)
-            self.updated(entity)
+            if entity.id in self.bounding_rects:
+                self.rtree.delete(entity.id, self.bounding_rects[entity.id])
+                del self.bounding_rects[entity.id]
+                self.updated(entity)
             self.rebuild_path_map()
             log.debug('[index] Removed %s', entity)
 
@@ -124,11 +143,12 @@ class EntityIndex:
             yield self._updates.pop()
 
     def generate_rtree_from_entities(self):
-        """Create empty rtree and add all entities to it."""
+        """Create an rtree with all entities with bounding rectangles."""
         self.bounding_rects = {id_: e.bounding_rect
-                               for id_, e in self.entities.items()}
-        self.rtree = Rtree((id_, self.bounding_rects[id_], None)
-                           for id_ in self.entities)
+                               for id_, e in self.entities.items()
+                               if hasattr(e, 'bounding_rect')}
+        self.rtree = Rtree((id_, rect, None)
+                           for id_, rect in self.bounding_rects.items())
 
     def load(self, name: Optional[str] = None):
         """Load entities from shelf.

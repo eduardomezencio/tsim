@@ -16,5 +16,5 @@ class Bulldozer(Tool):
         selected = next(iter(INDEX.get_at(self.cursor.position, of_type=Way)),
                         None)
         if selected is not None:
-            INDEX.delete(selected)
+            selected.delete()
             p3d.MESSENGER.send('entities_changed')

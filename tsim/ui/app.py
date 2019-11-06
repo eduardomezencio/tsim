@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-import logging
+import logging as log
+from typing import Dict, Tuple
+
 
 from direct.task import Task
 from panda3d.core import (AntialiasAttrib, ConfigVariableBool, NodePath,
@@ -11,6 +13,7 @@ from panda3d.core import (AntialiasAttrib, ConfigVariableBool, NodePath,
 import tsim.ui.input as INPUT
 import tsim.ui.panda3d as p3d
 from tsim.model.index import INSTANCE as INDEX
+from tsim.model.geometry import Point, bounding_rect_center
 from tsim.model.network.node import Node
 from tsim.model.network.way import Way
 from tsim.ui.camera import Camera
@@ -22,6 +25,9 @@ from tsim.ui.sky import Sky
 
 class App:
     """Graphic UI application, using Panda3D."""
+
+    entities: Dict[int, NodePath]
+    roads: Dict[Tuple[int, int], NodePath]
 
     def __init__(self, index_name: str):
         log_config()
@@ -40,9 +46,12 @@ class App:
         self.grid = Grid(50.0, 1000.0, self.world, self.cursor.cursor)
 
         # self.roads = self.world.attach_new_node(PandaNode('roads'))
-        self.roads = self.world.attach_new_node(RigidBodyCombiner('roads'))
-        init_objects(self.roads)
-        self.roads.node().collect()
+        # self.roads = self.world.attach_new_node(RigidBodyCombiner('roads'))
+        self.entities = {}
+        self.roads = {}
+        self.init_objects()
+        for node_path in self.roads.values():
+            node_path.node().collect()
 
         p3d.BASE.accept('entities_changed', self.on_entities_changed)
         p3d.TASK_MGR.add(self.update)
@@ -68,33 +77,55 @@ class App:
             self._update_entity(id_)
 
     def _update_entity(self, id_):
-        node_path = self.roads.find(str(id_))
-        if not node_path.is_empty():
+        node_path = self.entities.get(id_, None)
+        if node_path is not None and not node_path.is_empty():
             node_path.remove_node()
         entity = INDEX.entities.get(id_, None)
         if entity is not None:
-            factory.create(self.roads, entity)
+            point = bounding_rect_center(entity.bounding_rect)
+            parent = self.get_roads_parent(point)
+            self.entities[id_] = factory.create(parent, entity)
 
     def on_entities_changed(self):
         """Update entities."""
         self.update_entities()
-        self.roads.node().collect()
+        for node_path in self.roads.values():
+            node_path.node().collect()
 
+    def get_roads_parent(self, point: Point) -> NodePath:
+        """Get the correct parent for roads on the given point.
 
-def init_objects(parent: NodePath):
-    """Create all objects on the index."""
-    for node in filter(lambda e: isinstance(e, Node),
-                       INDEX.entities.values()):
-        factory.create_node(parent, node)
-    for way in filter(lambda e: isinstance(e, Way),
-                      INDEX.entities.values()):
-        factory.create_way(parent, way)
+        The world is divided into sections, each section with a node path
+        holding a part of the network nodes. This is to make the combiner
+        `collect` method faster when changing the network, while keeping the
+        number of nodes small.
+        """
+        key = (point.x // 1024, point.y // 1024)
+        parent = self.roads.get(key, None)
+        if parent is None:
+            combiner = RigidBodyCombiner(f'roads{key}')
+            parent = self.world.attach_new_node(combiner)
+            self.roads[key] = parent
+        return parent
+
+    def init_objects(self):
+        """Create all objects on the index."""
+        for node in filter(lambda e: isinstance(e, Node),
+                           INDEX.entities.values()):
+            parent = self.get_roads_parent(node.position)
+            self.entities[node.id] = factory.create_node(parent, node)
+
+        for way in filter(lambda e: isinstance(e, Way),
+                          INDEX.entities.values()):
+            center = bounding_rect_center(way.bounding_rect)
+            parent = self.get_roads_parent(center)
+            self.entities[way.id] = factory.create_way(parent, way)
 
 
 def log_config():
     """Initialize log configuration."""
-    logging.basicConfig(format='%(levelname)s: %(message)s',
-                        level=logging.DEBUG if __debug__ else logging.ERROR)
+    log.basicConfig(format='%(levelname)s: %(message)s',
+                    level=log.DEBUG if __debug__ else log.ERROR)
 
 
 def panda3d_config():

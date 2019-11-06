@@ -97,6 +97,11 @@ def calc_bounding_rect(points: Iterable[Point],
     return accumulated
 
 
+def bounding_rect_center(rect: BoundingRect) -> Point:
+    """Calculate the center of a bounding rectangle."""
+    return Point((rect[0] + rect[2]) / 2, (rect[1] + rect[3]) / 2)
+
+
 def point_in_polygon(point: Point, polygon: Polygon) -> bool:
     """Calculate if point is inside the given polygon."""
     crossings = 0

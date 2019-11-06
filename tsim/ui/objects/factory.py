@@ -12,7 +12,7 @@ from tsim.ui.objects.node import create as create_node
 from tsim.ui.objects.way import create as create_way
 
 if TYPE_CHECKING:
-       from tsim.model.network.entity import Entity
+    from tsim.model.network.entity import Entity
 
 MAP = {Node: create_node,
        Way: create_way}
@@ -20,4 +20,4 @@ MAP = {Node: create_node,
 
 def create(parent: NodePath, entity: Entity) -> NodePath:
     """Create node for given entity and attach it to the parent."""
-    MAP[type(entity)](parent, entity)
+    return MAP[type(entity)](parent, entity)
