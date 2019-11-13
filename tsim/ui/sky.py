@@ -71,7 +71,7 @@ class Sky:
         """Initialize distance fog."""
         self.fog = Fog('fog')
         self.fog.set_linear_range(2000.0, 7000.0)
-        if not ConfigVariableBool('use-shaders'):
+        if not ConfigVariableBool('use-shaders', False):
             self._parent.set_fog(self.fog)
 
 

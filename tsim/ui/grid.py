@@ -11,6 +11,8 @@ from panda3d.core import (ConfigVariableColor, Geom, GeomLinestrips, GeomNode,
 
 from tsim.model.geometry import Vector
 
+DEFAULT_GRID_COLOR = '0.3 0.3 0.3 1.0'
+
 
 class Grid:
     """A grid of lines for visual reference."""
@@ -42,7 +44,7 @@ class Grid:
         self.node_path.set_y(y - y % self.spacing)
 
     def _create_geom(self):
-        color = ConfigVariableColor('grid-color')
+        color = ConfigVariableColor('grid-color', DEFAULT_GRID_COLOR)
 
         radius = floor(self.size / (2 * self.spacing))
         diameter = (2 * radius + 1)
