@@ -10,7 +10,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import islice
 from math import asin, cos, radians, sin, sqrt
 from textwrap import wrap
-from typing import Dict, Tuple
+from typing import Dict, Iterable, Tuple
 from xml.etree import ElementTree
 
 from tsim.model.geometry import Point
@@ -20,10 +20,10 @@ from tsim.model.network.way import Way
 from tsim.utils.cached_property import touch_cache
 
 
-def main():
-    """Call osm_reader for each name in command line arguments."""
+def osm_reader_multiprocess(names: Iterable[str]):
+    """Call osm_reader for all files with multiprocessing."""
     with ProcessPoolExecutor() as executor:
-        futures = [executor.submit(osm_reader, name) for name in sys.argv[1:]]
+        futures = [executor.submit(osm_reader, name) for name in names]
         for _ in as_completed(futures):
             pass
 
@@ -168,4 +168,7 @@ def log_config(name: str):
 
 
 if __name__ == '__main__':
-    main()
+    if len(sys.argv) > 2:
+        osm_reader_multiprocess(sys.argv[1:])
+    else:
+        osm_reader(sys.argv[1])
