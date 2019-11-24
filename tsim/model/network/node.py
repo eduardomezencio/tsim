@@ -21,8 +21,6 @@ from tsim.utils.cached_property import add_cached, cached_property
 
 
 @add_cached
-@with_slots
-@dataclass(eq=False)
 class Node(NetworkEntity):
     """A node of the network.
 
@@ -32,10 +30,19 @@ class Node(NetworkEntity):
     and can't be merged.
     """
 
+    __slots__ = 'position', 'level', 'starts', 'ends'
+
     position: Point
-    level: int = field(default_factory=int)
-    starts: List[EntityRef[Way]] = field(default_factory=list)
-    ends: List[EntityRef[Way]] = field(default_factory=list)
+    level: int
+    starts: List[EntityRef[Way]]
+    ends: List[EntityRef[Way]]
+
+    def __init__(self, position: Point, level: int = 0):
+        self.position = position
+        self.level = level
+        self.starts = []
+        self.ends = []
+        super().__init__()
 
     @cached_property
     def geometry(self) -> NodeGeometry:
@@ -223,9 +230,6 @@ class Node(NetworkEntity):
         to_delete = {r.value for r in set(chain(self.starts, self.ends))}
         Index.INSTANCE.rebuild_path_map()
         return DeleteResult(to_delete, ())
-
-    def __repr__(self):
-        return f'{Node.__name__}(id={self.id}, xid={self.xid})'
 
 
 @with_slots

@@ -16,17 +16,21 @@ from tsim.model.index import INSTANCE as INDEX
 from tsim.model.geometry import Point, bounding_rect_center
 from tsim.model.network.node import Node
 from tsim.model.network.way import Way
+from tsim.model.simulation.agent import Agent
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
 from tsim.ui.objects import factory, world
 from tsim.ui.sky import Sky
 
+FRAME_DURATION = 1 / 60
+
 
 class App:
     """Graphic UI application, using Panda3D."""
 
-    entities: Dict[int, NodePath]
+    network_entities: Dict[int, NodePath]
+    agents: Dict[Agent, NodePath]
     roads: Dict[Tuple[int, int], NodePath]
 
     def __init__(self, index_name: str):
@@ -38,6 +42,9 @@ class App:
         INPUT.init()
 
         self.scene = NodePath('scene')
+        self.agents_parent = NodePath('agents')
+        self.agents_parent.reparent_to(self.scene)
+
         self.camera = Camera()
         self.world = world.create(self.scene, 10000, 16)
         self.sky = Sky(self.scene, self.camera)
@@ -47,23 +54,27 @@ class App:
 
         # self.roads = self.world.attach_new_node(PandaNode('roads'))
         # self.roads = self.world.attach_new_node(RigidBodyCombiner('roads'))
-        self.entities = {}
+        self.network_entities = {}
+        self.agents = {}
         self.roads = {}
         self.init_objects()
         for node_path in self.roads.values():
             node_path.node().collect()
 
-        p3d.BASE.accept('entities_changed', self.on_entities_changed)
-        p3d.TASK_MGR.add(self.update)
+        p3d.BASE.accept('entities_changed', self.on_network_entities_changed)
+        p3d.BASE.accept('new_agent', self.add_agent)
 
         self.scene.reparent_to(p3d.RENDER)
 
     def run(self):
         """Start the main loop."""
+        p3d.TASK_MGR.add(self.update)
         p3d.BASE.run()
 
     def update(self, _task: Task):
         """Update task, to run every frame."""
+        INDEX.simulation.update(FRAME_DURATION)
+        self.update_agents()
         self.camera.update()
         self.sky.update()
         self.cursor.update()
@@ -71,24 +82,24 @@ class App:
         INPUT.clear()
         return Task.cont
 
-    def update_entities(self):
-        """Update graphics for changed entities."""
+    def update_network_entities(self):
+        """Update graphics for changed network entities."""
         for id_ in INDEX.consume_updates():
-            self._update_entity(id_)
+            self._update_network_entity(id_)
 
-    def _update_entity(self, id_):
-        node_path = self.entities.get(id_, None)
+    def _update_network_entity(self, id_):
+        node_path = self.network_entities.get(id_, None)
         if node_path is not None and not node_path.is_empty():
             node_path.remove_node()
         entity = INDEX.entities.get(id_, None)
         if entity is not None:
             point = bounding_rect_center(entity.bounding_rect)
             parent = self.get_roads_parent(point)
-            self.entities[id_] = factory.create(parent, entity)
+            self.network_entities[id_] = factory.create(parent, entity)
 
-    def on_entities_changed(self):
-        """Update entities."""
-        self.update_entities()
+    def on_network_entities_changed(self):
+        """Update network entities."""
+        self.update_network_entities()
         for node_path in self.roads.values():
             node_path.node().collect()
 
@@ -113,13 +124,29 @@ class App:
         for node in filter(lambda e: isinstance(e, Node),
                            INDEX.entities.values()):
             parent = self.get_roads_parent(node.position)
-            self.entities[node.id] = factory.create_node(parent, node)
+            self.network_entities[node.id] = factory.create_node(parent, node)
 
         for way in filter(lambda e: isinstance(e, Way),
                           INDEX.entities.values()):
             center = bounding_rect_center(way.bounding_rect)
             parent = self.get_roads_parent(center)
-            self.entities[way.id] = factory.create_way(parent, way)
+            self.network_entities[way.id] = factory.create_way(parent, way)
+
+        # TODO: load agents
+
+    def add_agent(self, agent: Agent):
+        """Create actor for agent."""
+        self.agents[agent] = factory.create_agent(self.agents_parent, agent)
+
+    def update_agents(self):
+        """Update agent actors."""
+        for agent in INDEX.simulation.active:
+            position = agent.position
+            node_path = self.agents[agent]
+            node_path.set_pos(position.x, position.y, 0.0)
+            if agent.direction_changed:
+                node_path.look_at(*(position + agent.direction), 0.0)
+                agent.direction_changed = False
 
 
 def log_config():
@@ -135,7 +162,7 @@ def panda3d_config():
     # print(task_mgr)  # to print all tasks
 
     p3d.RENDER.set_antialias(AntialiasAttrib.M_auto)
-    if ConfigVariableBool('use-shaders'):
+    if ConfigVariableBool('use-shaders', False):
         p3d.RENDER.set_shader_auto()
 
 

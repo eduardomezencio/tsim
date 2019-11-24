@@ -26,72 +26,38 @@
             "args": ["data/custom.osm"]
         },
         {
-            "name": "Python: osm_reader [*]",
+            "name": "Python: tsim [intersection]",
+            "type": "python",
+            "request": "launch",
+            "module": "tsim",
+            "console": "integratedTerminal",
+            "args": ["data/intersection.osm"]
+        },
+        {
+            "name": "Python: osm_reader",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/osm_reader.py",
             "console": "integratedTerminal",
-            "args": ["data/*.osm"],
+            "args": ["data/${input:mapName}.osm"],
             "env": {"PYTHONPATH": "${workspaceFolder}"}
         },
         {
-            "name": "Python: osm_reader [formiga]",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/scripts/osm_reader.py",
-            "console": "integratedTerminal",
-            "args": ["data/formiga.osm"],
-            "env": {"PYTHONPATH": "${workspaceFolder}"}
-        },
-        {
-            "name": "Python: osm_reader [bh]",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/scripts/osm_reader.py",
-            "console": "integratedTerminal",
-            "args": ["data/bh.osm"],
-            "env": {"PYTHONPATH": "${workspaceFolder}"}
-        },
-        {
-            "name": "Python: osm_reader [custom]",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/scripts/osm_reader.py",
-            "console": "integratedTerminal",
-            "args": ["data/custom.osm"],
-            "env": {"PYTHONPATH": "${workspaceFolder}"}
-        },
-        {
-            "name": "Python: osm_cleaner [bh]",
+            "name": "Python: osm_cleaner",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/scripts/osm_cleaner.py",
             "console": "integratedTerminal",
-            "args": ["data/bh.osm", "data/bh.osm"],
+            "args": ["data/${input:mapName}.osm", "data/${input:mapName}.osm"],
             "env": {"PYTHONPATH": "${workspaceFolder}"}
-        },
+        }
+    ],
+    "inputs": [
         {
-            "name": "Python: osm_cleaner [formiga]",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/scripts/osm_cleaner.py",
-            "console": "integratedTerminal",
-            "args": ["data/formiga.osm", "data/formiga.osm"],
-            "env": {"PYTHONPATH": "${workspaceFolder}"}
-        },
-        {
-            "name": "Python: Current File (Integrated Terminal)",
-            "type": "python",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal"
-        },
-        {
-            "name": "Python: Current File (External Terminal)",
-            "type": "python",
-            "request": "launch",
-            "program": "${file}",
-            "console": "externalTerminal"
+            "id": "mapName",
+            "type": "promptString",
+            "default": "",
+            "description": "Name of the map to load"
         }
     ]
 }

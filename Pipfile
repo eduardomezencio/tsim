@@ -10,6 +10,7 @@ pydocstyle = "*"
 pylint = "*"
 radon = "*"
 rope = "*"
+matplotlib = "*"
 
 [packages]
 aggdraw = "*"

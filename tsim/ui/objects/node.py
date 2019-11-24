@@ -108,7 +108,7 @@ def _create_lane_connections_image(node: Node) -> Image:
         path.moveto(*start)
         path.curveto(*start, *crossing, *end)
         path.lineto(*(end + vector))
-        draw.path(path, aggdraw.Pen(colors[lanes[0].oriented_way],
+        draw.path(path, aggdraw.Pen(colors[lanes[0].oriented_way.flipped()],
                                     0.25 * PPM, 224))
 
     pen = aggdraw.Pen('black', 1, 192)

@@ -8,24 +8,25 @@ from typing import TYPE_CHECKING, Optional
 from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import NodePath, TextNode
 
+import tsim.ui.panda3d as p3d
 from tsim.model.index import INSTANCE as INDEX
-from tsim.model.network.position import OrientedWayPosition
+from tsim.model.network.position import LanePosition
 from tsim.model.network.way import Way
+from tsim.model.simulation.agent import Agent
 from tsim.ui.objects.path import create as create_path
-from tsim.ui.panda3d import LOADER, PIXEL2D, RENDER
 from tsim.ui.tools.tool import Tool
 
 if TYPE_CHECKING:
     from tsim.model.network.path import Path
 
-FONT = LOADER.load_font('cmtt12.egg')
+FONT = p3d.LOADER.load_font('cmtt12.egg')
 
 
 class PathTool(Tool):
     """Tool for finding and showing pathes."""
 
-    source: Optional[OrientedWayPosition]
-    dest: Optional[OrientedWayPosition]
+    source: Optional[LanePosition]
+    dest: Optional[LanePosition]
     path: Path
     hud_text: OnscreenText
     path_np: NodePath
@@ -43,7 +44,7 @@ class PathTool(Tool):
                                      fg=(1.0, 1.0, 1.0, 0.9),
                                      shadow=(0.0, 0.0, 0.0, 0.9),
                                      align=TextNode.A_left, font=FONT,
-                                     parent=PIXEL2D, mayChange=True)
+                                     parent=p3d.PIXEL2D, mayChange=True)
         self.path_np = None
         self._update_hud_text()
 
@@ -68,29 +69,34 @@ class PathTool(Tool):
         selected = next(iter(INDEX.get_at(self.cursor.position, of_type=Way)),
                         None)
         position = (None if selected is None else
-                    selected.oriented_position_at(self.cursor.position))
+                    selected.lane_position_at(self.cursor.position))
         setattr(self, way, position)
-        self._update_path_np()
+        self._update_path()
         self._update_hud_text()
 
     def _swap_ways(self):
         self.source, self.dest = self.dest, self.source
-        self._update_path_np()
+        self._update_path()
         self._update_hud_text()
+
+    def _update_path(self):
+        if self.source and self.dest:
+            self.path = INDEX.path_map.path(self.source.oriented_way_position,
+                                            self.dest.oriented_way_position)
+            self._update_path_np()
+            self._create_agent()
+
+    def _update_path_np(self):
+        self._clear_path_np()
+        if self.path is not None:
+            points = self.path.oriented_points()
+            if len(points) >= 2:
+                self.path_np = create_path(p3d.RENDER, points)
 
     def _clear_path_np(self):
         if self.path_np is not None:
             self.path_np.remove_node()
             self.path_np = None
-
-    def _update_path_np(self):
-        if self.source and self.dest:
-            self._clear_path_np()
-            self.path = INDEX.path_map.path(self.source, self.dest)
-            if self.path is not None:
-                points = self.path.oriented_points()
-                if len(points) >= 2:
-                    self.path_np = create_path(RENDER, points)
 
     def _update_hud_text(self):
         source_text = (f'{self.source.oriented_way.way_id}'
@@ -108,3 +114,11 @@ class PathTool(Tool):
 
         if self.source and self.dest:
             log.debug(text)
+
+    def _create_agent(self):
+        if self.path is None:
+            return
+        agent = Agent()
+        agent.place_at(self.source)
+        agent.set_destination(self.dest.oriented_way_position)
+        p3d.MESSENGER.send('new_agent', [agent])

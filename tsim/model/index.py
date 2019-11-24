@@ -13,6 +13,7 @@ from rtree.index import Rtree
 from tsim.model.entity import Entity
 from tsim.model.geometry import BoundingRect, Point, point_in_polygon
 from tsim.model.network.path import PathMap
+from tsim.model.simulation.simulation import Simulation
 
 
 class EntityIndex:
@@ -23,7 +24,7 @@ class EntityIndex:
     """
 
     __slots__ = ('name', 'id_count', 'entities', 'bounding_rects', 'rtree',
-                 'path_map', 'register_updates', '_updates')
+                 'path_map', 'register_updates', 'simulation', '_updates')
 
     extension: ClassVar[str] = 'shelf'
     storage_fields: ClassVar[Tuple[str]] = ('id_count', 'entities')
@@ -35,6 +36,7 @@ class EntityIndex:
     rtree: Rtree
     path_map: PathMap
     register_updates: bool
+    simulation: Simulation
     _updates: Set[int]
 
     def __init__(self, name: Optional[str] = None):
@@ -56,6 +58,7 @@ class EntityIndex:
         self.rtree = Rtree()
         self.path_map = PathMap()
         self.register_updates = False
+        self.simulation = Simulation()
         self._updates = set()
 
     def add(self, entity: Entity):

@@ -30,7 +30,7 @@ def setstate(self, state, add_dict=True, add_slots=True):
     """
     dict_copy, slots = state
 
-    if add_dict:
+    if add_dict and dict_copy:
         self.__dict__.update(dict_copy)
 
     if add_slots:

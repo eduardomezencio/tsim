@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod, abstractproperty
-from dataclasses import dataclass, field
 from typing import Iterable
-
-from dataslots import with_slots
 
 from tsim.model.entity import Entity
 from tsim.model.geometry import BoundingRect, Point, Polygon
@@ -16,8 +13,6 @@ import tsim.model.index as Index
 
 
 @add_cached
-@with_slots
-@dataclass(eq=False)
 class NetworkEntity(Entity):
     """Base class for network entities.
 
@@ -26,12 +21,14 @@ class NetworkEntity(Entity):
     spatial index for fast spatial queries.
     """
 
-    def __post_init__(self):
-        super(NetworkEntity, self).__post_init__()
+    __slots__ = ('xid',)
+
+    xid: int
+
+    def __init__(self):
+        super().__init__()
         Index.INSTANCE.add_static(self)
         Index.INSTANCE.rebuild_path_map()
-
-    xid: int = field(init=False, default_factory=type(None))
 
     @cached_property
     def bounding_rect(self) -> BoundingRect:

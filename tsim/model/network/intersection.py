@@ -8,16 +8,18 @@ from enum import Enum
 from itertools import chain, combinations, islice, product
 from math import pi
 from statistics import median_low
-from typing import (TYPE_CHECKING, DefaultDict, Deque, Dict, Iterator, List,
-                    Set, Tuple)
+from typing import (TYPE_CHECKING, Callable, DefaultDict, Deque, Dict,
+                    Iterator, List, Set, Tuple)
 
 import bezier
 import numpy
 from dataslots import with_slots
 from rtree.index import Rtree
 
-from tsim.model.geometry import Point, angle, line_intersection_safe
-from tsim.model.network.way import LANE_WIDTH, LaneRef, OrientedWay
+from tsim.model.entity import EntityRef
+from tsim.model.geometry import Point, Vector, angle, line_intersection_safe
+from tsim.model.network.position import OrientedWayPosition
+from tsim.model.network.way import LANE_WIDTH, Lane, LaneRef, OrientedWay
 
 if TYPE_CHECKING:
     from tsim.model.network.node import Node
@@ -37,6 +39,7 @@ class Intersection:
     Contains way and lane connections with their curves and conflict points.
 
     Attributes:
+        node_ref: Reference to the node
         lane_connections: Maps each lane to the set of lanes it connects to.
         way_connections: Maps each incoming oriented way to a set of all
             oriented ways it has lane connections to.
@@ -46,37 +49,42 @@ class Intersection:
 
     """
 
-    __slots__ = ('lane_connections', 'way_connections', 'connection_map',
-                 'curves')
+    __slots__ = ('node_ref', 'lane_connections', 'way_connections',
+                 'connection_map', 'curves')
 
+    node_ref: EntityRef[Node]
     lane_connections: LaneConnections
     way_connections: WayConnections
     connection_map: Dict[Tuple[LaneRef, OrientedWay], LaneConnection]
     curves: Dict[LaneConnection, Curve]
 
     def __init__(self, node: Node):
+        self.node_ref = EntityRef(node)
         self.lane_connections = _build_lane_connections(node)
         self.connection_map = _build_connection_map(node,
                                                     self.lane_connections)
         self.curves = _build_bezier_curves(node, self.lane_connections)
-        _build_conflict_points(self.curves)
+        _build_conflict_points(node, self.curves)
         self._build_way_connections()
 
     def iterate_connections(self) -> Iterator[LaneConnection]:
-        """Get iterator for connections as Tuple[LaneRef, LaneRef]s."""
+        """Get iterator for lane connections in this intersection."""
         for source, dests in self.lane_connections.items():
             yield from product((source,), dests)
 
-    def curve_points(self, lane_connection: LaneConnection = None) \
-            -> Tuple[Point]:
+    def curve_points(self, lane_connection: LaneConnection = None,
+                     relative: bool = True) -> Tuple[Point]:
         """Get control points of curve for the given lane connection."""
         nodes = self.curves[lane_connection].curve.nodes
-        return tuple(Point(*nodes[:, i]) for i in range(3))
+        points = (Point(*nodes[:, i]) for i in range(3))
+        if relative:
+            points = map((-self.node_ref().position).add, points)
+        return tuple(points)
 
-    def iterate_connections_curve_points(self) \
+    def iterate_connections_curve_points(self, relative: bool = True) \
             -> Iterator[Tuple[LaneConnection, Tuple[Point]]]:
         """Get iterator for curve points for all lane connections."""
-        yield from ((c, self.curve_points(c))
+        yield from ((c, self.curve_points(c, relative))
                     for c in self.iterate_connections())
 
     def _build_way_connections(self):
@@ -92,12 +100,13 @@ class Intersection:
                                       for c in self.curves.values())}
         neighbors = {k: {id(p) for p in v.neighbors}
                      for k, v in points.items()}
-        return (self.lane_connections, self.way_connections,
+        return (self.node_ref.id, self.lane_connections, self.way_connections,
                 self.connection_map, self.curves, points, neighbors)
 
     def __setstate__(self, state):
-        (self.lane_connections, self.way_connections,
+        (node_id, self.lane_connections, self.way_connections,
          self.connection_map, self.curves, points, neighbors) = state
+        self.node_ref = EntityRef(node_id)
         for id_, neighbor_ids in neighbors.items():
             points[id_].neighbors.update(points[i] for i in neighbor_ids)
 
@@ -136,21 +145,35 @@ class Curve:
     """The curve of a lane connection.
 
     Contains the bezier curve connecting one lane to the other and the conflict
-    points that intersect with this curve.
+    points that intersect with this curve. The bezier curves are in world
+    coordinates, while the conflict points are in coordinates relative to the
+    node position.
     """
 
-    __slots__ = 'curve', 'length', '_conflict_points', '_sorted'
+    __slots__ = ('node_ref', 'source', 'dest', 'curve', 'length',
+                 '_conflict_points', '_sorted')
 
+    node_ref: EntityRef[Node]
+    source: Lane
+    dest: Lane
     curve: bezier.Curve
     length: float
     _conflict_points: List[Tuple[float, ConflictPoint]]
     _sorted: bool
 
-    def __init__(self, curve: bezier.Curve):
+    def __init__(self, node_ref: EntityRef[Node], lanes: LaneConnection,
+                 curve: bezier.Curve):
+        self.node_ref = node_ref
+        self.source, self.dest = (lane_ref() for lane_ref in lanes)
         self.curve = curve
         self.length = curve.length
         self._conflict_points = []
         self._sorted = True
+
+    @property
+    def node(self) -> Node:
+        """Get the referenced node, where the curve is located."""
+        return self.node_ref()
 
     @property
     def conflict_points(self) -> Iterator(Tuple[float, ConflictPoint]):
@@ -159,6 +182,15 @@ class Curve:
             self._conflict_points.sort()
             self._sorted = True
         yield from self._conflict_points
+
+    @property
+    def segment_count(self) -> int:
+        """Get the number of segments.
+
+        A `Curve` has always one single segment. This property exists so that
+        the curve can be used as a `NetworkLocation`.
+        """
+        return 1
 
     def add_conflict_point(self, param: float, point: ConflictPoint):
         """Add conflict point to curve, with given param for sorting."""
@@ -192,15 +224,50 @@ class Curve:
         except NotImplementedError:
             return numpy.array([])
 
+    def oriented_way_position(self, _position: float) -> OrientedWayPosition:
+        """Get oriented way position from this curve.
+
+        Implements the `NetworkLocation` interface. This method ignores the
+        position argument and returns an `OrientedWayPosition` in the start of
+        the destination way of this curve.
+        """
+        oriented_way = self.dest.oriented_way
+        return OrientedWayPosition(oriented_way, oriented_way.start_offset)
+
+    def world_position(self, position: float) -> Tuple[Point, Vector]:
+        """Get world position and direction in the given curve position."""
+        param = position / self.length
+
+        params = ((param, (position + 0.1) / self.length)
+                  if position < 0.1 else
+                  ((position - 0.1) / self.length, param))
+
+        evaluated = self.curve.evaluate_multi(numpy.array(params))
+        points = (Point(*chain.from_iterable(evaluated[:, 0])),
+                  Point(*chain.from_iterable(evaluated[:, 1])))
+
+        point = (points[0 if position < 0.1 else 1] + self.node.position)
+
+        vector = (points[1] - points[0]).normalized()
+        return point, vector
+
     def evaluate(self, param: float) -> Point:
         """Evaluate bezier curve at t=param."""
         return Point(*chain.from_iterable(self.curve.evaluate(param)))
 
+    def evaluate_position(self, position: float) -> Point:
+        """Evaluate bezier curve at t=position/length."""
+        return Point(*chain.from_iterable(self.curve.evaluate(position /
+                                                              self.length)))
+
     def __getstate__(self):
-        return self.curve, self.length, self._conflict_points, self._sorted
+        return (self.node_ref.id, self.source, self.dest, self.curve,
+                self.length, self._conflict_points, self._sorted)
 
     def __setstate__(self, state):
-        self.curve, self.length, self._conflict_points, self._sorted = state
+        (node_id, self.source, self.dest, self.curve, self.length,
+         self._conflict_points, self._sorted) = state
+        self.node_ref = EntityRef(node_id)
         for _, point in self._conflict_points:
             point.curves.add(self)
 
@@ -229,14 +296,15 @@ def _build_lane_connections(node: Node) -> LaneConnections:
     def self_connect():
         """Connect ways[0] to itself."""
         connections.update({l: {o} for l, o in zip(
-            way.lane_refs(opposite_only=True),
+            way.lane_refs(opposite_only=True, positive=True),
             way.lane_refs(l_to_r=False))})
 
     def connect_to(index: int, other: OrientedWay) -> LaneConnections:
         """Connect ways[0] to the given way."""
         outwards = angles[index] > pi * 2.0 / 3.0
         for source, dest in zip(way.lane_refs(l_to_r=not(outwards),
-                                              opposite_only=True),
+                                              opposite_only=True,
+                                              positive=True),
                                 other.lane_refs(outwards)):
             new_conn[source].add(dest)
             conn_angles[(source, dest)] = angles[index]
@@ -249,8 +317,8 @@ def _build_lane_connections(node: Node) -> LaneConnections:
                 continue
             if conn_1 in to_remove or conn_2 in to_remove:
                 continue
-            conn = ((conn_2, conn_1) if conn_1[0].index > conn_2[0].index
-                    else (conn_1, conn_2))
+            conn = ((conn_1, conn_2) if conn_1[0].index > conn_2[0].index
+                    else (conn_2, conn_1))
             angle_1, angle_2 = conn_angles[conn[0]], conn_angles[conn[1]]
             if angle_1 > angle_2:
                 to_remove.add(conn[curvier(angle_1, angle_2)])
@@ -287,37 +355,40 @@ def _build_lane_connections(node: Node) -> LaneConnections:
 
 def _build_connection_map(node: Node, connections: LaneConnections) \
         -> Dict[Tuple[LaneRef, OrientedWay], LaneConnection]:
-    """Create connection map from (LaneRef, OrientedWay) to LaneConnection.
+    """Create connection map from (LaneRef, OrientedWay) keys.
 
     The map contains all lanes that reach the given node. The lane connection
     it maps to can be from the lane itself or from another lane if there is no
     connection from the given lane to the oriented way.
     """
+    def index_diff(lane: LaneRef) -> Callable[[LaneConnection], int]:
+        def index_diff_(connection: LaneConnection) -> int:
+            return abs(connection[0].index - lane.index)
+        return index_diff_
+
     result = {}
     for way in node.oriented_ways:
-        missing = defaultdict(list)
+        missing = []
         found = defaultdict(list)
-        for lane in way.lane_refs(opposite_only=True):
-            for dest_way in node.oriented_ways:
-                dest_lane = next((l for l in connections[lane]
-                                  if l.oriented_way == dest_way),
-                                 None)
-                if dest_lane is not None:
-                    found[dest_way].append((lane, dest_lane))
-                else:
-                    missing[dest_way].append(lane)
+        for lane, dest_way in product(way.lane_refs(opposite_only=True,
+                                                    positive=True),
+                                      node.oriented_ways):
+            dest_lane = next((l for l in connections[lane]
+                              if l.oriented_way == dest_way),
+                             None)
+            if dest_lane is not None:
+                found[dest_way].append((lane, dest_lane))
+            else:
+                missing.append((lane, dest_way))
 
-        for dest_way, lanes in found.items():
-            for lane, dest_lane in lanes:
-                result[lane, dest_way] = lane
+        for dest_way, connections_ in found.items():
+            for lane, dest_lane in connections_:
+                result[lane, dest_way] = (lane, dest_lane)
 
-        for dest_way, lanes in missing.items():
-            if not found[dest_way]:
-                continue
-            for lane in lanes:
-                result[lane, dest_way] = min(
-                    found[dest_way],
-                    key=lambda l: abs(l[0].index - lane.index))
+        for lane, dest_way in missing:
+            found_ = [c for c in found[dest_way] if c[0] == lane]
+            if found_:
+                result[lane, dest_way] = (lane, min(found_, index_diff(lane)))
 
     return result
 
@@ -334,35 +405,36 @@ def _build_bezier_curves(node: Node, connections: LaneConnections) \
         right = vector.rotated_right()
         first = right * LaneRef(*way, 0).distance_from_center()
         for lane in way.lane_refs(include_opposite=True):
-            points[lane] = (vector * node.geometry.distance(way)
-                            + right * lane.index * LANE_WIDTH
-                            + first)
+            points[lane.positive()] = (vector * node.geometry.distance(way)
+                                       + right * lane.index * LANE_WIDTH
+                                       + first)
 
     crossings = {}
     for source, dests in connections.items():
         for lane1, lane2 in product((source,), dests):
             crossings[(lane1, lane2)] = line_intersection_safe(
-                points[lane1], vectors[lane1.oriented_way],
+                points[lane1], vectors[lane1.oriented_way.flipped()],
                 points[lane2], vectors[lane2.oriented_way])
 
     curves = {}
+    node_ref = EntityRef(node)
     for lanes, crossing in crossings.items():
         start, end = map(points.get, lanes)
-        curve = bezier.Curve(
-            numpy.asfortranarray(list(zip(start, crossing, end))), degree=2)
-        curves[lanes] = Curve(curve)
+        points_ = list(zip(*map(node.position.add, (start, crossing, end))))
+        curve = bezier.Curve(numpy.asfortranarray(points_), degree=2)
+        curves[lanes] = Curve(node_ref, lanes, curve)
 
     return curves
 
 
-def _build_conflict_points(curves: Dict[LaneConnection, Curve]):
+def _build_conflict_points(node: Node, curves: Dict[LaneConnection, Curve]):
     """Create conflict points from lane connection curves.
 
     Fill conflict points in given Curve objects. Merges points that are less
     than MERGE_RADIUS apart and add points that are within NEIGHBOR_RADIUS as
     neighbors.
     """
-    points = {}
+    points: Dict[int, ConflictPoint] = {}
     diverge = defaultdict(set)
     merge = defaultdict(set)
     for (lanes1, curve1), (lanes2, curve2) in combinations(curves.items(), 2):
@@ -380,12 +452,18 @@ def _build_conflict_points(curves: Dict[LaneConnection, Curve]):
         _merge_points(points, rtree)
         _fill_neighbors(points, rtree)
 
+    # This makes the conflict point positions relative to the node
+    for point in points.values():
+        point.point = point.point - node.position
+
 
 def _add_crossing_conflict_points(points: Dict[int, ConflictPoint],
                                   curve1: Curve, curve2: Curve):
     """Create crossing conflict points points between given curves."""
     try:
         intersection = curve1.intersect(curve2)[:, 0]
+        if any(numpy.isnan(intersection)):
+            return
 
         # Intersections close to the endpoints are diverging or merging.
         distance = (0.5 - abs(intersection[0] - 0.5)) * curve1.length

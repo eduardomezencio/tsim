@@ -69,7 +69,7 @@ class Debug(Tool):
     def on_cursor_move(self):
         """Cursor moved callback."""
         if self.pressed:
-            self._update_selection()
+            self._update_selection(False)
         self._update_position()
         self._update_hud_text()
 
@@ -78,10 +78,10 @@ class Debug(Tool):
         self.hud_text.destroy()
         self._clear_selection()
 
-    def _update_selection(self):
+    def _update_selection(self, draw_intersection: bool = True):
         self._clear_selection()
         selected = INDEX.get_at(self.cursor.position, of_type=Node)
-        if selected:
+        if selected and draw_intersection:
             self.card = create_lane_connections_card(selected[0], RENDER)
         else:
             selected = INDEX.get_at(self.cursor.position, of_type=Way)
@@ -96,8 +96,15 @@ class Debug(Tool):
             position = selected.way_position_raw(self.cursor.position)
             way_position, lane_index = position
             lane = selected.lanes[lane_index]
-            lane_position = lane.way_to_lane_position(way_position)
-            oriented_position = lane.lane_to_oriented_position(lane_position)
+
+            try:
+                lane_position = lane.way_to_lane_position(way_position)
+            except ValueError:
+                lane_position = 0.0
+
+            oriented_position = (lane.lane_to_oriented_position(lane_position)
+                                 if lane_position is not None else 0.0)
+
             self.text_lines[2] = (
                 f'way_position={way_position:.2f}, '
                 f'oriented_position={oriented_position:.2f}, '

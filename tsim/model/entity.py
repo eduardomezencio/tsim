@@ -3,24 +3,22 @@
 from __future__ import annotations
 
 from abc import ABC
-from dataclasses import dataclass, field
 from typing import Generic, Iterable, NamedTuple, Optional, TypeVar, Union
 from weakref import ref, ReferenceType
-
-from dataslots import with_slots
 
 from tsim.utils import pickling
 import tsim.model.index as Index
 
 
-@with_slots(add_dict=True, add_weakref=True)
-@dataclass(eq=False)
 class Entity(ABC):
     """Base class for entities."""
 
-    id: int = field(init=False, default_factory=type(None))
+    __slots__ = '__dict__', '__weakref__', 'id'
 
-    def __post_init__(self):
+    id: int
+
+    def __init__(self):
+        self.id = None
         Index.INSTANCE.add(self)
 
     def delete(self):
@@ -38,6 +36,9 @@ class Entity(ABC):
 
     __getstate__ = pickling.getstate
     __setstate__ = pickling.setstate
+
+    def __repr__(self):
+        return f'{type(self).__name__}(id={self.id})'
 
 
 T = TypeVar('T', bound=Entity)
@@ -62,8 +63,7 @@ class EntityRef(Generic[T]):
     _id: int
     _value: ReferenceType
 
-    def __init__(self, entity: Union[EntityRef, ReferenceType, Entity, int]):
-        # TODO: change to singledispatchmethod methods in Python 3.8
+    def __init__(self, entity: Union[Entity, EntityRef, ReferenceType, int]):
         if isinstance(entity, Entity):
             self._id = entity.id
             self._value = ref(entity)
@@ -74,7 +74,7 @@ class EntityRef(Generic[T]):
             self._id = entity.id
             self._value = entity.value
         else:
-            self._id = entity.id
+            self._id = entity
             self._value = None
         assert (isinstance(self._value, ReferenceType) or
                 (self._value is None and isinstance(self._id, int)))
