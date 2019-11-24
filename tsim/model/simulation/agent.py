@@ -113,7 +113,7 @@ class Agent(Entity):
         deactivated.
         """
         if buffer is None:
-            buffer = Index.INSTANCE.simulation.target_buffer
+            buffer = Index.INSTANCE.simulation.ready_buffer
         position = network_position.world_and_segment_position()
         self.position = position.position
         self.direction = position.direction
@@ -131,20 +131,22 @@ class Agent(Entity):
                       else self.on_curve)
         self.set_active(False)
 
-    def set_destination(self, destination: OrientedWayPosition):
+    def set_destination(self, destination: OrientedWayPosition,
+                        buffer: Optional[int] = None):
         """Set the agent's destination.
 
         Tries to find a path from the agent location to the given destination.
         If a path is found, it's set as the agent's path and the agent is
         activated.
         """
-        target = Index.INSTANCE.simulation.target_buffer
-        oriented_way = self.oriented_way_position(target)
+        if buffer is None:
+            buffer = Index.INSTANCE.simulation.ready_buffer
+        oriented_way = self.oriented_way_position(buffer)
         self.path = Index.INSTANCE.path_map.path(oriented_way, destination)
         self.path_segment = 0
         self.path_end = False
         if self.path is not None:
-            lane = self.network_location[target]
+            lane = self.network_location[buffer]
             if isinstance(lane, Curve):
                 lane = lane.dest
             self._calc_segment_end(lane, self.network_segment_end)

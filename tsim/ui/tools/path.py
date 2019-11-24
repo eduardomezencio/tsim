@@ -118,7 +118,5 @@ class PathTool(Tool):
     def _create_agent(self):
         if self.path is None:
             return
-        agent = Agent()
-        agent.place_at(self.source)
-        agent.set_destination(self.dest.oriented_way_position)
-        p3d.MESSENGER.send('new_agent', [agent])
+        p3d.MESSENGER.send('new_agent', [Agent(), self.source,
+                                         self.dest.oriented_way_position])

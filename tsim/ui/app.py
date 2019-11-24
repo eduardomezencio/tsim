@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging as log
+from collections import deque
 from typing import Dict, Tuple
 
 
@@ -15,6 +16,7 @@ import tsim.ui.panda3d as p3d
 from tsim.model.index import INSTANCE as INDEX
 from tsim.model.geometry import Point, bounding_rect_center
 from tsim.model.network.node import Node
+from tsim.model.network.position import LanePosition, OrientedWayPosition
 from tsim.model.network.way import Way
 from tsim.model.simulation.agent import Agent
 from tsim.ui.camera import Camera
@@ -34,6 +36,8 @@ class App:
     roads: Dict[Tuple[int, int], NodePath]
 
     def __init__(self, index_name: str):
+        self._event_queue = deque()
+
         log_config()
         panda3d_config()
 
@@ -62,7 +66,7 @@ class App:
             node_path.node().collect()
 
         p3d.BASE.accept('entities_changed', self.on_network_entities_changed)
-        p3d.BASE.accept('new_agent', self.add_agent)
+        p3d.BASE.accept('new_agent', self.enqueue_event)
 
         self.scene.reparent_to(p3d.RENDER)
 
@@ -75,6 +79,10 @@ class App:
         """Update task, to run every frame."""
         INDEX.simulation.update(FRAME_DURATION)
         self.update_agents()
+        while self._event_queue:
+            event = self._event_queue.popleft()
+            App.event_handlers[type(event[0])](self, *event)
+
         self.camera.update()
         self.sky.update()
         self.cursor.update()
@@ -134,8 +142,15 @@ class App:
 
         # TODO: load agents
 
-    def add_agent(self, agent: Agent):
-        """Create actor for agent."""
+    def enqueue_event(self, *args):
+        """Enqueue event from panda3d messenger."""
+        self._event_queue.append(args)
+
+    def add_agent(self, agent: Agent, position: LanePosition,
+                  destination: OrientedWayPosition):
+        """Add agent with given position and destination."""
+        agent.place_at(position)
+        agent.set_destination(destination)
         self.agents[agent] = factory.create_agent(self.agents_parent, agent)
 
     def update_agents(self):
@@ -147,6 +162,8 @@ class App:
             if agent.direction_changed:
                 node_path.look_at(*(position + agent.direction), 0.0)
                 agent.direction_changed = False
+
+    event_handlers = {Agent: add_agent}
 
 
 def log_config():

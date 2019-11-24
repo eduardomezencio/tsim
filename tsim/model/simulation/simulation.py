@@ -48,10 +48,7 @@ class Simulation:
 
         if self._active_updates:
             for agent in self._active_updates:
-                if agent.active:
-                    self.active.add(agent)
-                else:
-                    self.active.remove(agent)
+                self._activate_or_deactivate(agent)
             self._active_updates.clear()
 
         self.time += dt
@@ -70,7 +67,15 @@ class Simulation:
         """
         if self._in_update:
             self._active_updates.add(agent)
-        elif agent.active:
+        else:
+            self._activate_or_deactivate(agent)
+
+    def _activate_or_deactivate(self, agent: Agent):
+        """Add or remove agent from `active` set."""
+        if agent.active:
             self.active.add(agent)
         else:
-            self.active.remove(agent)
+            try:
+                self.active.remove(agent)
+            except KeyError:
+                pass
