@@ -10,7 +10,7 @@ from panda3d.core import (Geom, GeomNode, GeomTristrips, GeomVertexData,
                           TransparencyAttrib)
 
 from tsim.model.geometry import Point, sec
-from tsim.model.network.way import LANE_WIDTH
+from tsim.model.network.lane import LANE_WIDTH
 from tsim.ui.objects.way import LEVEL_HEIGHT
 from tsim.utils.color import interpolate_rgb
 from tsim.utils.iterators import window_iter

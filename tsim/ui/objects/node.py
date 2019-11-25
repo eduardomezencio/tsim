@@ -14,8 +14,8 @@ from PIL import Image
 
 from tsim.model.geometry import Vector
 from tsim.model.network.intersection import ConflictPointType
+from tsim.model.network.lane import LANE_WIDTH
 from tsim.model.network.node import Node
-from tsim.model.network.way import LANE_WIDTH
 from tsim.ui import textures
 from tsim.ui.objects.way import LEVEL_HEIGHT
 from tsim.ui.textures import create_texture

@@ -7,7 +7,8 @@ from itertools import accumulate
 from panda3d.core import (Geom, GeomNode, GeomTristrips, GeomVertexData,
                           GeomVertexFormat, GeomVertexWriter, NodePath)
 
-from tsim.model.network.way import LANE_WIDTH, Way
+from tsim.model.network.lane import LANE_WIDTH
+from tsim.model.network.way import Way
 from tsim.ui import textures
 
 LEVEL_HEIGHT = 5.0

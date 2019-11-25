@@ -15,8 +15,8 @@ from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
                                  midpoint, point_in_polygon)
 from tsim.model.network.entity import NetworkEntity
 from tsim.model.network.intersection import Intersection, LaneConnection
-from tsim.model.network.way import (LANE_WIDTH, Endpoint, LaneRef, OrientedWay,
-                                    Way)
+from tsim.model.network.lane import LANE_WIDTH, LaneRef
+from tsim.model.network.way import Endpoint, OrientedWay, Way
 from tsim.utils.cached_property import add_cached, cached_property
 
 
@@ -282,7 +282,7 @@ def build_polygon(node: Node, ways: List[OrientedWay],
                        for w, e in ways)
     for i, (way, _) in enumerate(ways):
         half_widths = tuple(w().total_lane_count * LANE_WIDTH / 2
-                            for w in (ways[i - 1][0], way))
+                            for w in (ways[i - 1].way_ref, way))
         # Points relative to the node position.
         points = (directions[i - 1].rotated_left() * half_widths[0],
                   directions[i].rotated_right() * half_widths[1])

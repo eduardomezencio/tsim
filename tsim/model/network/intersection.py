@@ -18,8 +18,9 @@ from rtree.index import Rtree
 
 from tsim.model.entity import EntityRef
 from tsim.model.geometry import Point, Vector, angle, line_intersection_safe
+from tsim.model.network.lane import LANE_WIDTH, Lane, LaneRef
 from tsim.model.network.position import OrientedWayPosition
-from tsim.model.network.way import LANE_WIDTH, Lane, LaneRef, OrientedWay
+from tsim.model.network.way import OrientedWay
 
 if TYPE_CHECKING:
     from tsim.model.network.node import Node

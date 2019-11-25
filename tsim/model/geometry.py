@@ -248,25 +248,22 @@ class Vector:
         return Vector(-self.x, -self.y)
 
     def __iter__(self):
-        yield self.x
-        yield self.y
+        return iter((self.x, self.y))
 
-    angle = angle
-    bounding_rect = property(calc_bounding_rect)
-    distance = distance
-    distance_squared = distance_squared
-    midpoint = midpoint
-    sec = sec
 
-    __abs__ = norm
-    __add__ = add
-    __mul__ = multiply
-    __rmul__ = multiply
-    __sub__ = subtract
-
-    __getstate__ = partialmethod(pickling.getstate, add_dict=False)
-    __setstate__ = partialmethod(pickling.setstate, add_dict=False)
-
+Vector.angle = angle
+Vector.bounding_rect = property(Vector.calc_bounding_rect)
+Vector.distance = distance
+Vector.distance_squared = distance_squared
+Vector.midpoint = midpoint
+Vector.sec = sec
+Vector.__abs__ = Vector.norm
+Vector.__add__ = Vector.add
+Vector.__mul__ = Vector.multiply
+Vector.__rmul__ = Vector.multiply
+Vector.__sub__ = Vector.subtract
+Vector.__getstate__ = partialmethod(pickling.getstate, add_dict=False)
+Vector.__setstate__ = partialmethod(pickling.setstate, add_dict=False)
 
 Point = Vector
 Polygon = Sequence[Point]

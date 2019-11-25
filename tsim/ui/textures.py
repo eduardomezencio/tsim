@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
-from collections import namedtuple
 from io import BytesIO
+from typing import Callable, NamedTuple, Sequence
 
 from panda3d.core import PNMImage, SamplerState, StringStream, Texture
 from PIL import Image
 
 import tsim.ui.panda3d as p3d
 
-
-TextureInfo = namedtuple('TextureInfo', ['extension', 'filters'])
-
 LOADED_TEXTURES = {}
 PATH = 'textures/'
+
+
+class TextureInfo(NamedTuple):
+    """Texture information."""
+
+    extension: str
+    filters: Sequence[Callable[[Texture], None]]
 
 
 def _mipmap(texture: Texture):
