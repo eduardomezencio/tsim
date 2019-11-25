@@ -386,9 +386,9 @@ def _build_connection_map(node: Node, connections: LaneConnections) \
                 result[lane, dest_way] = (lane, dest_lane)
 
         for lane, dest_way in missing:
-            found_ = [c for c in found[dest_way] if c[0] == lane]
+            found_ = found[dest_way]
             if found_:
-                result[lane, dest_way] = (lane, min(found_, index_diff(lane)))
+                result[lane, dest_way] = min(found_, key=index_diff(lane))
 
     return result
 
