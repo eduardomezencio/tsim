@@ -74,6 +74,26 @@ class LanePosition:
             self.lane.oriented_way,
             self.lane.lane_to_oriented_position(self.position))
 
+    @property
+    def left_neighbor(self) -> LanePosition:
+        """Get same position on the lane to the left."""
+        way_position = self.lane.lane_to_way_position(self.position)
+        lane = self.lane.left_neighbor
+        try:
+            return LanePosition(lane, lane.way_to_lane_position(way_position))
+        except ValueError:
+            return LanePosition(lane, self.position)
+
+    @property
+    def right_neighbor(self) -> LanePosition:
+        """Get same position on the lane to the right."""
+        way_position = self.lane.lane_to_way_position(self.position)
+        lane = self.lane.right_neighbor
+        try:
+            return LanePosition(lane, lane.way_to_lane_position(way_position))
+        except ValueError:
+            return LanePosition(lane, self.position)
+
     def world_and_segment_position(self) -> WorldAndSegmentPosition:
         """Get world and segment position at this lane position."""
         return self.lane.world_and_segment_position(self.position)

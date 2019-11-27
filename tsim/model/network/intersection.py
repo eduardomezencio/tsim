@@ -185,6 +185,11 @@ class Curve:
         yield from self._conflict_points
 
     @property
+    def lane_index(self) -> int:
+        """Get lane index from destination."""
+        return self.dest.index
+
+    @property
     def segment_count(self) -> int:
         """Get the number of segments.
 

@@ -71,6 +71,16 @@ class LaneRef(NamedTuple):
         return (self.way.end if self.endpoint is Endpoint.START
                 else self.way.start)
 
+    @property
+    def left_neighbor(self) -> LaneRef:
+        """Get lane reference one lane to the left."""
+        return LaneRef(self.way_ref, self.endpoint, self.index - 1)
+
+    @property
+    def right_neighbor(self) -> LaneRef:
+        """Get lane reference one lane to the right."""
+        return LaneRef(self.way_ref, self.endpoint, self.index + 1)
+
     def positive(self) -> LaneRef:
         """Get equivalent lane with positive index."""
         if self.index >= 0:
@@ -138,6 +148,8 @@ class Lane:
         """Get lane index."""
         return self.lane_ref.index
 
+    lane_index = index
+
     @property
     def oriented_way(self) -> OrientedWay:
         """Get oriented way from this lane."""
@@ -157,6 +169,16 @@ class Lane:
     def segment_count(self) -> int:
         """Get the number of lane segments."""
         return len(self.segments)
+
+    @property
+    def left_neighbor(self) -> Lane:
+        """Get the lane to the left of this one."""
+        return self.lane_ref.left_neighbor()
+
+    @property
+    def right_neighbor(self) -> Lane:
+        """Get the lane to the right of this one."""
+        return self.lane_ref.right_neighbor()
 
     def world_and_segment_position(self, position: float) \
             -> WorldAndSegmentPosition:
