@@ -95,22 +95,6 @@ class Intersection:
             connections[way].update(d.oriented_way for d in dests)
         self.way_connections = dict(connections)
 
-    def __getstate__(self):
-        points = {id(p): p for _, p in
-                  chain.from_iterable(c.conflict_points
-                                      for c in self.curves.values())}
-        neighbors = {k: {id(p) for p in v.neighbors}
-                     for k, v in points.items()}
-        return (self.node_ref.id, self.lane_connections, self.way_connections,
-                self.connection_map, self.curves, points, neighbors)
-
-    def __setstate__(self, state):
-        (node_id, self.lane_connections, self.way_connections,
-         self.connection_map, self.curves, points, neighbors) = state
-        self.node_ref = EntityRef(node_id)
-        for id_, neighbor_ids in neighbors.items():
-            points[id_].neighbors.update(points[i] for i in neighbor_ids)
-
 
 class ConflictPointType(Enum):
     """Types of conflict point."""
@@ -132,14 +116,6 @@ class ConflictPoint:
     type: ConflictPointType
     neighbors: Set[ConflictPoint] = field(default_factory=set, repr=False)
     curves: Set[Curve] = field(default_factory=set, repr=False)
-
-    def __getstate__(self):
-        return self.point, self.type
-
-    def __setstate__(self, state):
-        self.point, self.type = state
-        self.neighbors = set()
-        self.curves = set()
 
 
 class Curve:
@@ -265,17 +241,6 @@ class Curve:
         """Evaluate bezier curve at t=position/length."""
         return Point(*chain.from_iterable(self.curve.evaluate(position /
                                                               self.length)))
-
-    def __getstate__(self):
-        return (self.node_ref.id, self.source, self.dest, self.curve,
-                self.length, self._conflict_points, self._sorted)
-
-    def __setstate__(self, state):
-        (node_id, self.source, self.dest, self.curve, self.length,
-         self._conflict_points, self._sorted) = state
-        self.node_ref = EntityRef(node_id)
-        for _, point in self._conflict_points:
-            point.curves.add(self)
 
 
 def _build_lane_connections(node: Node) -> LaneConnections:

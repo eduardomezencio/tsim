@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import partialmethod
 from math import acos, copysign, cos, pi, sin, sqrt
 from typing import Iterable, Sequence, Tuple
 
 from dataslots import with_slots
 
-from tsim.utils import pickling
 from tsim.utils.iterators import window_iter
 
 BoundingRect = Tuple[float, float, float, float]
@@ -262,8 +260,6 @@ Vector.__add__ = Vector.add
 Vector.__mul__ = Vector.multiply
 Vector.__rmul__ = Vector.multiply
 Vector.__sub__ = Vector.subtract
-Vector.__getstate__ = partialmethod(pickling.getstate, add_dict=False)
-Vector.__setstate__ = partialmethod(pickling.setstate, add_dict=False)
 
 Point = Vector
 Polygon = Sequence[Point]

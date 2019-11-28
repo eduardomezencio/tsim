@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import partialmethod
 from typing import TYPE_CHECKING, NamedTuple, Optional, Tuple
 
 from dataslots import with_slots
@@ -14,7 +13,6 @@ from tsim.model.network.endpoint import Endpoint
 from tsim.model.network.orientedway import OrientedWay
 from tsim.model.network.position import (OrientedWayPosition,
                                          WorldAndSegmentPosition)
-from tsim.utils import pickling
 
 if TYPE_CHECKING:
     from tsim.model.network.intersection import Curve
@@ -112,10 +110,6 @@ class LaneSegment:
     start: Point
     vector: Vector
     is_turning: bool
-
-
-LaneSegment.__getstate__ = partialmethod(pickling.getstate, add_dict=False)
-LaneSegment.__setstate__ = partialmethod(pickling.setstate, add_dict=False)
 
 
 class Lane:

@@ -6,7 +6,6 @@ from abc import ABC
 from typing import Generic, Iterable, NamedTuple, Optional, TypeVar, Union
 from weakref import ref, ReferenceType
 
-from tsim.utils import pickling
 import tsim.model.index as Index
 
 
@@ -34,9 +33,6 @@ class Entity(ABC):
         """
         return DeleteResult.empty()
 
-    __getstate__ = pickling.getstate
-    __setstate__ = pickling.setstate
-
     def __repr__(self):
         return f'{type(self).__name__}(id={self.id})'
 
@@ -47,10 +43,10 @@ T = TypeVar('T', bound=Entity)
 class EntityRef(Generic[T]):
     """Reference for an entity.
 
-    Avoid deep recursion in pickling. It pickles itself including only the id
-    and not the entity. It also uses only the id for __eq__ and __hash__
-    functions, so it can be used as dict key or in sets. In runtime, the
-    reference to the entity is kept as a weakref.
+    Avoid deep recursion in serialization. Should serialize itself including
+    only the id and not the entity. It also uses only the id for __eq__ and
+    __hash__ functions, so it can be used as dict key or in sets. In runtime,
+    the reference to the entity is kept as a weakref.
 
     The id of an EntityRef can only be None when it's referencing an Entity
     that was just created and was not yet added to the index, so it does not
@@ -96,13 +92,6 @@ class EntityRef(Generic[T]):
             self._value = ref(value)
             return value
         return None
-
-    def __getstate__(self):
-        return self.id
-
-    def __setstate__(self, state):
-        self._id = state
-        self._value = None
 
     def __call__(self):
         """Get the referenced value, like calling a weakref."""

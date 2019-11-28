@@ -17,6 +17,7 @@ from tsim.model.geometry import Point
 from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network.node import Node
 from tsim.model.network.way import Way
+from tsim.serialization.config import configure_serialization
 from tsim.utils.cached_property import touch_cache
 
 
@@ -168,6 +169,7 @@ def log_config(name: str):
 
 
 if __name__ == '__main__':
+    configure_serialization()
     if len(sys.argv) > 2:
         osm_reader_multiprocess(sys.argv[1:])
     else:
