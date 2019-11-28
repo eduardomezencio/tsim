@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from tsim.model.network.position import NetworkLocation, NetworkPosition
 
 LANE_CHANGE_SPEED_MPS = 1.0
+LANE_CHANGE_MIN_DURATION = LANE_WIDTH / LANE_CHANGE_SPEED_MPS
 MAX_SPEED_KPH = 60.0
 MAX_SPEED_MPS = kph_to_mps(MAX_SPEED_KPH)
 
@@ -127,9 +128,13 @@ class Agent(Entity):
         self.speed[buffer] = 0.0
         self.network_location[buffer] = network_position.location
         self.network_position[buffer] = network_position.position
-        self.update = (self._on_lane
-                       if isinstance(network_position.location, Lane)
-                       else self._on_curve)
+        lane = network_position.location
+        if isinstance(lane, Lane):
+            self.update = self._on_lane
+        else:
+            lane = lane.dest
+            self.update = self._on_curve
+        self.current_max_speed = min(MAX_SPEED_MPS, lane.way.max_speed)
         self.set_active(False)
 
     def set_destination(self, destination: OrientedWayPosition,
@@ -218,15 +223,15 @@ class Agent(Entity):
         target_oriented_way = self.path.ways[self.path_segment]
         curve = location.get_curve(target_oriented_way)
         position = curve.evaluate_position(offset)
-        self.direction = position - self.position
         self.position = position
-        self.direction_changed = True
         self.side_offset = None
         self.target_lane = curve.source.index
         self.network_segment = 0
         self.network_segment_end = curve.length
         self.network_location[target] = curve
         self.network_position[target] = offset
+        self.current_max_speed = min(MAX_SPEED_MPS,
+                                     target_oriented_way.way.max_speed)
         self.update = self._on_curve
 
     def _on_curve(self, dt: Duration, ready: int, target: int):
@@ -248,23 +253,24 @@ class Agent(Entity):
 
         # Reached end of curve
         offset = position - self.network_segment_end
-        segment = location.dest.segments[0]
+        location = location.dest
+        segment = location.segments[0]
         self.position = segment.start + segment.vector * offset
         self.direction = segment.vector
         self.direction_changed = True
         self.network_segment = 0
-        self._calc_segment_end(location.dest, segment.end_distance)
-        self.network_location[target] = location.dest
+        self._calc_segment_end(location, segment.end_distance)
+        self.network_location[target] = location
         self.network_position[target] = offset
         if not self.path_last_way:
-            self._calc_target_lane(location.dest)
+            self._calc_target_lane(location)
             self._start_lane_change(target, target)
         self.update = self._on_lane
 
     def _follow(self, dt: Duration, ready: int, target: int):
         """Set the agent speed according to car following logic."""
         # TODO: write real car following here
-        acceleration = 1.0 * dt
+        acceleration = 5.0 * dt
         self.speed[target] = min(max(self.speed[ready] + acceleration, 0.0),
                                  self.current_max_speed)
 
@@ -296,6 +302,16 @@ class Agent(Entity):
                 return
         self.network_segment_end = segment_end
 
+    def _set_lane_change_max_speed(self, position: LanePosition,
+                                   lane_index: int):
+        """Set `current_max_speed` for lane change."""
+        time = abs(self.target_lane - lane_index) * LANE_CHANGE_MIN_DURATION
+        if time > 0.0:
+            space = position.remaining
+            self.current_max_speed = max(LANE_CHANGE_SPEED_MPS,
+                                         min(space / time,
+                                             self.current_max_speed))
+
     def _start_lane_change(self, ready: int, target: int) -> bool:
         """Start lane change if needed.
 
@@ -312,6 +328,8 @@ class Agent(Entity):
 
         # Start lane change.
         position = LanePosition(lane, self.network_position[ready])
+        self._set_lane_change_max_speed(position, lane_index)
+
         self.side_offset = LANE_WIDTH
         if self.target_lane > lane_index:
             new_position = position.right_neighbor

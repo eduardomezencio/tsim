@@ -63,6 +63,11 @@ class LanePosition:
         return self.lane
 
     @property
+    def remaining(self) -> float:
+        """Get distance in meters to the end of the lane."""
+        return self.lane.length - self.position
+
+    @property
     def oriented_way(self) -> OrientedWay:
         """Get the oriented way of this lane."""
         return self.lane.oriented_way
