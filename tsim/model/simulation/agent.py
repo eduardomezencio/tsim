@@ -186,8 +186,8 @@ class Agent(Entity):
             self.network_position[target] = position
             return
 
-        # Reached end of segment or path.
         if self.path_last_segment:
+            # Reached end of path.
             segment = location.segments[self.network_segment]
             self.speed[target] = 0.0
             self.path = None
@@ -205,6 +205,8 @@ class Agent(Entity):
             self.direction = direction
             self.direction_changed = True
             self.position = segment.start + direction * offset
+            if self.side_offset is not None:
+                self.position -= self.side_vector * self.side_offset
             self._calc_segment_end(location, segment.end_distance)
             self.network_location[target] = location
             self.network_position[target] = position
@@ -219,6 +221,7 @@ class Agent(Entity):
         self.direction = position - self.position
         self.position = position
         self.direction_changed = True
+        self.side_offset = None
         self.target_lane = curve.source.index
         self.network_segment = 0
         self.network_segment_end = curve.length
@@ -327,8 +330,7 @@ class Agent(Entity):
         before this method. The return value is whether the location has
         changed on the target buffer.
         """
-        side_movement = min(LANE_CHANGE_SPEED_MPS,
-                            self.speed[ready] * 0.5) * dt
+        side_movement = min(LANE_CHANGE_SPEED_MPS, self.speed[ready]) * dt
         self.side_offset -= side_movement
         self.position += self.side_vector * side_movement
         if self.side_offset <= 0:
