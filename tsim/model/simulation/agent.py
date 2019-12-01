@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Optional
 
+import bezier
+
 import tsim.model.index as Index
 from tsim.model.entity import Entity, EntityRef
 from tsim.model.geometry import Point, Vector
@@ -52,6 +54,7 @@ class Agent(Entity):
     side_offset: float
     network_segment: int
     network_segment_end: float
+    curve_override: bezier.Curve
     lead: EntityRef[Agent]
     current_max_speed: float
     path: Path
@@ -74,6 +77,7 @@ class Agent(Entity):
         self.side_offset = None
         self.network_segment = 0
         self.network_segment_end = 0.0
+        self.curve_override = None
         self.lead = None
         self.current_max_speed = MAX_SPEED_MPS
         self.path = None
@@ -222,9 +226,14 @@ class Agent(Entity):
         self.path_last_way = self.path_segment == len(self.path.ways) - 1
         target_oriented_way = self.path.ways[self.path_segment]
         curve = location.get_curve(target_oriented_way)
-        position = curve.evaluate_position(offset)
-        self.position = position
-        self.side_offset = None
+        if self.side_offset is None:
+            position = curve.evaluate_position(offset)
+            self.position = position
+        else:
+            nodes = curve.curve.nodes
+            nodes[:, 0] = list(self.position)
+            self.curve_override = bezier.Curve(nodes, degree=2)
+            self.side_offset = None
         self.target_lane = curve.source.index
         self.network_segment = 0
         self.network_segment_end = curve.length
@@ -243,7 +252,8 @@ class Agent(Entity):
 
         if position < self.network_segment_end:
             # Still in curve.
-            new_position = location.evaluate_position(position)
+            new_position = location.evaluate_position(position,
+                                                      self.curve_override)
             self.direction = new_position - self.position
             self.position = new_position
             self.direction_changed = True
@@ -259,6 +269,7 @@ class Agent(Entity):
         self.direction = segment.vector
         self.direction_changed = True
         self.network_segment = 0
+        self.curve_override = None
         self._calc_segment_end(location, segment.end_distance)
         self.network_location[target] = location
         self.network_position[target] = offset
@@ -270,7 +281,7 @@ class Agent(Entity):
     def _follow(self, dt: Duration, ready: int, target: int):
         """Set the agent speed according to car following logic."""
         # TODO: write real car following here
-        acceleration = 5.0 * dt
+        acceleration = 1.0 * dt
         self.speed[target] = min(max(self.speed[ready] + acceleration, 0.0),
                                  self.current_max_speed)
 

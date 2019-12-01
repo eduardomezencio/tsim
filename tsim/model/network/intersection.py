@@ -9,7 +9,7 @@ from itertools import chain, combinations, islice, product
 from math import pi
 from statistics import median_low
 from typing import (TYPE_CHECKING, Callable, DefaultDict, Deque, Dict,
-                    Iterator, List, Set, Tuple)
+                    Iterator, List, Optional, Set, Tuple)
 
 import bezier
 import numpy
@@ -237,10 +237,13 @@ class Curve:
         """Evaluate bezier curve at t=param."""
         return Point(*chain.from_iterable(self.curve.evaluate(param)))
 
-    def evaluate_position(self, position: float) -> Point:
+    def evaluate_position(self, position: float,
+                          curve_override: Optional[bezier.Curve] = None) \
+            -> Point:
         """Evaluate bezier curve at t=position/length."""
-        return Point(*chain.from_iterable(self.curve.evaluate(position /
-                                                              self.length)))
+        curve = self.curve if curve_override is None else curve_override
+        return Point(*chain.from_iterable(curve.evaluate(position /
+                                                         self.length)))
 
 
 def _build_lane_connections(node: Node) -> LaneConnections:

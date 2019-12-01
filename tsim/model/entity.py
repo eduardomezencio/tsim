@@ -106,7 +106,7 @@ class EntityRef(Generic[T]):
         When the entity was not yet inserted into the index and does not have
         an id, it is not yet usable as a dict key or in a set, because the id
         will still change. A class must be immutable to be hashable, so
-        __hash__ will assert id is not None.
+        `__hash__` will assert id is not None.
         """
         assert self.id is not None
         return self.id
