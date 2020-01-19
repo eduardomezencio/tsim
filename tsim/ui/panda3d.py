@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+# Importing bezier to get around a bug causing a crash when bezier is imported
+# after ShowBase is instantiated. Remove this import when the bug is fixed.
+import bezier  # noqa  # pylint: disable=unused-import
+
 from direct.showbase import Loader, Messenger, ShowBase
 from direct.task import Task
 from panda3d.core import (load_prc_file, GraphicsWindow, Lens, MouseWatcher,
