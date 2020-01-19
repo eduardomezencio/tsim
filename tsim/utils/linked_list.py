@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import MutableSequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Generic, Iterable, Tuple, TypeVar
 
 from dataslots import with_slots
@@ -19,9 +19,9 @@ class LinkedListNode(Generic[T]):
     """Node of LinkedList."""
 
     data: T
-    next: LinkedListNode[T]
-    previous: LinkedListNode[T]
-    parent: LinkedList[T]
+    next: LinkedListNode[T] = field(repr=False)
+    previous: LinkedListNode[T] = field(repr=False)
+    parent: LinkedList[T] = field(repr=False)
 
     @staticmethod
     def head(parent: LinkedList) -> LinkedListNode:
@@ -159,6 +159,19 @@ class LinkedList(MutableSequence, Generic[T]):
     def appendleft(self, value: T) -> LinkedListNode[T]:
         """Append value to the start of the list."""
         return self.insert(0, value)
+
+    def insort(self, value: T, key=None) -> LinkedListNode[T]:
+        """Insert value in sorted position, assuming list is sorted."""
+        node = LinkedListNode(value, None, None, self)
+        comp_value = value if key is None else key(value)
+        reference_node = self._head.next
+        while reference_node is not self._head:
+            comp_other = reference_node.data
+            if comp_value < (comp_other if key is None else key(comp_other)):
+                break
+            reference_node = reference_node.next
+        self._insert_node(node, reference_node)
+        return node
 
     def clear(self):
         """Remove all items from the list."""
