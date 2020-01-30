@@ -8,7 +8,7 @@ from typing import Iterable
 from tsim.model.entity import Entity
 from tsim.model.geometry import BoundingRect, Point, Polygon
 from tsim.utils import osm as xurl_provider
-from tsim.utils.cached_property import add_cached, cached_property, clear_cache
+from tsim.utils.cachedproperty import add_cached, cached_property, clear_cache
 import tsim.model.index as Index
 
 

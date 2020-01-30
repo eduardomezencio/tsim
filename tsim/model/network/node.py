@@ -17,7 +17,7 @@ from tsim.model.network.entity import NetworkEntity
 from tsim.model.network.intersection import Intersection, LaneConnection
 from tsim.model.network.lane import LANE_WIDTH, LaneRef
 from tsim.model.network.way import Endpoint, OrientedWay, Way
-from tsim.utils.cached_property import add_cached, cached_property
+from tsim.utils.cachedproperty import add_cached, cached_property
 
 
 @add_cached

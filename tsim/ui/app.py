@@ -6,7 +6,6 @@ import logging as log
 from collections import deque
 from typing import Dict, Tuple
 
-
 from direct.task import Task
 from panda3d.core import (AntialiasAttrib, ConfigVariableBool, NodePath,
                           RigidBodyCombiner)
@@ -16,7 +15,8 @@ import tsim.ui.panda3d as p3d
 from tsim.model.index import INSTANCE as INDEX
 from tsim.model.geometry import Point, bounding_rect_center
 from tsim.model.network.node import Node
-from tsim.model.network.position import LanePosition, OrientedWayPosition
+from tsim.model.network.lane import LanePosition
+from tsim.model.network.orientedway import OrientedWayPosition
 from tsim.model.network.way import Way
 from tsim.model.simulation.agent import Agent
 from tsim.ui.camera import Camera

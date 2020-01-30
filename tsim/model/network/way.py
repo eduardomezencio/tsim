@@ -18,12 +18,11 @@ from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
                                  point_in_polygon, sec)
 from tsim.model.network.endpoint import Endpoint
 from tsim.model.network.entity import NetworkEntity
-from tsim.model.network.lane import HALF_LANE_WIDTH, LANE_WIDTH, Lane, LaneRef
-from tsim.model.network.orientedway import OrientedWay
-from tsim.model.network.position import (LanePosition, OrientedWayPosition,
-                                         WayPosition)
+from tsim.model.network.lane import (HALF_LANE_WIDTH, LANE_WIDTH, Lane,
+                                     LanePosition, LaneRef)
+from tsim.model.network.orientedway import OrientedWay, OrientedWayPosition
 from tsim.model.units import kph_to_mps
-from tsim.utils.cached_property import add_cached, cached_property
+from tsim.utils.cachedproperty import add_cached, cached_property
 from tsim.utils.iterators import drop_duplicates, window_iter
 
 if TYPE_CHECKING:
@@ -480,6 +479,22 @@ class Way(NetworkEntity):
                     pass
         Index.INSTANCE.rebuild_path_map()
         return DeleteResult(to_delete, updated)
+
+
+@with_slots
+@dataclass(frozen=True)
+class WayPosition:
+    """A position in a `Way`.
+
+    The position is in meters from the start of the way.
+    """
+
+    way: EntityRef[Way]
+    position: float
+
+    def world_position(self) -> Tuple[Point, Vector]:
+        """Get world position and direction at this way position."""
+        raise NotImplementedError()
 
 
 @with_slots

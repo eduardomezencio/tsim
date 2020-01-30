@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import MutableSequence
 from dataclasses import dataclass, field
-from typing import Generic, Iterable, Tuple, TypeVar
+from typing import Generic, Iterable, Iterator, Tuple, TypeVar
 
 from dataslots import with_slots
 
@@ -45,9 +45,31 @@ class LinkedListNode(Generic[T]):
         """Check if there is a node before this one."""
         return self.previous.data is not LINKED_LIST_HEAD
 
+    def insert_before(self, value: T) -> LinkedListNode[T]:
+        """Insert value before node."""
+        return self.parent.insert_before(self, value)
+
+    def insert_after(self, value: T) -> LinkedListNode[T]:
+        """Insert value after node."""
+        return self.parent.insert_after(self, value)
+
     def remove(self):
         """Remove this node from the list."""
         self.parent.remove_node(self)
+
+    def iterate_forward(self) -> Iterator[T]:
+        """Get iterator for the list strarting from this item."""
+        node = self
+        while node.data is not LINKED_LIST_HEAD:
+            yield node.data
+            node = node.next
+
+    def iterate_backward(self) -> Iterator[T]:
+        """Get backward iterator for the list strarting from this item."""
+        node = self
+        while node.data is not LINKED_LIST_HEAD:
+            yield node.data
+            node = node.previous
 
 
 class LinkedList(MutableSequence, Generic[T]):
@@ -89,6 +111,13 @@ class LinkedList(MutableSequence, Generic[T]):
                 node = node.previous
 
         return node
+
+    def iter_nodes(self):
+        """Get iterator to list nodes."""
+        node = self._head.next
+        while node is not self._head:
+            yield node
+            node = node.next
 
     def remove_node(self, node: LinkedListNode[T]):
         """Remove given node from list."""
@@ -151,6 +180,20 @@ class LinkedList(MutableSequence, Generic[T]):
 
         self._insert_node(node, reference_node)
         return node
+
+    def insert_before(self, node: LinkedListNode[T],
+                      value: T) -> LinkedListNode[T]:
+        """Insert value before node."""
+        new_node = LinkedListNode(value, None, None, self)
+        self._insert_node(new_node, node)
+        return new_node
+
+    def insert_after(self, node: LinkedListNode[T],
+                     value: T) -> LinkedListNode[T]:
+        """Insert value after node."""
+        new_node = LinkedListNode(value, None, None, self)
+        self._insert_node(new_node, node.next)
+        return new_node
 
     def append(self, value: T) -> LinkedListNode[T]:
         """Append value to the end of the list."""

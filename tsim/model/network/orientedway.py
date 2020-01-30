@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import (TYPE_CHECKING, Iterable, Iterator, NamedTuple, Optional,
                     Tuple)
+
+from dataslots import with_slots
 
 from tsim.model.entity import EntityRef
 from tsim.model.network.endpoint import Endpoint
 
 if TYPE_CHECKING:
-    from tsim.model.geometry import Point
+    from tsim.model.geometry import Point, Vector
     from tsim.model.network.lane import Lane, LaneRef
     from tsim.model.network.node import Node
     from tsim.model.network.way import Way
@@ -114,3 +117,19 @@ class OrientedWay(NamedTuple):
     def __repr__(self):
         return (f'{OrientedWay.__name__}(way_id={self.way.id}, '
                 f'endpoint={self.endpoint.name[0]})')
+
+
+@with_slots
+@dataclass(frozen=True)
+class OrientedWayPosition:
+    """A position in an `OrientedWay`.
+
+    The position is in meters from the endpoint of the oriented way.
+    """
+
+    oriented_way: OrientedWay
+    position: float
+
+    def world_position(self) -> Tuple[Point, Vector]:
+        """Get world position and direction at this oriented way position."""
+        raise NotImplementedError()

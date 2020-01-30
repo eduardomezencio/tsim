@@ -10,9 +10,11 @@ from dataslots import with_slots
 from tsim.model.entity import EntityRef
 from tsim.model.geometry import Point, Vector, line_intersection
 from tsim.model.network.endpoint import Endpoint
-from tsim.model.network.orientedway import OrientedWay
-from tsim.model.network.position import (OrientedWayPosition,
+from tsim.model.network.orientedway import OrientedWay, OrientedWayPosition
+from tsim.model.network.location import (NetworkLocation, NetworkPosition,
                                          WorldAndSegmentPosition)
+from tsim.model.network.traffic import Traffic
+from tsim.utils.linkedlist import LinkedList
 
 if TYPE_CHECKING:
     from tsim.model.network.intersection import Curve
@@ -112,20 +114,23 @@ class LaneSegment:
     is_turning: bool
 
 
-class Lane:
+class Lane(NetworkLocation):
     """A longitudinal section of a `Way` for one-way flow."""
 
-    __slots__ = 'lane_ref', 'distance_from_center', 'length', 'segments'
+    __slots__ = ('lane_ref', 'distance_from_center', 'length', 'segments',
+                 'traffic')
 
     lane_ref: LaneRef
     distance_from_center: float
     length: float
     segments: Tuple[LaneSegment]
+    traffic: Traffic
 
     def __init__(self, lane_ref: LaneRef):
         self.lane_ref = lane_ref.positive()
         self.distance_from_center = self.lane_ref.distance_from_center()
         self._build_segments()
+        self.traffic = LinkedList()
 
     @property
     def way(self) -> Optional[Way]:
@@ -253,10 +258,13 @@ class Lane:
 
         raise ValueError('Position outside of lane.')
 
-    def get_curve(self, dest: OrientedWay) -> Curve:
+    def get_curve(self, dest: OrientedWay,
+                  accept_lane_change: bool = True) -> Optional[Curve]:
         """Get the curve connecting this lane to `dest` oriented way."""
         connection = self.end.get_lane_connection(self.lane_ref, dest)
-        return self.end.intersection.curves[connection]
+        if accept_lane_change or connection[0].index == self.index:
+            return self.end.intersection.curves[connection]
+        return None
 
     def _build_segments(self):
         distance = 0.0
@@ -297,3 +305,61 @@ class Lane:
     def __repr__(self):
         return (f'{Lane.__name__}(way_id={self.way.id}, '
                 f'endpoint={self.endpoint.name[0]}, index={self.index})')
+
+
+@with_slots
+@dataclass(frozen=True)
+class LanePosition(NetworkPosition):
+    """A position in a `Lane`.
+
+    The position is in meters from the start of the lane.
+    """
+
+    lane: Lane
+    position: float
+
+    @property
+    def location(self) -> NetworkLocation:
+        """Get the `NetworkLocation` of this lane position."""
+        return self.lane
+
+    @property
+    def remaining(self) -> float:
+        """Get distance in meters to the end of the lane."""
+        return self.lane.length - self.position
+
+    @property
+    def oriented_way(self) -> OrientedWay:
+        """Get the oriented way of this lane."""
+        return self.lane.oriented_way
+
+    @property
+    def oriented_way_position(self) -> OrientedWayPosition:
+        """Get the oriented way position at this lane position."""
+        return OrientedWayPosition(
+            self.lane.oriented_way,
+            self.lane.lane_to_oriented_position(self.position))
+
+    @property
+    def left_neighbor(self) -> LanePosition:
+        """Get same position on the lane to the left."""
+        way_position = self.lane.lane_to_way_position(self.position)
+        lane = self.lane.left_neighbor
+        try:
+            return LanePosition(lane, lane.way_to_lane_position(way_position))
+        except ValueError:
+            return LanePosition(lane, self.position)
+
+    @property
+    def right_neighbor(self) -> LanePosition:
+        """Get same position on the lane to the right."""
+        way_position = self.lane.lane_to_way_position(self.position)
+        lane = self.lane.right_neighbor
+        try:
+            return LanePosition(lane, lane.way_to_lane_position(way_position))
+        except ValueError:
+            return LanePosition(lane, self.position)
+
+    def world_and_segment_position(self) -> WorldAndSegmentPosition:
+        """Get world and segment position at this lane position."""
+        return self.lane.world_and_segment_position(self.position)

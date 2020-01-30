@@ -5,7 +5,7 @@ from __future__ import annotations
 from bisect import bisect_right
 from typing import List, NamedTuple, Tuple
 
-from tsim.model.network.position import OrientedWayPosition
+from tsim.model.network.orientedway import OrientedWayPosition
 from tsim.model.units import Timestamp
 
 

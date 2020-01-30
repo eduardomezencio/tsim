@@ -10,7 +10,7 @@ from panda3d.core import NodePath, TextNode
 
 import tsim.ui.panda3d as p3d
 from tsim.model.index import INSTANCE as INDEX
-from tsim.model.network.position import LanePosition
+from tsim.model.network.lane import LanePosition
 from tsim.model.network.way import Way
 from tsim.model.simulation.agent import Agent
 from tsim.ui.objects.path import create as create_path

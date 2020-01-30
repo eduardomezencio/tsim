@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from itertools import chain, combinations, islice, product
-from math import pi
+from itertools import chain, combinations, count, islice, product
+from math import pi as PI
 from statistics import median_low
 from typing import (TYPE_CHECKING, Callable, DefaultDict, Deque, Dict,
                     Iterator, List, Optional, Set, Tuple)
@@ -19,8 +19,14 @@ from rtree.index import Rtree
 from tsim.model.entity import EntityRef
 from tsim.model.geometry import Point, Vector, angle, line_intersection_safe
 from tsim.model.network.lane import LANE_WIDTH, Lane, LaneRef
-from tsim.model.network.position import OrientedWayPosition
+from tsim.model.network.orientedway import OrientedWayPosition
+from tsim.model.network.location import (NetworkLocation, NetworkPosition,
+                                         WorldAndSegmentPosition)
+from tsim.model.network.traffic import (Traffic, TrafficAgent,
+                                        TrafficDynamicAgent, TrafficLock)
 from tsim.model.network.way import OrientedWay
+from tsim.utils.linkedlist import LinkedList, LinkedListNode
+from tsim.utils.maptovalue import MapToValue
 
 if TYPE_CHECKING:
     from tsim.model.network.node import Node
@@ -32,6 +38,7 @@ WayConnections = Dict[OrientedWay, Set[OrientedWay]]
 MERGE_RADIUS = 0.1
 NEIGHBOR_RADIUS = 1.8
 NEIGHBOR_RADIUS_SQUARED = NEIGHBOR_RADIUS ** 2
+MAP_TO_ZERO = MapToValue(0.0)
 
 
 class Intersection:
@@ -40,7 +47,7 @@ class Intersection:
     Contains way and lane connections with their curves and conflict points.
 
     Attributes:
-        node_ref: Reference to the node
+        node_ref: Reference to the node.
         lane_connections: Maps each lane to the set of lanes it connects to.
         way_connections: Maps each incoming oriented way to a set of all
             oriented ways it has lane connections to.
@@ -67,6 +74,9 @@ class Intersection:
         self.curves = _build_bezier_curves(node, self.lane_connections)
         _build_conflict_points(node, self.curves)
         self._build_way_connections()
+
+        for curve in self.curves.values():
+            curve.init_traffic()
 
     def iterate_connections(self) -> Iterator[LaneConnection]:
         """Get iterator for lane connections in this intersection."""
@@ -104,21 +114,153 @@ class ConflictPointType(Enum):
     CROSSING = 2
 
 
-@with_slots
-@dataclass(eq=False)
-class ConflictPoint:
+class ConflictPoint(TrafficLock):
     """Conflict point in an intersection.
 
     The point where two lane connections cross.
     """
 
+    id: int
     point: Point
     type: ConflictPointType
-    neighbors: Set[ConflictPoint] = field(default_factory=set, repr=False)
-    curves: Set[Curve] = field(default_factory=set, repr=False)
+    neighbors: Set[ConflictPoint]
+    curves: Set[Curve]
+    lock_order: List[ConflictPoint]
+    owner: Optional[TrafficAgent]
+    owner_secondary: Optional[TrafficDynamicAgent]
+    acquiring: TrafficDynamicAgent
+    queue: Deque[Tuple[TrafficAgent, bool]]
+    waiting: int
+    traffic_node: LinkedListNode[ConflictPoint]
+
+    def __init__(self, id_: int, point: Point, type_: ConflictPointType):
+        self.id = id_
+        self.point = point
+        self.type = type_
+        self.neighbors = set()
+        self.curves = set()
+        self.lock_order = None
+        self.owner = None
+        self.owner_secondary = None
+        self.acquiring = None
+        self.queue = deque()
+        self.waiting = 0
+        self.traffic_node = None
+
+    @property
+    def speed(self):
+        """Get agent speed, always zero for conflict points."""
+        return MAP_TO_ZERO
+
+    def get_network_position(self, location: Curve,
+                             buffer: Optional[int] = None) -> float:
+        """Get network position of the conflict point in given `location`."""
+        if not hasattr(location, 'positions'):
+            return None
+        return location.positions.get(self, None)
+
+    def is_at(self, location: NetworkLocation,
+              buffer: Optional[int] = None) -> bool:
+        """Get whether conflict point is at given `location`."""
+        return hasattr(location, 'positions') and self in location.positions
+
+    def create_lock_order(self):
+        """Create the `lock_order` list after `neighbors` is filled."""
+        self.lock_order = sorted(chain(self.neighbors, [self]),
+                                 key=lambda cp: cp.id)
+
+    def acquire(self, lock: TrafficLock, buffer: Optional[int] = None):
+        """Register acquisition of `lock` by agent."""
+
+    def add_follower(self, agent: TrafficDynamicAgent,
+                     buffer: Optional[int] = None):
+        """Register agent as follower."""
+        distance = agent.distance_to_lead(buffer)
+        lock_distance = 10  # TODO: Remove hard-coded distance here.
+        if distance <= lock_distance:
+            self.lock(agent)
+        else:
+            agent.distance_to_lock = distance - lock_distance
+
+    def remove_follower(self, agent: TrafficDynamicAgent):
+        """Unregister agent as follower."""
+        agent.distance_to_lock = None
+        # Here release was probably already called, but is called in case
+        # some agent got in the way before `agent` could reach the lock.
+        self.release(agent)
+
+    def lock(self, agent: TrafficAgent, terminal: bool = False):
+        """Lock this traffic lock to `agent`.
+
+        If the lock is available, start the lock process immediately. If
+        terminal this lock is acquired, otherwise start acquiring the
+        neighbors. If the lock is not available, the `(agent, terminal)` tuple
+        is added to the queue.
+        """
+        if terminal and self.owner_secondary is agent.acquiring:
+            self.queue.appendleft((agent, terminal))
+            self._dequeue()
+            return
+
+        self.queue.append((agent, terminal))
+        if self.owner is None:
+            self._dequeue()
+
+    def release(self, agent: TrafficAgent, terminal: bool = False):
+        """Release this lock.
+
+        If not `terminal` release all neighbors.
+        """
+        if self.owner is not agent:
+            return
+
+        self.owner = None
+        self._dequeue()
+
+        if terminal:
+            self.owner_secondary = None
+        else:
+            self._pass(agent)
+            for cpoint in self.neighbors:
+                cpoint.release(self, True)
+
+    def _pass(self, agent: TrafficAgent):
+        node = self.traffic_node.previous
+        if node.data is agent:
+            node.remove()
+            agent.traffic_node = self.traffic_node.insert_after(agent)
+
+    def notify(self):
+        """Notify this agent of lead events."""
+        next_ = self.waiting + 1
+        if next_ >= len(self.lock_order):
+            self.owner = self.acquiring
+            self.owner.acquire(self)
+            self.owner.notify()
+        else:
+            self.waiting = next_
+            self.lock_order[next_].lock(self, True)
+
+    def _dequeue(self):
+        """Lock to the next agent in the queue."""
+        agent, terminal = self.queue.popleft() if self.queue else (None, None)
+        if agent is None:
+            return
+        if terminal:
+            self.owner = agent
+            self.owner_secondary = agent.acquiring
+            agent.notify()
+        else:
+            self.acquiring = agent
+            self.waiting = 0
+            self.lock_order[0].lock(self, True)
+
+    def __repr__(self):
+        return (ConflictPoint.__name__ +
+                f'(id={self.id}, point={self.point}, type={self.type})')
 
 
-class Curve:
+class Curve(NetworkLocation):
     """The curve of a lane connection.
 
     Contains the bezier curve connecting one lane to the other and the conflict
@@ -127,14 +269,16 @@ class Curve:
     node position.
     """
 
-    __slots__ = ('node_ref', 'source', 'dest', 'curve', 'length',
-                 '_conflict_points', '_sorted')
+    __slots__ = ('node_ref', 'source', 'dest', 'curve', 'length', 'traffic',
+                 'positions', '_conflict_points', '_sorted')
 
     node_ref: EntityRef[Node]
     source: Lane
     dest: Lane
     curve: bezier.Curve
     length: float
+    traffic: Traffic
+    positions: Dict[TrafficAgent, float]
     _conflict_points: List[Tuple[float, ConflictPoint]]
     _sorted: bool
 
@@ -144,6 +288,8 @@ class Curve:
         self.source, self.dest = (lane_ref() for lane_ref in lanes)
         self.curve = curve
         self.length = curve.length
+        self.traffic = LinkedList()
+        self.positions = {}
         self._conflict_points = []
         self._sorted = True
 
@@ -178,15 +324,22 @@ class Curve:
         """Add conflict point to curve, with given param for sorting."""
         self._sorted = False
         self._conflict_points.append((param, point))
+        self.positions[point] = param * self.length
         point.curves.add(self)
 
     def replace_conflict_point(self, old: ConflictPoint, new: ConflictPoint):
         """Replace conflict point, for use when merging conflict points."""
-        for i, (param, point) in enumerate(self._conflict_points):
+        index, param = None, None
+        for i, (param_, point) in enumerate(self._conflict_points):
             if point is old:
-                self._conflict_points[i] = (param, new)
-                new.curves.add(self)
-                return
+                index, param = i, param_
+                break
+        if index is not None:
+            self._conflict_points[index] = (param, new)
+            self.positions[new] = param * self.length
+            del self.positions[old]
+            new.curves.add(self)
+            return
         raise ValueError('Old conflict point not found in curve.')
 
     def remove_conflict_point_duplicates(self):
@@ -197,7 +350,35 @@ class Curve:
         for cpoint, params in list(point_map.items()):
             if len(params) <= 1:
                 continue
-            self._conflict_points.remove((median_low(params), cpoint))
+            selected = median_low(params)
+            params.remove(selected)
+            self.positions[cpoint] = selected * self.length
+            for param in params:
+                self._conflict_points.remove((param, cpoint))
+
+    def remove_redundant_conflict_point(self):
+        """Remove points that are neighbors of a point in the same curve.
+
+        The conflict points in a curve are always locked in order, so if a
+        conflict point has a neighbor that is in the same curve, one of them
+        will always be locked first and will lock the other as a consequence,
+        so this second one must be removed from the curve conflict points.
+        Elsewhere, after doing this to all curves, the conflict points that
+        don't exist in any curve anymore must be removed from the neighborhood
+        of all conflict points, because it should not exist.
+        """
+        to_remove = set()
+        for i, (_, cpoint) in enumerate(self.conflict_points):
+            if i in to_remove:
+                continue
+            for j, (_, cpoint_) in islice(enumerate(self.conflict_points),
+                                          i + 1, None):
+                if cpoint_ in cpoint.neighbors:
+                    to_remove.add(j)
+                else:
+                    break
+        for i in sorted(to_remove, reverse=True):
+            del self._conflict_points[i]
 
     def intersect(self, other: Curve) -> numpy.ndarray:
         """Calculate intersection of bezier curves."""
@@ -242,8 +423,40 @@ class Curve:
             -> Point:
         """Evaluate bezier curve at t=position/length."""
         curve = self.curve if curve_override is None else curve_override
-        return Point(*chain.from_iterable(curve.evaluate(position /
-                                                         self.length)))
+        return Point(*chain.from_iterable(
+            curve.evaluate(position / self.length)))
+
+    def init_traffic(self):
+        """Initialize traffic containing only the conflict points."""
+        self.traffic = LinkedList(p[1] for p in self.conflict_points)
+        for node in self.traffic.iter_nodes():
+            node.data.traffic_node = node
+
+
+@with_slots
+@dataclass(frozen=True)
+class CurvePosition(NetworkPosition):
+    """A position in a `Curve`.
+
+    The position is in meters from the start of the curve.
+    """
+
+    curve: Curve
+    position: float
+
+    @property
+    def location(self) -> NetworkLocation:
+        """Get the `NetworkLocation` of this curve position."""
+        return self.curve
+
+    def world_and_segment_position(self) -> WorldAndSegmentPosition:
+        """Get world and segment position at this curve position.
+
+        Curves don't have segments, so the segment is always `0` and the
+        segment's end is the length of the curve.
+        """
+        world = self.curve.world_position(self.position)
+        return WorldAndSegmentPosition(*world, 0, self.curve.length)
 
 
 def _build_lane_connections(node: Node) -> LaneConnections:
@@ -259,10 +472,10 @@ def _build_lane_connections(node: Node) -> LaneConnections:
             yield from product((key,), values)
 
     def curvier(angle_a: float, angle_b: float) -> bool:
-        return int(abs(pi - angle_a) < abs(pi - angle_b))
+        return int(abs(PI - angle_a) < abs(PI - angle_b))
 
     def rotate_angles():
-        angles[0] = 2 * pi
+        angles[0] = 2 * PI
         size = len(angles)
         angles[0:] = [angles[i + 1 - size] - angles[1]
                       for i in range(size)]
@@ -275,7 +488,7 @@ def _build_lane_connections(node: Node) -> LaneConnections:
 
     def connect_to(index: int, other: OrientedWay) -> LaneConnections:
         """Connect ways[0] to the given way."""
-        outwards = angles[index] > pi * 2.0 / 3.0
+        outwards = angles[index] > PI * 2.0 / 3.0
         for source, dest in zip(way.lane_refs(l_to_r=not(outwards),
                                               opposite_only=True,
                                               positive=True),
@@ -408,6 +621,7 @@ def _build_conflict_points(node: Node, curves: Dict[LaneConnection, Curve]):
     than MERGE_RADIUS apart and add points that are within NEIGHBOR_RADIUS as
     neighbors.
     """
+    id_generator = count()
     points: Dict[int, ConflictPoint] = {}
     diverge = defaultdict(set)
     merge = defaultdict(set)
@@ -416,9 +630,9 @@ def _build_conflict_points(node: Node, curves: Dict[LaneConnection, Curve]):
             diverge[lanes1[0]].update((curve1, curve2))
         if lanes1[1] == lanes2[1]:
             merge[lanes1[1]].update((curve1, curve2))
-        _add_crossing_conflict_points(points, curve1, curve2)
+        _add_crossing_conflict_points(id_generator, points, curve1, curve2)
 
-    _add_diverge_merge_conflict_points(points, diverge, merge)
+    _add_diverge_merge_conflict_points(id_generator, points, diverge, merge)
 
     if len(points) > 1:
         rtree = Rtree((id_, p.point.bounding_rect, None)
@@ -426,12 +640,25 @@ def _build_conflict_points(node: Node, curves: Dict[LaneConnection, Curve]):
         _merge_points(points, rtree)
         _fill_neighbors(points, rtree)
 
-    # This makes the conflict point positions relative to the node
     for point in points.values():
+        point.create_lock_order()
+        # This makes the conflict point positions relative to the node.
         point.point = point.point - node.position
 
+    for curve in curves.values():
+        curve.remove_redundant_conflict_point()
 
-def _add_crossing_conflict_points(points: Dict[int, ConflictPoint],
+    # Remove from neighbors points that aren't in any curve
+    points = {p for _, p in chain.from_iterable(c.conflict_points
+                                                for c in curves.values())}
+    for point in points:
+        for neighbor in list(point.neighbors):
+            if neighbor not in points:
+                point.neighbors.remove(neighbor)
+
+
+def _add_crossing_conflict_points(id_generator: Iterator[int],
+                                  points: Dict[int, ConflictPoint],
                                   curve1: Curve, curve2: Curve):
     """Create crossing conflict points points between given curves."""
     try:
@@ -444,7 +671,8 @@ def _add_crossing_conflict_points(points: Dict[int, ConflictPoint],
         if distance < LANE_WIDTH / 3:
             return
 
-        point = ConflictPoint(curve1.evaluate(intersection[0]),
+        point = ConflictPoint(next(id_generator),
+                              curve1.evaluate(intersection[0]),
                               ConflictPointType.CROSSING)
         curve1.add_conflict_point(intersection[0], point)
         curve2.add_conflict_point(intersection[1], point)
@@ -453,7 +681,8 @@ def _add_crossing_conflict_points(points: Dict[int, ConflictPoint],
         pass
 
 
-def _add_diverge_merge_conflict_points(points: Dict[int, ConflictPoint],
+def _add_diverge_merge_conflict_points(id_generator: Iterator[int],
+                                       points: Dict[int, ConflictPoint],
                                        diverge: Dict[LaneRef, Set[Curve]],
                                        merge: Dict[LaneRef, Set[Curve]]):
     """Create diverge and merge points from given dicts."""
@@ -462,7 +691,8 @@ def _add_diverge_merge_conflict_points(points: Dict[int, ConflictPoint],
             (ConflictPointType.DIVERGE, ConflictPointType.MERGE),
             (0.0, 1.0)):
         for curves_ in collection.values():
-            point = ConflictPoint(next(iter(curves_)).evaluate(param), type_)
+            point = ConflictPoint(next(id_generator),
+                                  next(iter(curves_)).evaluate(param), type_)
             points[id(point)] = point
             for curve in curves_:
                 curve.add_conflict_point(param, point)

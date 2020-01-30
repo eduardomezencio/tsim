@@ -18,7 +18,7 @@ from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network.node import Node
 from tsim.model.network.way import Way
 from tsim.serialization.config import configure_serialization
-from tsim.utils.cached_property import touch_cache
+from tsim.utils.cachedproperty import touch_cache
 
 
 def osm_reader_multiprocess(names: Iterable[str]):
