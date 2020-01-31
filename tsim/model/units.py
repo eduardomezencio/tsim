@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import time
+from math import floor
+
 Timestamp = float
 Duration = float
 
@@ -14,6 +17,14 @@ DAY = 24.0 * HOUR
 def normalized_hours(timestamp: Timestamp) -> float:
     """Get hours in range 0.0 <= hours < 24.0 from timestamp."""
     return (timestamp % DAY) / HOUR
+
+
+def time_string(timestamp: Timestamp) -> str:
+    """Get string representation of timestamp."""
+    hours = (timestamp % DAY) / HOUR
+    minutes = (hours - floor(hours)) * 60.0
+    seconds = (minutes - floor(minutes)) * 60.0
+    return str(time(floor(hours), floor(minutes), floor(seconds)))
 
 
 def whole_days(timestamp: Timestamp) -> int:

@@ -8,13 +8,14 @@ import bezier  # noqa  # pylint: disable=unused-import
 
 from direct.showbase import Loader, Messenger, ShowBase
 from direct.task import Task
-from panda3d.core import (load_prc_file, GraphicsWindow, Lens, MouseWatcher,
-                          NodePath)
+from panda3d.core import (load_prc_file, Camera, GraphicsWindow, Lens,
+                          MouseWatcher, NodePath)
 
 load_prc_file('config.prc')
 
 BASE: ShowBase.ShowBase
 CAM: NodePath
+CAM_NODE: Camera
 CAMERA: NodePath
 LENS: Lens
 LOADER: Loader.Loader
@@ -29,6 +30,7 @@ WIN: GraphicsWindow
 
 BASE = ShowBase.ShowBase()
 CAM = BASE.cam
+CAM_NODE = BASE.camNode
 CAMERA = BASE.camera
 LENS = BASE.cam.node().get_lens()
 LOADER = BASE.loader

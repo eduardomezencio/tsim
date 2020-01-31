@@ -328,7 +328,6 @@ class Agent(Entity, TrafficAgent):
     def update_lead(self):
         """Find new lead for this agent and update accordingly."""
         new_lead, owned = self.find_lead()
-        print(f'{self} found lead: {new_lead}')
         if new_lead is self.lead:
             return
 
@@ -674,12 +673,8 @@ class Agent(Entity, TrafficAgent):
         self.next_location = location.get_curve(target_oriented_way, False)
 
     def _update_distance_to_lock(self, speed: float, buffer):
-        # print(f'lead is {self.lead} '
-        #       f'({"not" if self.lead in self.owns else ""}owned)')
-
         if self.distance_to_lock is not None:
             self.distance_to_lock -= speed
-            # print(f'distance to lock: {self.distance_to_lock:.2f}')
             if self.distance_to_lock <= 0.0:
                 self.distance_to_lock = None
                 try:
@@ -689,8 +684,6 @@ class Agent(Entity, TrafficAgent):
 
         if self.distance_to_release is not None:
             self.distance_to_release -= speed
-            # print(f'distance to release: {self.distance_to_release:.2f}')
-            # print(f'owns [{", ".join(str(o.id) for o in self.owns)}]')
             if self.distance_to_release < 0.0:
                 lock = self.owns.popleft()
                 lock.release(self)

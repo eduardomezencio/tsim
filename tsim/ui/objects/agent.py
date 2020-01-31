@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from random import random
 
-from panda3d.core import NodePath
+from panda3d.core import CollisionBox, CollisionNode, NodePath
 
 import tsim.ui.panda3d as p3d
 from tsim.model.simulation.agent import Agent
@@ -15,6 +15,10 @@ from tsim.utils.color import hsv_to_rgb
 def create(parent: NodePath, agent: Agent) -> NodePath:
     """Create actor for given `agent` and reparent it to `parent`."""
     node_path: NodePath = p3d.LOADER.load_model(f'{os.getcwd()}/models/car')
+
+    collision_solid = CollisionBox((0.0, 0.0, 0.0), 1.0, 1.0, 1.0)
+    collision_np = node_path.attach_new_node(CollisionNode('cnode'))
+    collision_np.node().add_solid(collision_solid)
 
     if agent.position is not None:
         node_path.set_pos(*agent.position, 0.0)

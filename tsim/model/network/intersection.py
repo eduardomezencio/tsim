@@ -256,8 +256,7 @@ class ConflictPoint(TrafficLock):
             self.lock_order[0].lock(self, True)
 
     def __repr__(self):
-        return (ConflictPoint.__name__ +
-                f'(id={self.id}, point={self.point}, type={self.type})')
+        return f'{ConflictPoint.__name__}(id={self.id})'
 
 
 class Curve(NetworkLocation):

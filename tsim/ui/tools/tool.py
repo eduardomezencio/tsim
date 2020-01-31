@@ -42,5 +42,8 @@ class Tool(ABC):
     def on_cursor_move(self):
         """Cursor moved callback."""
 
+    def on_point_at_object(self, obj):
+        """Cursor pointing at object."""
+
     def cleanup(self):
         """Clean up before changing tool."""

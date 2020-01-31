@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import logging as log
 from collections import deque
+from functools import partial
+from math import floor
 from typing import Dict, Tuple
 
 from direct.task import Task
 from panda3d.core import (AntialiasAttrib, ConfigVariableBool, NodePath,
-                          RigidBodyCombiner)
+                          RigidBodyCombiner, TextNode)
 
 import tsim.ui.input as INPUT
 import tsim.ui.panda3d as p3d
@@ -19,6 +21,7 @@ from tsim.model.network.lane import LanePosition
 from tsim.model.network.orientedway import OrientedWayPosition
 from tsim.model.network.way import Way
 from tsim.model.simulation.agent import Agent
+from tsim.model.units import HOUR, normalized_hours, time_string
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
@@ -26,11 +29,13 @@ from tsim.ui.objects import factory, world
 from tsim.ui.sky import Sky
 
 FRAME_DURATION = 1 / 60
+SPEED_STEPS = 4
 
 
 class App:
     """Graphic UI application, using Panda3D."""
 
+    time_text: TextNode
     network_entities: Dict[int, NodePath]
     agents: Dict[Agent, NodePath]
     roads: Dict[Tuple[int, int], NodePath]
@@ -52,9 +57,10 @@ class App:
         self.camera = Camera()
         self.world = world.create(self.scene, 10000, 16)
         self.sky = Sky(self.scene, self.camera)
-        self.sky.set_time(8.0)
         self.cursor = Cursor(self.world)
         self.grid = Grid(50.0, 1000.0, self.world, self.cursor.cursor)
+
+        self._build_on_screen_text()
 
         # self.roads = self.world.attach_new_node(PandaNode('roads'))
         # self.roads = self.world.attach_new_node(RigidBodyCombiner('roads'))
@@ -65,10 +71,30 @@ class App:
         for node_path in self.roads.values():
             node_path.node().collect()
 
+        # TODO: Change to set simulation time when loading INDEX from file.
+        INDEX.simulation.time = 6.5 * HOUR
+        self.sky.set_time(8.0)
+
+        self._simulation_speed = SPEED_STEPS
+        p3d.BASE.accept('wheel_up',
+                        partial(self.change_simulation_speed, 1))
+        p3d.BASE.accept('wheel_down',
+                        partial(self.change_simulation_speed, -1))
+
         p3d.BASE.accept('entities_changed', self.on_network_entities_changed)
         p3d.BASE.accept('new_agent', self.enqueue_event)
 
         self.scene.reparent_to(p3d.RENDER)
+
+    @property
+    def simulation_speed(self) -> int:
+        """Get simulation speed from 0 to `SPEED_STEPS`."""
+        return self._simulation_speed
+
+    def change_simulation_speed(self, value: int):
+        """Add value to the simulation speed."""
+        value = self._simulation_speed + value
+        self._simulation_speed = floor(max(0, min(value, SPEED_STEPS)))
 
     def run(self):
         """Start the main loop."""
@@ -77,17 +103,22 @@ class App:
 
     def update(self, _task: Task):
         """Update task, to run every frame."""
-        INDEX.simulation.update(FRAME_DURATION)
+        INDEX.simulation.update(self.simulation_speed / SPEED_STEPS
+                                * FRAME_DURATION)
         self.update_agents()
         while self._event_queue:
             event = self._event_queue.popleft()
             App.event_handlers[type(event[0])](self, *event)
 
         self.camera.update()
+        self.sky.set_time(normalized_hours(INDEX.simulation.time))
         self.sky.update()
         self.cursor.update()
         self.grid.update()
         INPUT.clear()
+
+        self._update_on_screen_text()
+
         return Task.cont
 
     def update_network_entities(self):
@@ -164,6 +195,22 @@ class App:
                 agent.direction_changed = False
 
     event_handlers = {Agent: add_agent}
+
+    def _build_on_screen_text(self):
+        time_text = TextNode('time_text')
+        time_text.text = ''
+        time_text.text_scale = 0.15
+        time_text.shadow = -0.01, 0.01
+        time_text.shadow_color = 0, 0, 0, 1
+        time_text_np = p3d.ASPECT2D.attach_new_node(time_text)
+        aspect = 1.0 / p3d.ASPECT2D.get_scale()[0]
+        time_text_np.set_pos(-0.9 * aspect, -0.0, -0.8)
+        self.time_text = time_text
+
+    def _update_on_screen_text(self):
+        time_text = time_string(INDEX.simulation.time)
+        if self.time_text.text != time_text:
+            self.time_text.text = time_text
 
 
 def log_config():
