@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Set
 
-from tsim.model.simulation.agent import Agent
+from tsim.model.network.traffic import TrafficDynamicAgent
 from tsim.model.units import Duration
 
 
@@ -12,10 +12,10 @@ class Simulation:
     """Agent-based simulation."""
 
     time: int
-    agents: Set[Agent]
-    active: Set[Agent]
+    agents: Set[TrafficDynamicAgent]
+    active: Set[TrafficDynamicAgent]
     ready_buffer: int
-    _active_updates: Set[Agent]
+    _active_updates: Set[TrafficDynamicAgent]
     _in_update: bool
 
     def __init__(self):
@@ -31,7 +31,7 @@ class Simulation:
         """Get index of current target buffer."""
         return (self.ready_buffer + 1) % 2
 
-    def add(self, agent: Agent):
+    def add(self, agent: TrafficDynamicAgent):
         """Add agent to the simulation."""
         self.agents.add(agent)
         self.update_active_set(agent)
@@ -58,7 +58,7 @@ class Simulation:
         """Flip ready buffer index."""
         self.ready_buffer = (self.ready_buffer + 1) % 2
 
-    def update_active_set(self, agent: Agent):
+    def update_active_set(self, agent: TrafficDynamicAgent):
         """Activate or deactivate agent according to its `active` attribute.
 
         When an agent is activated or deactivated during update, this should be
@@ -70,7 +70,7 @@ class Simulation:
         else:
             self._activate_or_deactivate(agent)
 
-    def _activate_or_deactivate(self, agent: Agent):
+    def _activate_or_deactivate(self, agent: TrafficDynamicAgent):
         """Add or remove agent from `active` set."""
         if agent.active:
             self.active.add(agent)

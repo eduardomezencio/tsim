@@ -1,4 +1,4 @@
-"""Agent class."""
+"""Car class."""
 
 from __future__ import annotations
 
@@ -37,71 +37,70 @@ MAX_SPEED_KPH = 60.0
 MAX_SPEED_MPS = kph_to_mps(MAX_SPEED_KPH)
 
 
-class Agent(Entity, TrafficAgent):
+class Car(Entity, TrafficAgent):
     """The simulated dynamic entity of the simulator.
 
-    An agent represents a single car or person in the simulation. It has a
-    schedule that tells where it needs to be at all times, so its destination
-    can be set to the correct location. In each step of the simulation, the
-    `update` method needs to called passing the target buffer index as
-    argument. This index is used for the attributes that are double buffered.
-    Some of the attributes are buffered so that a part of the previous state of
-    the agent is kept after calculating its next state. This is important
-    because agents use information from other agents to update themselves and
-    this information must always come from the previous state.
+    A car, the main agent of the simulation. It has a schedule that tells where
+    it needs to be at all times, so its destination can be set to the correct
+    location and path. In each step of the simulation, the `update` method
+    needs to called passing the target buffer index as argument. This index is
+    used for the attributes that are double buffered. Some of the attributes
+    are buffered so that a part of the previous state of the agent is kept
+    after calculating its next state. This is important because agents use
+    information from other agents to update themselves and this information
+    must always come from the previous state.
 
     Attributes:
-        active: Reflects the agent's active status in the simulation. When not
-            active, the agent is not updated.
-        position: The agent world position coordinates.
-        direction: Vector pointing in the direction the agent is facing.
-        direction_changed: Boolean indicating if agent has changed the
+        active: Reflects the car's active status in the simulation. When not
+            active, the car is not updated.
+        position: The car world position coordinates.
+        direction: Vector pointing in the direction the car is facing.
+        direction_changed: Boolean indicating if car has changed the
             direction in the last update, to be used by the front end.
-        target_lane: The index of the lane where the agent must be to connect
+        target_lane: The index of the lane where the car must be to connect
             to the next location in its path.
         side_vector: Vector perpendicular to direction, pointing to the
-            direction the agent must move on lane change.
-        side_offset: The distance the agent is, sideways, in relation to where
+            direction the car must move on lane change.
+        side_offset: The distance the car is, sideways, in relation to where
             it should be to be in the center of the current lane. Used during
             lane changes for the transition.
-        network_segment: The index of the segment the agent is in, inside its
+        network_segment: The index of the segment the car is in, inside its
             current network location.
         network_segment_end: The network position where the current segment
             ends.
         curve_override: Curve used to get smooth animation in cases where the
-            agent enters a curve while there's still some side offset because
+            car enters a curve while there's still some side offset because
             of lane transitions. It's the curve corrected to start in the
-            position the agent was in.
+            position the car was in.
         lead: The agent being followed, used to calculate the behavior of this
-            agent at each update.
-        followers: Set of agents that have this agent as lead.
+            car at each update.
+        followers: Set of agents that have this car as lead.
         diatance_to_lock: The remaining distance to travel before locking the
             traffic lock ahead. Is `Null` when not following a lock or after
             locking the lock.
-        current_max_speed: The maximum speed this agent can reach in the
-            current network location, given by both the location's maximum
-            speed and the agent's maximum speed.
-        path: The path the agent is currently following.
-        path_segment: The index of the segment of the current path that the
-            agent is in.
-        path_last_segment: Indicates whether the agent is in the last segment
-            of its path.
-        path_last_way: Indicates whether the agent is in the last way of its
+        current_max_speed: The maximum speed this car can reach in the current
+            network location, given by both the location's maximum speed and
+            the car's maximum speed.
+        path: The path the car is currently following.
+        path_segment: The index of the segment of the current path that the car
+            is in.
+        path_last_segment: Indicates whether the car is in the last segment of
+            its path.
+        path_last_way: Indicates whether the car is in the last way of its
             path.
-        next_location: The next location ahead in the agent's path. This
-            location must be straight ahead, without need to change lanes, so
-            if the agent is at a lane and the next curve he will take is from
-            another lane, this attribute is `None` until the lane change, then
-            it becomes the curve.
-        speed: The agent's current speed (double buffered).
-        network_location: The agent's current location. The location is an
-            object where a single line of traffic can happen, like a lane or
-            a curve (double buffered).
+        next_location: The next location ahead in the car's path. This location
+            must be straight ahead, without need to change lanes, so if the car
+            is at a lane and the next curve he will take is from another lane,
+            this attribute is `None` until the lane change, then it becomes the
+            curve.
+        speed: The car's current speed (double buffered).
+        network_location: The car's current location. The location is an object
+            where a single line of traffic can happen, like a lane or a curve
+            (double buffered).
         network_position: The position inside of the current
             `network_location`. This position is measured in meters from the
             beginning of the location (double buffered).
         schedule: The agent's schedule.
-
     """
 
     __slots__ = ('active', 'position', 'direction', 'direction_changed',
@@ -124,7 +123,7 @@ class Agent(Entity, TrafficAgent):
     network_segment_end: float
     curve_override: bezier.Curve
     lead: TrafficAgent
-    followers: Set[Agent]
+    followers: Set[Car]
     distance_to_lock: float
     distance_to_release: float
     owns: Deque[TrafficLock]
@@ -137,7 +136,7 @@ class Agent(Entity, TrafficAgent):
     speed: List[float]
     network_location: List[NetworkLocation]
     network_position: List[float]
-    traffic_node: LinkedListNode[Agent]
+    traffic_node: LinkedListNode[Car]
     schedule: Schedule
 
     def __init__(self, schedule: Schedule = None):
@@ -193,21 +192,21 @@ class Agent(Entity, TrafficAgent):
 
     def is_at(self, location: NetworkLocation,
               buffer: Optional[int] = None) -> bool:
-        """Get whether agent is at given `location`."""
+        """Get whether car is at given `location`."""
         if buffer is None:
             buffer = Index.INSTANCE.simulation.ready_buffer
 
         return self.network_location[buffer] is location
 
     def oriented_way_position(self, ready: int) -> OrientedWayPosition:
-        """Get the agent's current `OrientedWayPosition`."""
+        """Get the car's current `OrientedWayPosition`."""
         location = self.network_location[ready]
         return location.oriented_way_position(self.network_position[ready])
 
     def set_active(self, active: bool = True):
-        """Activate or deactivate the agent.
+        """Activate or deactivate the car.
 
-        Sets the agent's `active` attribute (default True). If changed, update
+        Sets the car's `active` attribute (default True). If changed, update
         the simulation accordingly.
         """
         active = bool(active)
@@ -218,9 +217,9 @@ class Agent(Entity, TrafficAgent):
 
     def place_at(self, network_position: NetworkPosition,
                  buffer: Optional[int] = None):
-        """Place the agent at given `NetworkPosition`.
+        """Place the car at given `NetworkPosition`.
 
-        Places the agent at the given position, without a destination and
+        Places the car at the given position, without a destination and
         deactivated.
         """
         if buffer is None:
@@ -262,11 +261,10 @@ class Agent(Entity, TrafficAgent):
 
     def set_destination(self, destination: OrientedWayPosition,
                         buffer: Optional[int] = None):
-        """Set the agent's destination.
+        """Set the car's destination.
 
-        Tries to find a path from the agent location to the given destination.
-        If a path is found, it's set as the agent's path and the agent is
-        activated.
+        Tries to find a path from the car location to the given destination. If
+        a path is found, it's set as the car's path and the car is activated.
         """
         if buffer is None:
             buffer = Index.INSTANCE.simulation.ready_buffer
@@ -301,8 +299,8 @@ class Agent(Entity, TrafficAgent):
         location on the path is checked and the first agent found is returned,
         or `None` if there are no agents.
 
-        All locks that are skipped for being owned by the agent are returned
-        as the second value on the tuple.
+        All locks that are skipped for being owned by the car are returned as
+        the second value on the tuple.
         """
         owned = set()
         for agent in self.traffic_node.next.iterate_forward():
@@ -326,7 +324,7 @@ class Agent(Entity, TrafficAgent):
         return None, owned
 
     def update_lead(self):
-        """Find new lead for this agent and update accordingly."""
+        """Find new lead for this car and update accordingly."""
         new_lead, owned = self.find_lead()
         if new_lead is self.lead:
             return
@@ -356,7 +354,7 @@ class Agent(Entity, TrafficAgent):
             return lead_position - position
 
         # This logic assumes that if the lead is not in the same network
-        # location, it is in a location that follows the agent location
+        # location, it is in a location that follows the car location
         # immediately. Being two locations ahead would break this.
         if self.next_location:
             lead_position = self.lead.get_network_position(self.next_location,
@@ -398,13 +396,13 @@ class Agent(Entity, TrafficAgent):
         return 0.0
 
     def notify(self):
-        """Notify this agent of lead events."""
+        """Notify this car of lead events."""
         self.update_lead()
         if not self.active:
             self.set_active()
 
     def acquire(self, lock: TrafficLock, buffer: Optional[int] = None):
-        """Register acquisition of `lock` by agent."""
+        """Register acquisition of `lock` by car."""
         self.owns.append(lock)
         if self.distance_to_release is None:
             self.distance_to_release = (self.distance_to(lock, buffer)
@@ -424,16 +422,16 @@ class Agent(Entity, TrafficAgent):
 
     def update(self,  # pylint: disable=method-hidden
                dt: Duration, ready: int, target: int):
-        """Update the agent.
+        """Update the car.
 
-        This method is a placeholder for the agent update method. All update
+        This method is a placeholder for the car update method. All update
         methods share the same signature. `dt` is the time duration passed
         since last update. `ready` and `target` are the indexes of the ready
         buffer and the target buffer.
         """
 
     def _on_lane(self, dt: Duration, ready: int, target: int):
-        """Update the agent on `on_lane` state."""
+        """Update the car on `on_lane` state."""
         self._follow(dt, ready, target)
         speed = self.speed[target] * dt
         position = self.network_position[ready] + speed
@@ -500,7 +498,7 @@ class Agent(Entity, TrafficAgent):
         self.update = self._on_curve
 
     def _on_curve(self, dt: Duration, ready: int, target: int):
-        """Update the agent on `on_curve` state."""
+        """Update the car on `on_curve` state."""
         self._follow(dt, ready, target)
         speed = self.speed[target] * dt
         position = self.network_position[ready] + speed
@@ -512,9 +510,11 @@ class Agent(Entity, TrafficAgent):
             # Still in curve.
             new_position = location.evaluate_position(position,
                                                       self.curve_override)
-            self.direction = new_position - self.position
+            direction = new_position - self.position
+            if direction.x + direction.y > 0.001:
+                self.direction = direction
+                self.direction_changed = True
             self.position = new_position
-            self.direction_changed = True
             self.network_location[target] = location
             self.network_position[target] = position
             return
@@ -541,7 +541,7 @@ class Agent(Entity, TrafficAgent):
         self.update = self._on_lane
 
     def _follow(self, dt: Duration, ready: int, target: int):
-        """Set the agent speed according to car following logic."""
+        """Set the car speed according to car following logic."""
         speed = self.speed[ready]
         speed_diff = (self.lead.speed[ready] - speed) if self.lead else 0.0
         target_dist = max((MINIMUM_DISTANCE
@@ -564,7 +564,7 @@ class Agent(Entity, TrafficAgent):
         """Set the value of `target_lane` according to next curve connections.
 
         The value is set to the closest lane with a connection to the next
-        oriented way on the agent's path.
+        oriented way on the car's path.
         """
         target_oriented_way = self.path.ways[self.path_segment + 1]
         curve = lane.get_curve(target_oriented_way)
@@ -573,10 +573,10 @@ class Agent(Entity, TrafficAgent):
     def _calc_segment_end(self, lane: Lane, segment_end: float):
         """Set the value of `network_segment_end` depending on path segment.
 
-        The value is set to the given `segment_end` if the agent is not in the
+        The value is set to the given `segment_end` if the car is not in the
         last segment of its path, meaning that the segment ends on the actual
         segment end. If on the last path segment, the end is set to the point
-        where the path ends, so the agent stops there.
+        where the path ends, so the car stops there.
         """
         if self.path_last_way:
             endpoint = self.path.ways[self.path_segment].endpoint
@@ -697,12 +697,12 @@ class Agent(Entity, TrafficAgent):
     def _update_previous(self):
         """Update lead for immediate follower on same location.
 
-        To be used when the agent is inserted in a location and the agent right
+        To be used when the car is inserted in a location and the agent right
         behind is not yet registered as follower and needs to be updated.
         """
         if self.traffic_node.has_previous:
             prev = self.traffic_node.previous.data
-            if isinstance(prev, Agent):
+            if isinstance(prev, Car):
                 while prev.owns:
                     lock = prev.owns.popleft()
                     lock.release(prev)
@@ -710,4 +710,4 @@ class Agent(Entity, TrafficAgent):
                 prev.update_lead()
 
     def __repr__(self):
-        return f'{Agent.__name__}(id={self.id})'
+        return f'{Car.__name__}(id={self.id})'

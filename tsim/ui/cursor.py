@@ -132,6 +132,5 @@ class Cursor(DirectObject):
                 log.debug('No KEY set for tool %s', tool.__name__)
 
     def _on_point_at_object(self, obj):
-        print(obj)
         if self._tool:
             self._tool.on_point_at_object(obj)

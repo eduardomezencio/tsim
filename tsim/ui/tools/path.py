@@ -12,7 +12,7 @@ import tsim.ui.panda3d as p3d
 from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network.lane import LanePosition
 from tsim.model.network.way import Way
-from tsim.model.simulation.agent import Agent
+from tsim.model.simulation.car import Car
 from tsim.ui.objects.path import create as create_path
 from tsim.ui.tools.tool import Tool
 
@@ -118,5 +118,5 @@ class PathTool(Tool):
     def _create_agent(self):
         if self.path is None:
             return
-        p3d.MESSENGER.send('new_agent', [Agent(), self.source,
+        p3d.MESSENGER.send('new_agent', [Car(), self.source,
                                          self.dest.oriented_way_position])

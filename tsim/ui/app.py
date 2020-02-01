@@ -20,7 +20,7 @@ from tsim.model.network.node import Node
 from tsim.model.network.lane import LanePosition
 from tsim.model.network.orientedway import OrientedWayPosition
 from tsim.model.network.way import Way
-from tsim.model.simulation.agent import Agent
+from tsim.model.simulation.car import Car
 from tsim.model.units import HOUR, normalized_hours, time_string
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
@@ -37,7 +37,7 @@ class App:
 
     time_text: TextNode
     network_entities: Dict[int, NodePath]
-    agents: Dict[Agent, NodePath]
+    agents: Dict[Car, NodePath]
     roads: Dict[Tuple[int, int], NodePath]
 
     def __init__(self, index_name: str):
@@ -177,12 +177,12 @@ class App:
         """Enqueue event from panda3d messenger."""
         self._event_queue.append(args)
 
-    def add_agent(self, agent: Agent, position: LanePosition,
-                  destination: OrientedWayPosition):
-        """Add agent with given position and destination."""
-        agent.place_at(position)
-        agent.set_destination(destination)
-        self.agents[agent] = factory.create_agent(self.agents_parent, agent)
+    def add_car(self, car: Car, position: LanePosition,
+                destination: OrientedWayPosition):
+        """Add car with given position and destination."""
+        car.place_at(position)
+        car.set_destination(destination)
+        self.agents[car] = factory.create_car(self.agents_parent, car)
 
     def update_agents(self):
         """Update agent actors."""
@@ -194,7 +194,7 @@ class App:
                 node_path.look_at(*(position + agent.direction), 0.0)
                 agent.direction_changed = False
 
-    event_handlers = {Agent: add_agent}
+    event_handlers = {Car: add_car}
 
     def _build_on_screen_text(self):
         time_text = TextNode('time_text')
