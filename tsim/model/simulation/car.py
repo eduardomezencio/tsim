@@ -511,7 +511,7 @@ class Car(Entity, TrafficAgent):
             new_position = location.evaluate_position(position,
                                                       self.curve_override)
             direction = new_position - self.position
-            if direction.x + direction.y > 0.001:
+            if abs(direction.x) + abs(direction.y) > 0.001:
                 self.direction = direction
                 self.direction_changed = True
             self.position = new_position
