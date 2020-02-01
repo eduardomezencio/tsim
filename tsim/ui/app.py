@@ -192,7 +192,6 @@ class App:
             node_path.set_pos(position.x, position.y, 0.0)
             if agent.direction_changed:
                 node_path.look_at(*(position + agent.direction), 0.0)
-                agent.direction_changed = False
 
     event_handlers = {Car: add_car}
 

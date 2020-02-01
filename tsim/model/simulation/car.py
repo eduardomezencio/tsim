@@ -432,6 +432,9 @@ class Car(Entity, TrafficAgent):
 
     def _on_lane(self, dt: Duration, ready: int, target: int):
         """Update the car on `on_lane` state."""
+        if self.direction_changed:
+            self.direction_changed = False
+
         self._follow(dt, ready, target)
         speed = self.speed[target] * dt
         position = self.network_position[ready] + speed
@@ -514,6 +517,8 @@ class Car(Entity, TrafficAgent):
             if abs(direction.x) + abs(direction.y) > 0.001:
                 self.direction = direction
                 self.direction_changed = True
+            else:
+                self.direction_changed = False
             self.position = new_position
             self.network_location[target] = location
             self.network_position[target] = position
