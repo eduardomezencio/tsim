@@ -25,7 +25,7 @@ from tsim.model.units import HOUR, normalized_hours, time_string
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
-from tsim.ui.objects import factory, world
+from tsim.ui.objects import factory as Factory, world as World
 from tsim.ui.sky import Sky
 
 FRAME_DURATION = 1 / 60
@@ -55,7 +55,7 @@ class App:
         self.agents_parent.reparent_to(self.scene)
 
         self.camera = Camera()
-        self.world = world.create(self.scene, 10000, 16)
+        self.world = World.create(self.scene, 10000, 16)
         self.sky = Sky(self.scene, self.camera)
         self.cursor = Cursor(self.world)
         self.grid = Grid(50.0, 1000.0, self.world, self.cursor.actor)
@@ -136,7 +136,7 @@ class App:
         if entity is not None:
             point = bounding_rect_center(entity.bounding_rect)
             parent = self.get_roads_parent(point)
-            self.network_entities[id_] = factory.create(parent, entity)
+            self.network_entities[id_] = Factory.create(parent, entity)
 
     def on_network_entities_changed(self):
         """Update network entities."""
@@ -165,13 +165,13 @@ class App:
         for node in filter(lambda e: isinstance(e, Node),
                            INDEX.entities.values()):
             parent = self.get_roads_parent(node.position)
-            self.network_entities[node.id] = factory.create_node(parent, node)
+            self.network_entities[node.id] = Factory.create_node(parent, node)
 
         for way in filter(lambda e: isinstance(e, Way),
                           INDEX.entities.values()):
             center = bounding_rect_center(way.bounding_rect)
             parent = self.get_roads_parent(center)
-            self.network_entities[way.id] = factory.create_way(parent, way)
+            self.network_entities[way.id] = Factory.create_way(parent, way)
 
         # TODO: load agents
 
@@ -184,7 +184,7 @@ class App:
         """Add car with given position and destination."""
         car.place_at(position)
         car.set_destination(destination)
-        self.agents[car] = factory.create_car(self.agents_parent, car)
+        self.agents[car] = Factory.create_car(self.agents_parent, car)
 
     def update_agents(self):
         """Update agent actors."""

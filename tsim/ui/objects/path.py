@@ -11,6 +11,7 @@ from panda3d.core import (Geom, GeomNode, GeomTristrips, GeomVertexData,
 
 from tsim.model.geometry import Point, sec
 from tsim.model.network.lane import LANE_WIDTH
+from tsim.model.network.path import Path
 from tsim.ui.objects.way import LEVEL_HEIGHT
 from tsim.utils.color import interpolate_rgb
 from tsim.utils.iterators import window_iter
@@ -22,14 +23,20 @@ START_COLOR = (0.2, 0.2, 1.0, 0.8)
 END_COLOR = (1.0, 0.0, 0.6, 0.8)
 
 
-def create(parent: NodePath, points: List[Point]) -> NodePath:
+def create(parent: NodePath, path: Path) -> NodePath:
     """Create node for given path and attach it to the parent."""
-    geom = _generate_mesh(points)
-    node = GeomNode('path')
-    node.add_geom(geom)
-    node.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
-    node_path = parent.attach_new_node(node)
-    node_path.set_transparency(TransparencyAttrib.M_alpha)
+    points = path.oriented_points()
+
+    if len(points) >= 2:
+        geom = _generate_mesh(points)
+        node = GeomNode('path')
+        node.add_geom(geom)
+        node.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
+        node_path = parent.attach_new_node(node)
+        node_path.set_transparency(TransparencyAttrib.M_alpha)
+    else:
+        node_path = None
+
     return node_path
 
 

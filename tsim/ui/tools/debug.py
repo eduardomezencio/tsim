@@ -12,11 +12,12 @@ from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network.node import Node
 from tsim.model.network.traffic import TrafficAgent
 from tsim.model.network.way import Way
+from tsim.ui.objects import factory as Factory
 from tsim.ui.objects.node import create_lane_connections_card
-from tsim.ui.panda3d import LOADER, PIXEL2D, RENDER
+from tsim.ui import panda3d as p3d
 from tsim.ui.tools.tool import Tool
 
-FONT = LOADER.load_font('cmtt12.egg')
+FONT = p3d.LOADER.load_font('cmtt12.egg')
 
 
 class Debug(Tool):
@@ -28,6 +29,7 @@ class Debug(Tool):
     card: NodePath
     text_dict: Dict[str, str]
     selected_agent: Optional[TrafficAgent]
+    path_np: NodePath
 
     KEY = 'i'
 
@@ -39,12 +41,12 @@ class Debug(Tool):
                                      fg=(1.0, 1.0, 1.0, 0.9),
                                      shadow=(0.0, 0.0, 0.0, 0.9),
                                      align=TextNode.A_left, font=FONT,
-                                     parent=PIXEL2D, mayChange=True)
+                                     parent=p3d.PIXEL2D, mayChange=True)
         self.card = None
         self.text_dict = {'position': None, 'network_position': None,
-                          'distance': None, 'agent': None,
-                          'intersection': None}
-        self .selected_agent = None
+                          'distance': None, 'agent': None}
+        self.selected_agent = None
+        self.path_np = None
         self._update_position()
         self._update_hud_text()
 
@@ -95,11 +97,12 @@ class Debug(Tool):
             agent = INDEX.entities.get(id_, None)
             if agent is not None:
                 self.selected_agent = agent
+                self._update_path_np()
 
         selected = INDEX.get_at(self.cursor.position, of_type=Node)
         if selected and just_pressed:
-            self._clear_card()
-            self.card = create_lane_connections_card(selected[0], RENDER)
+            self._clear_intersection()
+            self.card = create_lane_connections_card(selected[0], p3d.RENDER)
         else:
             selected = INDEX.get_at(self.cursor.position, of_type=Way)
 
@@ -130,14 +133,25 @@ class Debug(Tool):
 
     def _clear_selection(self):
         """Clear all seleted objects."""
-        self.selected_agent = None
-        self._clear_card()
-        for key in self.text_dict:
-            self.text_dict[key] = None
-        self._update_position()
+        self._clear_agent()
+        self._clear_intersection()
+        self.text_dict['network_position'] = None
+        self.text_dict['distance'] = None
 
-    def _clear_card(self):
-        """Clear current intersection card."""
+    def _clear_agent(self):
+        """Clear current agent selection."""
+        self.selected_agent = None
+        self.text_dict['agent'] = None
+        self._clear_path_np()
+
+    def _clear_path_np(self):
+        """Clear current path mesh and node path."""
+        if self.path_np is not None:
+            self.path_np.remove_node()
+            self.path_np = None
+
+    def _clear_intersection(self):
+        """Clear current intersection selection."""
         if self.card is not None:
             self.card.get_texture().clear()
             self.card.remove_node()
@@ -146,6 +160,13 @@ class Debug(Tool):
     def _update_position(self):
         self.text_dict['position'] = (f'{self.cursor.position.x:8.2f}, '
                                       f'{self.cursor.position.y:8.2f}')
+
+    def _update_path_np(self):
+        self._clear_path_np()
+        if self.selected_agent is not None:
+            path = self.selected_agent.path
+            if path is not None:
+                self.path_np = Factory.create_path(p3d.RENDER, path)
 
     def _update_hud_text(self):
         self.hud_text.text = '\n'.join(f"\n['{k}']: {v}"

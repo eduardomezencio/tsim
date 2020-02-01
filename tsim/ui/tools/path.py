@@ -13,7 +13,7 @@ from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network.lane import LanePosition
 from tsim.model.network.way import Way
 from tsim.model.simulation.car import Car
-from tsim.ui.objects.path import create as create_path
+from tsim.ui.objects import factory as Factory
 from tsim.ui.tools.tool import Tool
 
 if TYPE_CHECKING:
@@ -95,9 +95,7 @@ class PathTool(Tool):
     def _update_path_np(self):
         self._clear_path_np()
         if self.path is not None:
-            points = self.path.oriented_points()
-            if len(points) >= 2:
-                self.path_np = create_path(p3d.RENDER, points)
+            self.path_np = Factory.create_path(p3d.RENDER, self.path)
 
     def _clear_path_np(self):
         if self.path_np is not None:
