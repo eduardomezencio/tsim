@@ -50,6 +50,12 @@ class PathTool(Tool):
 
     def on_button1_press(self):
         """Button 1 pressed callback."""
+        if self.cursor.pointed_at:
+            id_ = int(self.cursor.pointed_at.parent.tags['id'])
+            agent = INDEX.entities.get(id_, None)
+            if agent is not None:
+                log.debug(str(agent))
+                return
         self._change_way('source')
 
     def on_button2_press(self):

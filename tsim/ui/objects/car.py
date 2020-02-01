@@ -16,6 +16,7 @@ def create(parent: NodePath, car: Car) -> NodePath:
     """Create actor for given `car` and reparent it to `parent`."""
     node_path: NodePath = p3d.LOADER.load_model(f'{os.getcwd()}/models/car')
     node_path.name = f'car-{car.id}'
+    node_path.tags['id'] = str(car.id)
 
     collision_solid = CollisionBox((0.0, 0.0, 0.0), 1.0, 1.0, 1.0)
     collision_np = node_path.attach_new_node(CollisionNode('cnode'))

@@ -9,7 +9,7 @@ from itertools import chain, combinations, count, islice, product
 from math import pi as PI
 from statistics import median_low
 from typing import (TYPE_CHECKING, Callable, DefaultDict, Deque, Dict,
-                    Iterator, List, Optional, Set, Tuple)
+                    Iterable, Iterator, List, Optional, Set, Tuple)
 
 import bezier
 import numpy
@@ -117,7 +117,8 @@ class ConflictPointType(Enum):
 class ConflictPoint(TrafficLock):
     """Conflict point in an intersection.
 
-    The point where two lane connections cross.
+    The point where two lane connections cross. The `id` is unique only among
+    conflict points in the same intersection.
     """
 
     id: int
@@ -148,7 +149,12 @@ class ConflictPoint(TrafficLock):
         self.traffic_node = None
 
     @property
-    def speed(self):
+    def owns(self) -> Iterable[TrafficLock]:
+        """Get locks owned by this conflict point."""
+        return (n for n in self.neighbors if n.owner is self)
+
+    @property
+    def speed(self) -> float:
         """Get agent speed, always zero for conflict points."""
         return MAP_TO_ZERO
 
@@ -430,6 +436,9 @@ class Curve(NetworkLocation):
         self.traffic = LinkedList(p[1] for p in self.conflict_points)
         for node in self.traffic.iter_nodes():
             node.data.traffic_node = node
+
+    def __repr__(self):
+        return f'{Curve.__name__}(source={self.source}, dest={self.dest})'
 
 
 @with_slots

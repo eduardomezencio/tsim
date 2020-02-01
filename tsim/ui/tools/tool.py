@@ -21,6 +21,9 @@ class Tool(ABC):
     def prepare(self):
         """Initialize tool."""
 
+    def on_update(self):
+        """Update callback called every frame."""
+
     def on_button1_press(self):
         """Button 1 pressed callback."""
 
@@ -41,9 +44,6 @@ class Tool(ABC):
 
     def on_cursor_move(self):
         """Cursor moved callback."""
-
-    def on_point_at_object(self, obj):
-        """Cursor pointing at object."""
 
     def cleanup(self):
         """Clean up before changing tool."""

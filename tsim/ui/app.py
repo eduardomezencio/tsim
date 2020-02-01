@@ -58,7 +58,7 @@ class App:
         self.world = world.create(self.scene, 10000, 16)
         self.sky = Sky(self.scene, self.camera)
         self.cursor = Cursor(self.world)
-        self.grid = Grid(50.0, 1000.0, self.world, self.cursor.cursor)
+        self.grid = Grid(50.0, 1000.0, self.world, self.cursor.actor)
 
         self._build_on_screen_text()
 
@@ -103,9 +103,11 @@ class App:
 
     def update(self, _task: Task):
         """Update task, to run every frame."""
-        INDEX.simulation.update(self.simulation_speed / SPEED_STEPS
-                                * FRAME_DURATION)
-        self.update_agents()
+        if self.simulation_speed > 0:
+            INDEX.simulation.update(FRAME_DURATION * self.simulation_speed
+                                    / SPEED_STEPS)
+            self.update_agents()
+
         while self._event_queue:
             event = self._event_queue.popleft()
             App.event_handlers[type(event[0])](self, *event)

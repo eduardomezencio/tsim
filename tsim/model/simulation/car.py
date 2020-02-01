@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+from itertools import chain
 from math import inf as INF
 from typing import TYPE_CHECKING, Deque, List, Optional, Set, Tuple
 
@@ -178,6 +179,10 @@ class Car(Entity, TrafficAgent):
     def acquiring(self) -> None:
         """Get `None` since this is not a lock."""
         return None
+
+    def owns_indirect(self) -> Set[TrafficLock]:
+        """Get locks owned by locks owned by this car."""
+        return set(chain.from_iterable(l.owns for l in self.owns))
 
     def get_network_position(self, location: NetworkLocation,
                              buffer: Optional[int] = None) -> float:
@@ -713,6 +718,23 @@ class Car(Entity, TrafficAgent):
                     lock.release(prev)
                 prev.distance_to_release = None
                 prev.update_lead()
+
+    def __str__(self):
+        buffer = Index.INSTANCE.simulation.ready_buffer
+        position = self.network_position[buffer]
+        position = f'{position:.2f}' if position is not None else ''
+        indirect = sorted(l.id for l in self.owns_indirect())
+        to_lock = (f'{self.distance_to_lock:.2f}    '
+                   if self.distance_to_lock is not None else 'None')
+        to_release = (f'{self.distance_to_release:.2f}'
+                      if self.distance_to_release is not None else 'None')
+        return (
+            f'{repr(self)} @ {self.network_location[buffer]} : {position}\n'
+            f'lead: {self.lead}    followers: {self.followers}\n'
+            f'owns: {self.owns}\n'
+            f'indirect: {indirect}\n'
+            f'distance to lock: {to_lock}    '
+            f'distance to release: {to_release}')
 
     def __repr__(self):
         return f'{Car.__name__}(id={self.id})'

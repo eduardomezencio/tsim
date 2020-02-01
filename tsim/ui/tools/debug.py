@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import logging as log
-from itertools import islice
-from typing import List
+from typing import Dict, Optional
 
 from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import NodePath, TextNode
@@ -12,13 +10,13 @@ from panda3d.core import NodePath, TextNode
 from tsim.model.geometry import Point
 from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network.node import Node
+from tsim.model.network.traffic import TrafficAgent
 from tsim.model.network.way import Way
 from tsim.ui.objects.node import create_lane_connections_card
 from tsim.ui.panda3d import LOADER, PIXEL2D, RENDER
 from tsim.ui.tools.tool import Tool
 
 FONT = LOADER.load_font('cmtt12.egg')
-LINES = 4
 
 
 class Debug(Tool):
@@ -28,7 +26,8 @@ class Debug(Tool):
     last_point: Point
     hud_text: OnscreenText
     card: NodePath
-    text_lines: List[str]
+    text_dict: Dict[str, str]
+    selected_agent: Optional[TrafficAgent]
 
     KEY = 'i'
 
@@ -42,24 +41,31 @@ class Debug(Tool):
                                      align=TextNode.A_left, font=FONT,
                                      parent=PIXEL2D, mayChange=True)
         self.card = None
-        self.text_lines = [None] * LINES
+        self.text_dict = {'position': None, 'network_position': None,
+                          'distance': None, 'agent': None,
+                          'intersection': None}
+        self .selected_agent = None
         self._update_position()
         self._update_hud_text()
+
+    def on_update(self):
+        """Update callback called every frame."""
+        if self.selected_agent is not None:
+            self.text_dict['agent'] = \
+                str(self.selected_agent).replace('\n', '\n    ')
+            self._update_hud_text()
 
     def on_button1_press(self):
         """Button 1 pressed callback."""
         self.pressed = True
-        self._update_selection()
+        self._update_selection(True)
         point = self.cursor.position
 
         if self.last_point is not None:
             distance = self.last_point.distance(point)
-            self.text_lines[3] = f'Distance: {distance:.2f}'
+            self.text_dict['distance'] = f'{distance:.2f}'
         self.last_point = point
 
-        log.debug('%.2f, %.2f', point.x, point.y)
-        log.debug('\n'.join(l for l in islice(self.text_lines, 1, None)
-                            if l is not None))
         self._update_hud_text()
 
     def on_button1_release(self):
@@ -69,7 +75,7 @@ class Debug(Tool):
     def on_cursor_move(self):
         """Cursor moved callback."""
         if self.pressed:
-            self._update_selection(False)
+            self._update_selection()
         self._update_position()
         self._update_hud_text()
 
@@ -78,20 +84,32 @@ class Debug(Tool):
         self.hud_text.destroy()
         self._clear_selection()
 
-    def _update_selection(self, draw_intersection: bool = True):
-        self._clear_selection()
+    def _update_selection(self, just_pressed: bool = False):
+        selected_nothing = just_pressed
+
+        if just_pressed and self.cursor.pointed_at:
+            id_ = int(self.cursor.pointed_at.parent.tags['id'])
+            agent = INDEX.entities.get(id_, None)
+            if agent is not None:
+                selected_nothing = False
+                self.selected_agent = agent
+
         selected = INDEX.get_at(self.cursor.position, of_type=Node)
-        if selected and draw_intersection:
+        if selected and just_pressed:
+            selected_nothing = False
             self.card = create_lane_connections_card(selected[0], RENDER)
         else:
             selected = INDEX.get_at(self.cursor.position, of_type=Way)
+
+        if selected_nothing:
+            self._clear_selection()
 
         try:
             selected = selected[0]
         except IndexError:
             return
 
-        self.text_lines[1] = f'{selected} - {selected.xurl}'
+        self.text_dict['network_position'] = f'{selected} - {selected.xurl}'
         if isinstance(selected, Way):
             position = selected.way_position_raw(self.cursor.position)
             way_position, lane_index = position
@@ -105,25 +123,28 @@ class Debug(Tool):
             oriented_position = (lane.lane_to_oriented_position(lane_position)
                                  if lane_position is not None else 0.0)
 
-            self.text_lines[2] = (
-                f'way_position={way_position:.2f}, '
+            self.text_dict['network_position'] += (
+                f'\n    way_position={way_position:.2f}, '
                 f'oriented_position={oriented_position:.2f}, '
                 f'lane_position={lane_position:.2f}, '
                 f'lane={lane_index}')
 
     def _clear_selection(self):
         """Clear current selection and free related resources."""
+        self.selected_agent = None
         if self.card is not None:
             self.card.get_texture().clear()
             self.card.remove_node()
             self.card = None
-        self.text_lines = [None] * LINES
+        for key in self.text_dict:
+            self.text_dict[key] = None
         self._update_position()
 
     def _update_position(self):
-        self.text_lines[0] = (f'x: {self.cursor.position.x:8.2f}  '
-                              f'y: {self.cursor.position.y:8.2f}')
+        self.text_dict['position'] = (f'x: {self.cursor.position.x:8.2f}  '
+                                      f'y: {self.cursor.position.y:8.2f}')
 
     def _update_hud_text(self):
-        self.hud_text.text = '\n'.join(l for l in self.text_lines
-                                       if l is not None)
+        self.hud_text.text = '\n'.join(f"\n['{k}']: {v}"
+                                       for k, v in self.text_dict.items()
+                                       if v is not None)
