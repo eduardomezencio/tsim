@@ -72,6 +72,11 @@ class Debug(Tool):
         """Button 1 released callback."""
         self.pressed = False
 
+    def on_button3_press(self):
+        """Button 3 pressed callback."""
+        self._clear_selection()
+        self._update_hud_text()
+
     def on_cursor_move(self):
         """Cursor moved callback."""
         if self.pressed:
@@ -85,24 +90,18 @@ class Debug(Tool):
         self._clear_selection()
 
     def _update_selection(self, just_pressed: bool = False):
-        selected_nothing = just_pressed
-
         if just_pressed and self.cursor.pointed_at:
             id_ = int(self.cursor.pointed_at.parent.tags['id'])
             agent = INDEX.entities.get(id_, None)
             if agent is not None:
-                selected_nothing = False
                 self.selected_agent = agent
 
         selected = INDEX.get_at(self.cursor.position, of_type=Node)
         if selected and just_pressed:
-            selected_nothing = False
+            self._clear_card()
             self.card = create_lane_connections_card(selected[0], RENDER)
         else:
             selected = INDEX.get_at(self.cursor.position, of_type=Way)
-
-        if selected_nothing:
-            self._clear_selection()
 
         try:
             selected = selected[0]
@@ -130,19 +129,23 @@ class Debug(Tool):
                 f'lane={lane_index}')
 
     def _clear_selection(self):
-        """Clear current selection and free related resources."""
+        """Clear all seleted objects."""
         self.selected_agent = None
-        if self.card is not None:
-            self.card.get_texture().clear()
-            self.card.remove_node()
-            self.card = None
+        self._clear_card()
         for key in self.text_dict:
             self.text_dict[key] = None
         self._update_position()
 
+    def _clear_card(self):
+        """Clear current intersection card."""
+        if self.card is not None:
+            self.card.get_texture().clear()
+            self.card.remove_node()
+            self.card = None
+
     def _update_position(self):
-        self.text_dict['position'] = (f'x: {self.cursor.position.x:8.2f}  '
-                                      f'y: {self.cursor.position.y:8.2f}')
+        self.text_dict['position'] = (f'{self.cursor.position.x:8.2f}, '
+                                      f'{self.cursor.position.y:8.2f}')
 
     def _update_hud_text(self):
         self.hud_text.text = '\n'.join(f"\n['{k}']: {v}"
