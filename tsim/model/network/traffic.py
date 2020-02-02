@@ -19,32 +19,30 @@ class TrafficAgent(ABC):
 
     @abstractmethod
     def get_network_position(self, location: NetworkLocation,
-                             buffer: Optional[int] = None) -> float:
+                             buffer: int) -> float:
         """Get network position in the given `location`.
 
         Used as sorting key for agents in network locations.
         """
 
     @abstractmethod
-    def is_at(self, location: NetworkLocation,
-              buffer: Optional[int] = None) -> bool:
+    def is_at(self, location: NetworkLocation, buffer: int) -> bool:
         """Get whether agent is at given `location`."""
 
     @abstractmethod
-    def notify(self):
+    def notify(self, buffer: int):
         """Notify this agent of lead events."""
 
     @abstractmethod
-    def acquire(self, lock: TrafficLock, buffer: Optional[int] = None):
+    def acquire(self, lock: TrafficLock, buffer: int):
         """Register acquisition of `lock` by agent."""
 
     @abstractmethod
-    def add_follower(self, agent: TrafficDynamicAgent,
-                     buffer: Optional[int] = None):
+    def add_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Register agent as follower."""
 
     @abstractmethod
-    def remove_follower(self, agent: TrafficDynamicAgent):
+    def remove_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Unregister agent as follower."""
 
 
@@ -55,7 +53,7 @@ class TrafficDynamicAgent(TrafficAgent):
     distance_to_lock: float
 
     @abstractmethod
-    def distance_to_lead(self, buffer: Optional[int] = None) -> float:
+    def distance_to_lead(self, buffer: int) -> float:
         """Get the distance to the lead or infinite if there's no lead."""
 
 
@@ -65,11 +63,12 @@ class TrafficLock(TrafficAgent):
     owner_secondary: Optional[TrafficDynamicAgent]
 
     @abstractmethod
-    def lock(self, agent: TrafficAgent, terminal: bool = False):
+    def lock(self, agent: TrafficAgent, buffer: int, terminal: bool = False):
         """Lock this traffic lock to `agent`."""
 
     @abstractmethod
-    def release(self, agent: TrafficAgent, terminal: bool = False):
+    def release(self, agent: TrafficAgent, buffer: int,
+                terminal: bool = False):
         """Release this lock by `agent`."""
 
 

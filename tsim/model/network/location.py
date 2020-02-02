@@ -37,7 +37,7 @@ class NetworkLocation(ABC):
     def oriented_way_position(self, position: float) -> OrientedWayPosition:
         """Get `OrientedWayPosition` from this network location."""
 
-    def insert_agent(self, agent: TrafficAgent, buffer: int = None) \
+    def insert_agent(self, agent: TrafficAgent, buffer: int) \
             -> LinkedListNode[TrafficAgent]:
         """Insert agent in traffic in sorted position."""
         return self.traffic.insort(

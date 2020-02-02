@@ -54,7 +54,7 @@ class Debug(Tool):
         """Update callback called every frame."""
         if self.selected_agent is not None:
             self.text_dict['agent'] = \
-                str(self.selected_agent).replace('\n', '\n    ')
+                self.selected_agent.debug_str().replace('\n', '\n' + ' ' * 4)
             self._update_hud_text()
 
     def on_button1_press(self):
@@ -95,7 +95,7 @@ class Debug(Tool):
         if just_pressed and self.cursor.pointed_at:
             id_ = int(self.cursor.pointed_at.parent.tags['id'])
             agent = INDEX.entities.get(id_, None)
-            if agent is not None:
+            if agent is not None and hasattr(agent, 'debug_str'):
                 self.selected_agent = agent
                 self._update_path_np()
 
@@ -163,10 +163,11 @@ class Debug(Tool):
 
     def _update_path_np(self):
         self._clear_path_np()
-        if self.selected_agent is not None:
+        try:
             path = self.selected_agent.path
-            if path is not None:
-                self.path_np = Factory.create_path(p3d.RENDER, path)
+            self.path_np = Factory.create_path(p3d.RENDER, path)
+        except AttributeError:
+            pass
 
     def _update_hud_text(self):
         self.hud_text.text = '\n'.join(f"\n['{k}']: {v}"

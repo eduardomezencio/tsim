@@ -158,15 +158,13 @@ class ConflictPoint(TrafficLock):
         """Get agent speed, always zero for conflict points."""
         return MAP_TO_ZERO
 
-    def get_network_position(self, location: Curve,
-                             buffer: Optional[int] = None) -> float:
+    def get_network_position(self, location: Curve, buffer: int) -> float:
         """Get network position of the conflict point in given `location`."""
         if not hasattr(location, 'positions'):
             return None
         return location.positions.get(self, None)
 
-    def is_at(self, location: NetworkLocation,
-              buffer: Optional[int] = None) -> bool:
+    def is_at(self, location: NetworkLocation, buffer: int) -> bool:
         """Get whether conflict point is at given `location`."""
         return hasattr(location, 'positions') and self in location.positions
 
@@ -175,27 +173,26 @@ class ConflictPoint(TrafficLock):
         self.lock_order = sorted(chain(self.neighbors, [self]),
                                  key=lambda cp: cp.id)
 
-    def acquire(self, lock: TrafficLock, buffer: Optional[int] = None):
+    def acquire(self, lock: TrafficLock, buffer: int):
         """Register acquisition of `lock` by agent."""
 
-    def add_follower(self, agent: TrafficDynamicAgent,
-                     buffer: Optional[int] = None):
+    def add_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Register agent as follower."""
         distance = agent.distance_to_lead(buffer)
         lock_distance = 10  # TODO: Remove hard-coded distance here.
         if distance <= lock_distance:
-            self.lock(agent)
+            self.lock(agent, buffer)
         else:
             agent.distance_to_lock = distance - lock_distance
 
-    def remove_follower(self, agent: TrafficDynamicAgent):
+    def remove_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Unregister agent as follower."""
         agent.distance_to_lock = None
         # Here release was probably already called, but is called in case
         # some agent got in the way before `agent` could reach the lock.
-        self.release(agent)
+        self.release(agent, buffer)
 
-    def lock(self, agent: TrafficAgent, terminal: bool = False):
+    def lock(self, agent: TrafficAgent, buffer: int, terminal: bool = False):
         """Lock this traffic lock to `agent`.
 
         If the lock is available, start the lock process immediately. If
@@ -205,14 +202,15 @@ class ConflictPoint(TrafficLock):
         """
         if terminal and self.owner_secondary is agent.acquiring:
             self.queue.appendleft((agent, terminal))
-            self._dequeue()
+            self._dequeue(buffer)
             return
 
         self.queue.append((agent, terminal))
         if self.owner is None:
-            self._dequeue()
+            self._dequeue(buffer)
 
-    def release(self, agent: TrafficAgent, terminal: bool = False):
+    def release(self, agent: TrafficAgent, buffer: int,
+                terminal: bool = False):
         """Release this lock.
 
         If not `terminal` release all neighbors.
@@ -221,14 +219,14 @@ class ConflictPoint(TrafficLock):
             return
 
         self.owner = None
-        self._dequeue()
+        self._dequeue(buffer)
 
         if terminal:
             self.owner_secondary = None
         else:
             self._pass(agent)
             for cpoint in self.neighbors:
-                cpoint.release(self, True)
+                cpoint.release(self, buffer, True)
 
     def _pass(self, agent: TrafficAgent):
         node = self.traffic_node.previous
@@ -236,18 +234,18 @@ class ConflictPoint(TrafficLock):
             node.remove()
             agent.traffic_node = self.traffic_node.insert_after(agent)
 
-    def notify(self):
+    def notify(self, buffer: int):
         """Notify this agent of lead events."""
         next_ = self.waiting + 1
         if next_ >= len(self.lock_order):
             self.owner = self.acquiring
-            self.owner.acquire(self)
-            self.owner.notify()
+            self.owner.acquire(self, buffer)
+            self.owner.notify(buffer)
         else:
             self.waiting = next_
-            self.lock_order[next_].lock(self, True)
+            self.lock_order[next_].lock(self, buffer, True)
 
-    def _dequeue(self):
+    def _dequeue(self, buffer: int):
         """Lock to the next agent in the queue."""
         agent, terminal = self.queue.popleft() if self.queue else (None, None)
         if agent is None:
@@ -255,11 +253,11 @@ class ConflictPoint(TrafficLock):
         if terminal:
             self.owner = agent
             self.owner_secondary = agent.acquiring
-            agent.notify()
+            agent.notify(buffer)
         else:
             self.acquiring = agent
             self.waiting = 0
-            self.lock_order[0].lock(self, True)
+            self.lock_order[0].lock(self, buffer, True)
 
     def __repr__(self):
         return f'{ConflictPoint.__name__}(id={self.id})'

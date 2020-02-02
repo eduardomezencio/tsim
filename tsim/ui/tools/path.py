@@ -53,8 +53,8 @@ class PathTool(Tool):
         if self.cursor.pointed_at:
             id_ = int(self.cursor.pointed_at.parent.tags['id'])
             agent = INDEX.entities.get(id_, None)
-            if agent is not None:
-                log.debug(str(agent))
+            if agent is not None and hasattr(agent, 'debug_str'):
+                log.debug("[%s] %s", __name__, agent.debug_str())
                 return
         self._change_way('source')
 
@@ -117,7 +117,7 @@ class PathTool(Tool):
         self.hud_text.text = text
 
         if self.source and self.dest:
-            log.debug(text)
+            log.debug("[%s] %s", __name__, text)
 
     def _create_agent(self):
         if self.path is None:

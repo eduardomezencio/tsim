@@ -138,9 +138,11 @@ class Cursor(DirectObject):
     def _register_tool_change_events(self):
         def set_tool(tool: Type[Tool]):
             self.tool = tool(self)
-            log.debug('Changing tool to %s', tool.__name__)
+            log.info('[%s] Changing tool to %s',
+                     __name__, tool.__name__)
         for tool in TOOLS:
             try:
                 self.accept(tool.KEY, partial(set_tool, tool))
             except AttributeError:
-                log.debug('No KEY set for tool %s', tool.__name__)
+                log.warning('[%s] No KEY set for tool %s',
+                            __name__, tool.__name__)

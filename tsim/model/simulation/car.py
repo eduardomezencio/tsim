@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import deque
 from itertools import chain
 from math import inf as INF
-from typing import TYPE_CHECKING, Deque, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Deque, List, Set, Tuple
 
 import bezier
 
@@ -141,7 +141,6 @@ class Car(Entity, TrafficAgent):
     schedule: Schedule
 
     def __init__(self, schedule: Schedule = None):
-        super().__init__()
         self.active = False
         self.position = None
         self.direction = None
@@ -168,6 +167,7 @@ class Car(Entity, TrafficAgent):
         self.network_position = [0.0, 0.0]
         self.traffic_node = None
         self.schedule = schedule
+        super().__init__()
         Index.INSTANCE.simulation.add(self)
 
     @property
@@ -185,22 +185,15 @@ class Car(Entity, TrafficAgent):
         return set(chain.from_iterable(l.owns for l in self.owns))
 
     def get_network_position(self, location: NetworkLocation,
-                             buffer: Optional[int] = None) -> float:
+                             buffer: int) -> float:
         """Get network position.
 
         The implementation of this method for this class ignores `location`.
         """
-        if buffer is None:
-            buffer = Index.INSTANCE.simulation.ready_buffer
-
         return self.network_position[buffer]
 
-    def is_at(self, location: NetworkLocation,
-              buffer: Optional[int] = None) -> bool:
+    def is_at(self, location: NetworkLocation, buffer: int) -> bool:
         """Get whether car is at given `location`."""
-        if buffer is None:
-            buffer = Index.INSTANCE.simulation.ready_buffer
-
         return self.network_location[buffer] is location
 
     def oriented_way_position(self, ready: int) -> OrientedWayPosition:
@@ -220,16 +213,12 @@ class Car(Entity, TrafficAgent):
         self.active = active
         Index.INSTANCE.simulation.update_active_set(self)
 
-    def place_at(self, network_position: NetworkPosition,
-                 buffer: Optional[int] = None):
+    def place_at(self, network_position: NetworkPosition, buffer: int):
         """Place the car at given `NetworkPosition`.
 
         Places the car at the given position, without a destination and
         deactivated.
         """
-        if buffer is None:
-            buffer = Index.INSTANCE.simulation.ready_buffer
-
         position = network_position.world_and_segment_position()
         self.position = position.position
         self.direction = position.direction
@@ -258,22 +247,18 @@ class Car(Entity, TrafficAgent):
 
         self.traffic_node = network_position.location.insert_agent(
             self, buffer)
-        self.update_lead()
+        self.update_lead(buffer)
         if self.lead is None:
-            self._update_previous()
+            self._update_previous(buffer)
 
         self.set_active(False)
 
-    def set_destination(self, destination: OrientedWayPosition,
-                        buffer: Optional[int] = None):
+    def set_destination(self, destination: OrientedWayPosition, buffer: int):
         """Set the car's destination.
 
         Tries to find a path from the car location to the given destination. If
         a path is found, it's set as the car's path and the car is activated.
         """
-        if buffer is None:
-            buffer = Index.INSTANCE.simulation.ready_buffer
-
         oriented_way = self.oriented_way_position(buffer)
         self.path = Index.INSTANCE.path_map.path(oriented_way, destination)
         self.path_segment = 0
@@ -289,7 +274,7 @@ class Car(Entity, TrafficAgent):
         self._calc_segment_end(lane, self.network_segment_end)
         self._calc_next_location(lane)
         if not self.path_last_way:
-            self.update_lead()
+            self.update_lead(buffer)
             self._calc_target_lane(lane)
             self._start_lane_change(buffer, buffer)
         self.set_active()
@@ -328,33 +313,30 @@ class Car(Entity, TrafficAgent):
 
         return None, owned
 
-    def update_lead(self):
+    def update_lead(self, buffer: int):
         """Find new lead for this car and update accordingly."""
         new_lead, owned = self.find_lead()
         if new_lead is self.lead:
             return
 
         if self.lead and (self.lead not in owned):
-            self.lead.remove_follower(self)
+            self.lead.remove_follower(self, buffer)
         else:
             self.distance_to_lock = None
 
         self.lead = new_lead
         if new_lead:
-            new_lead.add_follower(self)
+            new_lead.add_follower(self, buffer)
 
-    def distance_to_lead(self, buffer: Optional[int] = None) -> float:
+    def distance_to_lead(self, buffer: int) -> float:
         """Get the distance to the lead or infinite if there's no lead."""
         if self.lead is None:
             return INF
 
-        if buffer is None:
-            buffer = Index.INSTANCE.simulation.ready_buffer
-
         location = self.network_location[buffer]
         position = self.network_position[buffer]
 
-        if self.lead.is_at(location):
+        if self.lead.is_at(location, buffer):
             lead_position = self.lead.get_network_position(location, buffer)
             return lead_position - position
 
@@ -372,20 +354,16 @@ class Car(Entity, TrafficAgent):
 
         return INF
 
-    def distance_to(self, other: TrafficAgent,
-                    buffer: Optional[int] = None) -> float:
+    def distance_to(self, other: TrafficAgent, buffer: int) -> float:
         """Get distance to another agent.
 
         Checks in current location and next location ahead. Returns 0.0 if
         `other` is not found in this interval.
         """
-        if buffer is None:
-            buffer = Index.INSTANCE.simulation.ready_buffer
-
         location = self.network_location[buffer]
         position = self.network_position[buffer]
 
-        if other.is_at(location):
+        if other.is_at(location, buffer):
             other_position = other.get_network_position(location, buffer)
             return other_position - position
 
@@ -400,30 +378,29 @@ class Car(Entity, TrafficAgent):
 
         return 0.0
 
-    def notify(self):
+    def notify(self, buffer: int):
         """Notify this car of lead events."""
-        self.update_lead()
+        self.update_lead(buffer)
         if not self.active:
             self.set_active()
 
-    def acquire(self, lock: TrafficLock, buffer: Optional[int] = None):
+    def acquire(self, lock: TrafficLock, buffer: int):
         """Register acquisition of `lock` by car."""
         self.owns.append(lock)
         if self.distance_to_release is None:
             self.distance_to_release = (self.distance_to(lock, buffer)
                                         + MINIMUM_DISTANCE)
 
-    def add_follower(self, agent: TrafficDynamicAgent,
-                     buffer: Optional[int] = None):
+    def add_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Register agent as follower."""
         for follower in list(self.followers):
-            follower.update_lead()
+            follower.update_lead(buffer)
         self.followers.add(agent)
 
-    def remove_follower(self, agent: TrafficDynamicAgent):
+    def remove_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Unregister agent as follower."""
         self.followers.discard(agent)
-        self._update_previous()
+        self._update_previous(buffer)
 
     def update(self,  # pylint: disable=method-hidden
                dt: Duration, ready: int, target: int):
@@ -444,13 +421,15 @@ class Car(Entity, TrafficAgent):
         speed = self.speed[target] * dt
         position = self.network_position[ready] + speed
 
+        # TODO: Consider calling this at the end of the method, with the target
+        # buffer instead of ready (here and at _on_curve).
+        self._update_distance_to_lock(speed, ready)
+
         if (self.side_offset is not None
                 and self._lane_movement(dt, ready, target)):
             location = self.network_location[target]
         else:
             location = self.network_location[ready]
-
-        self._update_distance_to_lock(speed, ready)
 
         if position < self.network_segment_end:
             # Still in same segment.
@@ -502,7 +481,7 @@ class Car(Entity, TrafficAgent):
         self.traffic_node.remove()
         self.traffic_node = curve.insert_agent(self, target)
         for agent in list(self.followers):
-            agent.notify()
+            agent.notify(target)
         self.update = self._on_curve
 
     def _on_curve(self, dt: Duration, ready: int, target: int):
@@ -544,7 +523,7 @@ class Car(Entity, TrafficAgent):
         self._calc_next_location(location)
         self.traffic_node.remove()
         self.traffic_node = location.insert_agent(self, target)
-        self.update_lead()
+        self.update_lead(target)
         if not self.path_last_way:
             self._calc_target_lane(location)
             self._start_lane_change(target, target)
@@ -639,9 +618,9 @@ class Car(Entity, TrafficAgent):
         self._calc_next_location(new_lane)
         self.traffic_node.remove()
         self.traffic_node = new_lane.insert_agent(self, target)
-        self.update_lead()
+        self.update_lead(target)
         if self.lead is None:
-            self._update_previous()
+            self._update_previous(target)
         return True
 
     def _lane_movement(self, dt: Duration, ready: int, target: int) -> bool:
@@ -682,13 +661,13 @@ class Car(Entity, TrafficAgent):
         target_oriented_way = self.path.ways[self.path_segment + 1]
         self.next_location = location.get_curve(target_oriented_way, False)
 
-    def _update_distance_to_lock(self, speed: float, buffer):
+    def _update_distance_to_lock(self, speed: float, buffer: int):
         if self.distance_to_lock is not None:
             self.distance_to_lock -= speed
             if self.distance_to_lock <= 0.0:
                 self.distance_to_lock = None
                 try:
-                    self.lead.lock(self)
+                    self.lead.lock(self, buffer)
                 except AttributeError:
                     print('ops')
 
@@ -696,7 +675,7 @@ class Car(Entity, TrafficAgent):
             self.distance_to_release -= speed
             if self.distance_to_release < 0.0:
                 lock = self.owns.popleft()
-                lock.release(self)
+                lock.release(self, buffer)
                 if self.owns:
                     lock = self.owns[0]
                     self.distance_to_release = (self.distance_to(lock, buffer)
@@ -704,7 +683,7 @@ class Car(Entity, TrafficAgent):
                 else:
                     self.distance_to_release = None
 
-    def _update_previous(self):
+    def _update_previous(self, buffer: int):
         """Update lead for immediate follower on same location.
 
         To be used when the car is inserted in a location and the agent right
@@ -715,11 +694,12 @@ class Car(Entity, TrafficAgent):
             if isinstance(prev, Car):
                 while prev.owns:
                     lock = prev.owns.popleft()
-                    lock.release(prev)
+                    lock.release(prev, buffer)
                 prev.distance_to_release = None
-                prev.update_lead()
+                prev.update_lead(buffer)
 
-    def __str__(self):
+    def debug_str(self):
+        """Get detailed debug string for the car."""
         buffer = Index.INSTANCE.simulation.ready_buffer
         position = self.network_position[buffer]
         position = f'{position:.2f}' if position is not None else ''
@@ -730,7 +710,7 @@ class Car(Entity, TrafficAgent):
                       if self.distance_to_release is not None else 'None')
         return (
             f'{repr(self)} @ {self.network_location[buffer]} : {position}\n'
-            f'lead: {self.lead}    followers: {self.followers}\n'
+            f'lead: {repr(self.lead)}    followers: {self.followers}\n'
             f'owns: {self.owns}\n'
             f'indirect: {indirect}\n'
             f'distance to lock: {to_lock}    '

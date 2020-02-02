@@ -182,8 +182,9 @@ class App:
     def add_car(self, car: Car, position: LanePosition,
                 destination: OrientedWayPosition):
         """Add car with given position and destination."""
-        car.place_at(position)
-        car.set_destination(destination)
+        buffer = INDEX.simulation.ready_buffer
+        car.place_at(position, buffer)
+        car.set_destination(destination, buffer)
         self.agents[car] = Factory.create_car(self.agents_parent, car)
 
     def update_agents(self):
@@ -217,7 +218,7 @@ class App:
 def log_config():
     """Initialize log configuration."""
     log.basicConfig(format='%(levelname)s: %(message)s',
-                    level=log.DEBUG if __debug__ else log.ERROR)
+                    level=log.DEBUG if __debug__ else log.INFO)
 
 
 def panda3d_config():

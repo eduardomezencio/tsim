@@ -67,7 +67,7 @@ class EntityIndex:
             raise ValueError('Entity already has an id.')
         entity.id = next(self.id_count)
         self.entities[entity.id] = entity
-        log.debug('[index] Added %s', entity)
+        log.info('[%s] Added %s', __name__, Entity.__repr__(entity))
 
     def add_static(self, entity: Entity):
         """Add entity as static.
@@ -106,7 +106,7 @@ class EntityIndex:
                 del self.bounding_rects[entity.id]
                 self.updated(entity)
             self.rebuild_path_map()
-            log.debug('[index] Removed %s', entity)
+            log.info('[%s] Removed %s', __name__, entity)
 
     def update_bounding_rect(self, entity: Entity,
                              new_rect: Optional[BoundingRect] = None):
