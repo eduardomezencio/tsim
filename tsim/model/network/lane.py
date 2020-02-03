@@ -238,11 +238,10 @@ class Lane(NetworkLocation):
         orientation there's no need to set the `endpoint`, since an oriented
         way position from the `START` endpoint is equivalent to a way position.
         """
-        offsets = (self.way.geometry.start_offset,
-                   self.way.geometry.end_offset)
-        if self.endpoint != endpoint:
+        offsets = (self.oriented_way.start_offset,
+                   self.oriented_way.end_offset)
+        if self.endpoint is not endpoint:
             position = self.way.length - position
-            offsets = offsets[1::-1]
 
         last_segment = None
         if offsets[0] < position <= self.way.length - offsets[1]:
