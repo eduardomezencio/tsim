@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from collections import deque
-from itertools import chain
+from collections import defaultdict, deque
 from math import inf as INF
-from typing import TYPE_CHECKING, Deque, List, Set, Tuple
+from typing import TYPE_CHECKING, DefaultDict, Deque, List, Set, Tuple
 
 import bezier
 
@@ -54,53 +53,82 @@ class Car(Entity, TrafficAgent):
     Attributes:
         active: Reflects the car's active status in the simulation. When not
             active, the car is not updated.
+
         position: The car world position coordinates.
+
         direction: Vector pointing in the direction the car is facing.
+
         direction_changed: Boolean indicating if car has changed the
             direction in the last update, to be used by the front end.
+
         target_lane: The index of the lane where the car must be to connect
             to the next location in its path.
+
         side_vector: Vector perpendicular to direction, pointing to the
             direction the car must move on lane change.
+
         side_offset: The distance the car is, sideways, in relation to where
             it should be to be in the center of the current lane. Used during
             lane changes for the transition.
+
         network_segment: The index of the segment the car is in, inside its
             current network location.
+
         network_segment_end: The network position where the current segment
             ends.
         curve_override: Curve used to get smooth animation in cases where the
             car enters a curve while there's still some side offset because
             of lane transitions. It's the curve corrected to start in the
             position the car was in.
+
         lead: The agent being followed, used to calculate the behavior of this
             car at each update.
+
         followers: Set of agents that have this car as lead.
+
         diatance_to_lock: The remaining distance to travel before locking the
             traffic lock ahead. Is `Null` when not following a lock or after
             locking the lock.
+
+        distance_to_release: TODO: ???
+
+        lock_queue: TODO: ???
+
+        lock_count: TODO: ???
+
+        waiting: TODO: ???
+
         current_max_speed: The maximum speed this car can reach in the current
             network location, given by both the location's maximum speed and
             the car's maximum speed.
+
         path: The path the car is currently following.
+
         path_segment: The index of the segment of the current path that the car
             is in.
+
         path_last_segment: Indicates whether the car is in the last segment of
             its path.
+
         path_last_way: Indicates whether the car is in the last way of its
             path.
+
         next_location: The next location ahead in the car's path. This location
             must be straight ahead, without need to change lanes, so if the car
             is at a lane and the next curve he will take is from another lane,
             this attribute is `None` until the lane change, then it becomes the
             curve.
+
         speed: The car's current speed (double buffered).
+
         network_location: The car's current location. The location is an object
             where a single line of traffic can happen, like a lane or a curve
             (double buffered).
+
         network_position: The position inside of the current
             `network_location`. This position is measured in meters from the
             beginning of the location (double buffered).
+
         schedule: The agent's schedule.
     """
 
@@ -108,10 +136,11 @@ class Car(Entity, TrafficAgent):
                  'target_lane', 'side_vector', 'side_offset',
                  'network_segment', 'network_segment_end', 'curve_override',
                  'lead', 'followers', 'distance_to_lock',
-                 'distance_to_release', 'owns', 'current_max_speed', 'path',
-                 'path_segment', 'path_last_segment', 'path_last_way',
-                 'next_location', 'speed', 'network_location',
-                 'network_position', 'traffic_node', 'schedule')
+                 'distance_to_release', 'lock_queue', 'lock_count',
+                 'current_max_speed', 'path', 'path_segment',
+                 'path_last_segment', 'path_last_way', 'next_location',
+                 'speed', 'network_location', 'network_position',
+                 'traffic_node', 'schedule')
 
     active: bool
     position: Point
@@ -127,7 +156,9 @@ class Car(Entity, TrafficAgent):
     followers: Set[Car]
     distance_to_lock: float
     distance_to_release: float
-    owns: Deque[TrafficLock]
+    lock_queue: Deque[TrafficLock]
+    lock_count: DefaultDict[TrafficLock, int]
+    waiting: int
     current_max_speed: float
     path: Path
     path_segment: int
@@ -155,7 +186,8 @@ class Car(Entity, TrafficAgent):
         self.followers = set()
         self.distance_to_lock = None
         self.distance_to_release = None
-        self.owns = deque()
+        self.lock_queue = deque()
+        self.lock_count = defaultdict(int)
         self.current_max_speed = MAX_SPEED_MPS
         self.path = None
         self.path_segment = 0
@@ -174,15 +206,6 @@ class Car(Entity, TrafficAgent):
     def owner(self) -> None:
         """Get `None` since this is not a lock."""
         return None
-
-    @property
-    def acquiring(self) -> None:
-        """Get `None` since this is not a lock."""
-        return None
-
-    def owns_indirect(self) -> Set[TrafficLock]:
-        """Get locks owned by locks owned by this car."""
-        return set(chain.from_iterable(l.owns for l in self.owns))
 
     def get_network_position(self, location: NetworkLocation,
                              buffer: int) -> float:
@@ -213,6 +236,7 @@ class Car(Entity, TrafficAgent):
         self.active = active
         Index.INSTANCE.simulation.update_active_set(self)
 
+    # TODO: Here, first remove agent if already placed on a location.
     def place_at(self, network_position: NetworkPosition, buffer: int):
         """Place the car at given `NetworkPosition`.
 
@@ -279,7 +303,7 @@ class Car(Entity, TrafficAgent):
             self._start_lane_change(buffer, buffer)
         self.set_active()
 
-    def find_lead(self) -> Tuple[TrafficAgent, Set[TrafficLock]]:
+    def find_lead(self) -> Tuple[TrafficAgent, bool]:
         """Find the first agent ahead of this one.
 
         If there is some agent ahead on the same network location, this method
@@ -289,37 +313,39 @@ class Car(Entity, TrafficAgent):
         location on the path is checked and the first agent found is returned,
         or `None` if there are no agents.
 
-        All locks that are skipped for being owned by the car are returned as
-        the second value on the tuple.
+        Locks that are owned by the agent and marked as terminal (meaning that
+        all other locks required by this one were acquired) are skipped.
+        Whether the `lead` was skipped is the second element of the returned
+        tuple.
         """
-        owned = set()
+        skipped_lead = False
         for agent in self.traffic_node.next.iterate_forward():
-            if agent.owner is self:
-                owned.add(agent)
+            if agent.owner is self and not agent.terminal:
+                skipped_lead |= agent is self.lead
             else:
-                return agent, owned
+                return agent, skipped_lead
 
         if self.path_last_way:
-            return None, owned
+            return None, skipped_lead
 
         if self.next_location:
             for agent in self.next_location.traffic:
                 if agent is self:
                     break
-                if agent.owner is self:
-                    owned.add(agent)
+                if agent.owner is self and not agent.terminal:
+                    skipped_lead |= agent is self.lead
                 else:
-                    return agent, owned
+                    return agent, skipped_lead
 
-        return None, owned
+        return None, skipped_lead
 
     def update_lead(self, buffer: int):
         """Find new lead for this car and update accordingly."""
-        new_lead, owned = self.find_lead()
+        new_lead, skipped_lead = self.find_lead()
         if new_lead is self.lead:
             return
 
-        if self.lead and (self.lead not in owned):
+        if self.lead and not skipped_lead:
             self.lead.remove_follower(self, buffer)
         else:
             self.distance_to_lock = None
@@ -384,12 +410,28 @@ class Car(Entity, TrafficAgent):
         if not self.active:
             self.set_active()
 
-    def acquire(self, lock: TrafficLock, buffer: int):
+    def start_locking_lead(self, buffer: int):
+        """Start procedure to acquire the lock right ahead of the car."""
+        self.distance_to_lock = None
+        self.waiting = 0
+        self.lead.lock_order[0].lock(self, buffer, True)
+
+    def acquire(self, lock: TrafficLock, buffer: int, terminal: bool):
         """Register acquisition of `lock` by car."""
-        self.owns.append(lock)
-        if self.distance_to_release is None:
-            self.distance_to_release = (self.distance_to(lock, buffer)
-                                        + MINIMUM_DISTANCE)
+        if terminal:
+            self.lock_count[lock] += 1
+            next_index = self.waiting + 1
+            if next_index >= len(self.lead.lock_order):
+                self.lead.lock(self, buffer, False)
+            else:
+                self.waiting = next_index
+                self.lead.lock_order[next_index].lock(self, buffer, True)
+        else:
+            self.lock_queue.append(lock)
+            if self.distance_to_release is None:
+                self.distance_to_release = (self.distance_to(lock, buffer)
+                                            + MINIMUM_DISTANCE)
+            self.notify(buffer)
 
     def add_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Register agent as follower."""
@@ -665,21 +707,17 @@ class Car(Entity, TrafficAgent):
         if self.distance_to_lock is not None:
             self.distance_to_lock -= speed
             if self.distance_to_lock <= 0.0:
-                self.distance_to_lock = None
-                try:
-                    self.lead.lock(self, buffer)
-                except AttributeError:
-                    print('ops')
+                self.start_locking_lead(buffer)
 
         if self.distance_to_release is not None:
             self.distance_to_release -= speed
             if self.distance_to_release < 0.0:
-                lock = self.owns.popleft()
+                lock = self.lock_queue.popleft()
                 lock.release(self, buffer)
-                if self.owns:
-                    lock = self.owns[0]
-                    self.distance_to_release = (self.distance_to(lock, buffer)
-                                                + MINIMUM_DISTANCE)
+                if self.lock_queue:
+                    self.distance_to_release = (
+                        self.distance_to(self.lock_queue[0], buffer)
+                        + MINIMUM_DISTANCE)
                 else:
                     self.distance_to_release = None
 
@@ -692,8 +730,8 @@ class Car(Entity, TrafficAgent):
         if self.traffic_node.has_previous:
             prev = self.traffic_node.previous.data
             if isinstance(prev, Car):
-                while prev.owns:
-                    lock = prev.owns.popleft()
+                while prev.lock_queue:
+                    lock = prev.lock_queue.popleft()
                     lock.release(prev, buffer)
                 prev.distance_to_release = None
                 prev.update_lead(buffer)
@@ -703,7 +741,9 @@ class Car(Entity, TrafficAgent):
         buffer = Index.INSTANCE.simulation.ready_buffer
         position = self.network_position[buffer]
         position = f'{position:.2f}' if position is not None else ''
-        indirect = sorted(l.id for l in self.owns_indirect())
+        lock_count = ', '.join(f'{k.id}: {v}'
+                               for k, v in self.lock_count.items()
+                               if v != 0)
         to_lock = (f'{self.distance_to_lock:.2f}    '
                    if self.distance_to_lock is not None else 'None')
         to_release = (f'{self.distance_to_release:.2f}'
@@ -711,8 +751,8 @@ class Car(Entity, TrafficAgent):
         return (
             f'{repr(self)} @ {self.network_location[buffer]} : {position}\n'
             f'lead: {repr(self.lead)}    followers: {self.followers}\n'
-            f'owns: {self.owns}\n'
-            f'indirect: {indirect}\n'
+            f'lock_queue: {self.lock_queue}\n'
+            f'lock_count: {lock_count}\n'
             f'distance to lock: {to_lock}    '
             f'distance to release: {to_release}')
 

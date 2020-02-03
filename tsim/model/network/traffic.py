@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional, Sequence
+from typing import Deque, Optional, Mapping, Sequence
 
 from tsim.model.network.location import NetworkLocation
 from tsim.utils.linkedlist import LinkedList, LinkedListNode
@@ -13,7 +13,6 @@ class TrafficAgent(ABC):
     """Base for classes that can be part of the traffic."""
 
     owner: Optional[TrafficAgent]
-    acquiring: Optional[TrafficAgent]
     speed: Sequence[float]
     traffic_node: LinkedListNode[TrafficAgent]
 
@@ -30,14 +29,6 @@ class TrafficAgent(ABC):
         """Get whether agent is at given `location`."""
 
     @abstractmethod
-    def notify(self, buffer: int):
-        """Notify this agent of lead events."""
-
-    @abstractmethod
-    def acquire(self, lock: TrafficLock, buffer: int):
-        """Register acquisition of `lock` by agent."""
-
-    @abstractmethod
     def add_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Register agent as follower."""
 
@@ -50,7 +41,17 @@ class TrafficDynamicAgent(TrafficAgent):
     """Base class for agents that move."""
 
     lead: TrafficAgent
+    lock_queue: Deque[TrafficLock]
+    lock_count: Mapping[TrafficLock, int]
     distance_to_lock: float
+
+    @abstractmethod
+    def acquire(self, lock: TrafficLock, buffer: int, terminal: bool):
+        """Register acquisition of `lock` by agent."""
+
+    @abstractmethod
+    def notify(self, buffer: int):
+        """Notify this agent of lead events."""
 
     @abstractmethod
     def distance_to_lead(self, buffer: int) -> float:
@@ -60,14 +61,13 @@ class TrafficDynamicAgent(TrafficAgent):
 class TrafficLock(TrafficAgent):
     """Base class for lockable traffic resources."""
 
-    owner_secondary: Optional[TrafficDynamicAgent]
-
     @abstractmethod
-    def lock(self, agent: TrafficAgent, buffer: int, terminal: bool = False):
+    def lock(self, agent: TrafficDynamicAgent, buffer: int,
+             terminal: bool = False):
         """Lock this traffic lock to `agent`."""
 
     @abstractmethod
-    def release(self, agent: TrafficAgent, buffer: int,
+    def release(self, agent: TrafficDynamicAgent, buffer: int,
                 terminal: bool = False):
         """Release this lock by `agent`."""
 

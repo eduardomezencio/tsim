@@ -126,12 +126,10 @@ class ConflictPoint(TrafficLock):
     type: ConflictPointType
     neighbors: Set[ConflictPoint]
     curves: Set[Curve]
-    lock_order: List[ConflictPoint]
+    lock_order: Tuple[ConflictPoint, ...]
     owner: Optional[TrafficAgent]
-    owner_secondary: Optional[TrafficDynamicAgent]
-    acquiring: TrafficDynamicAgent
+    terminal: bool
     queue: Deque[Tuple[TrafficAgent, bool]]
-    waiting: int
     traffic_node: LinkedListNode[ConflictPoint]
 
     def __init__(self, id_: int, point: Point, type_: ConflictPointType):
@@ -140,18 +138,16 @@ class ConflictPoint(TrafficLock):
         self.type = type_
         self.neighbors = set()
         self.curves = set()
-        self.lock_order = None
+        self.lock_order = ()
         self.owner = None
-        self.owner_secondary = None
-        self.acquiring = None
+        self.terminal = False
         self.queue = deque()
-        self.waiting = 0
         self.traffic_node = None
 
     @property
-    def owns(self) -> Iterable[TrafficLock]:
-        """Get locks owned by this conflict point."""
-        return (n for n in self.neighbors if n.owner is self)
+    def lock_queue(self) -> Iterable[TrafficLock]:
+        """Get owned lock queue, always empty for conflict points."""
+        return ()
 
     @property
     def speed(self) -> float:
@@ -170,29 +166,27 @@ class ConflictPoint(TrafficLock):
 
     def create_lock_order(self):
         """Create the `lock_order` list after `neighbors` is filled."""
-        self.lock_order = sorted(chain(self.neighbors, [self]),
-                                 key=lambda cp: cp.id)
-
-    def acquire(self, lock: TrafficLock, buffer: int):
-        """Register acquisition of `lock` by agent."""
+        self.lock_order = tuple(sorted(chain(self.neighbors, [self]),
+                                       key=lambda cp: cp.id))
 
     def add_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Register agent as follower."""
         distance = agent.distance_to_lead(buffer)
         lock_distance = 10  # TODO: Remove hard-coded distance here.
         if distance <= lock_distance:
-            self.lock(agent, buffer)
+            agent.start_locking_lead(buffer)
         else:
             agent.distance_to_lock = distance - lock_distance
 
     def remove_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Unregister agent as follower."""
         agent.distance_to_lock = None
-        # Here release was probably already called, but is called in case
+        # Here release was probably already called, but is called just in case
         # some agent got in the way before `agent` could reach the lock.
         self.release(agent, buffer)
 
-    def lock(self, agent: TrafficAgent, buffer: int, terminal: bool = False):
+    def lock(self, agent: TrafficDynamicAgent, buffer: int,
+             terminal: bool = False):
         """Lock this traffic lock to `agent`.
 
         If the lock is available, start the lock process immediately. If
@@ -200,7 +194,12 @@ class ConflictPoint(TrafficLock):
         neighbors. If the lock is not available, the `(agent, terminal)` tuple
         is added to the queue.
         """
-        if terminal and self.owner_secondary is agent.acquiring:
+        # If not terminal, assume agent already owns the lock, because he had
+        # to acquire all terminals before locking with terminal=False.
+        already_owned = (not terminal
+                         or (self in agent.lock_count
+                             and agent.lock_count[self] > 0))
+        if already_owned:
             self.queue.appendleft((agent, terminal))
             self._dequeue(buffer)
             return
@@ -209,24 +208,29 @@ class ConflictPoint(TrafficLock):
         if self.owner is None:
             self._dequeue(buffer)
 
-    def release(self, agent: TrafficAgent, buffer: int,
+    def release(self, agent: TrafficDynamicAgent, buffer: int,
                 terminal: bool = False):
         """Release this lock.
 
-        If not `terminal` release all neighbors.
+        If `terminal` is false, will release all neighbors in order, calling
+        recursively with `terminal=True`.
         """
         if self.owner is not agent:
             return
 
-        self.owner = None
-        self._dequeue(buffer)
-
         if terminal:
-            self.owner_secondary = None
+            lock_count = agent.lock_count[self]
+            assert lock_count > 0
+            if lock_count == 1:
+                del agent.lock_count[self]
+                self.owner = None
+                self._dequeue(buffer)
+            else:
+                agent.lock_count[self] -= 1
         else:
+            for lock in self.lock_order:
+                lock.release(agent, buffer, True)
             self._pass(agent)
-            for cpoint in self.neighbors:
-                cpoint.release(self, buffer, True)
 
     def _pass(self, agent: TrafficAgent):
         node = self.traffic_node.previous
@@ -234,30 +238,12 @@ class ConflictPoint(TrafficLock):
             node.remove()
             agent.traffic_node = self.traffic_node.insert_after(agent)
 
-    def notify(self, buffer: int):
-        """Notify this agent of lead events."""
-        next_ = self.waiting + 1
-        if next_ >= len(self.lock_order):
-            self.owner = self.acquiring
-            self.owner.acquire(self, buffer)
-            self.owner.notify(buffer)
-        else:
-            self.waiting = next_
-            self.lock_order[next_].lock(self, buffer, True)
-
     def _dequeue(self, buffer: int):
         """Lock to the next agent in the queue."""
         agent, terminal = self.queue.popleft() if self.queue else (None, None)
-        if agent is None:
-            return
-        if terminal:
-            self.owner = agent
-            self.owner_secondary = agent.acquiring
-            agent.notify(buffer)
-        else:
-            self.acquiring = agent
-            self.waiting = 0
-            self.lock_order[0].lock(self, buffer, True)
+        if agent is not None:
+            self.owner, self.terminal = agent, terminal
+            agent.acquire(self, buffer, terminal)
 
     def __repr__(self):
         return f'{ConflictPoint.__name__}(id={self.id})'
