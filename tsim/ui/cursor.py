@@ -112,7 +112,8 @@ class Cursor(DirectObject):
             self._collision_handler.sort_entries()
             node_path = (self._collision_handler.get_entry(0)
                          .get_into_node_path())
-            self.actor.set_pos(node_path, 0.0, 0.0, 2.0)
+            self.position = node_path.get_pos(p3d.RENDER)
+            self.actor.set_z(2.0)
             self.pointed_at = node_path
         else:
             self.pointed_at = None

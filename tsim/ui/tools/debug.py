@@ -112,6 +112,7 @@ class Debug(Tool):
             return
 
         self.text_dict['network_position'] = f'{selected} - {selected.xurl}'
+
         if isinstance(selected, Way):
             position = selected.way_position_raw(self.cursor.position)
             way_position, lane_index = position

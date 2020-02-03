@@ -24,10 +24,11 @@ CARD_MAKER = CardMaker('lane_connections_card_maker')
 CARD_MAKER.set_frame((-16, 16, -16, 16))
 COLORS = ('crimson', 'orange', 'gold', 'limegreen',
           'turquoise', 'deepskyblue', 'blueviolet', 'hotpink')
-RESOLUTION = 1024
+RESOLUTION = 2048
 MIDDLE = Vector(RESOLUTION // 2, -RESOLUTION // 2)
 PPM = RESOLUTION // 32
 VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
+FONT = aggdraw.Font('black', 'fonts/freemono-numbers.otf', 15)
 
 
 def create(parent: NodePath, node: Node) -> NodePath:
@@ -121,7 +122,12 @@ def _create_lane_connections_image(node: Node) -> Image:
                                       node.intersection.curves.values()))
     for cpoint in cpoints:
         point = (cpoint.point * PPM + MIDDLE).y_flipped()
-        draw.ellipse(point.enclosing_rect(0.25 * PPM), pen, brush[cpoint.type])
+        draw.ellipse(point.enclosing_rect(0.25 * PPM),
+                     pen, brush[cpoint.type])
+        text = str(cpoint.id)
+        width, height = draw.textsize(text, FONT)
+        draw.text((point.x - width / 2, point.y - height / 2),
+                  text, FONT)
 
     pen = aggdraw.Pen('black', 1, 32)
     for cpoint in cpoints:
