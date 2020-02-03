@@ -136,7 +136,7 @@ class Car(Entity, TrafficAgent):
                  'target_lane', 'side_vector', 'side_offset',
                  'network_segment', 'network_segment_end', 'curve_override',
                  'lead', 'followers', 'distance_to_lock',
-                 'distance_to_release', 'lock_queue', 'lock_count',
+                 'distance_to_release', 'lock_queue', 'lock_count', 'waiting',
                  'current_max_speed', 'path', 'path_segment',
                  'path_last_segment', 'path_last_way', 'next_location',
                  'speed', 'network_location', 'network_position',
