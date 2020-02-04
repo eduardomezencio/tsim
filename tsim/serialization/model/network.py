@@ -59,10 +59,7 @@ def _conflict_point_setstate(self: ConflictPoint, state):
     self.neighbors = set()
     self.curves = set()
     self.owner = None
-    self.owner_secondary = None
-    self.acquiring = None
     self.queue = deque()
-    self.waiting = 0
 
 
 def _curve_getstate(self: Curve):
