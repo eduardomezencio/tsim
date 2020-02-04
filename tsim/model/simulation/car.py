@@ -129,6 +129,12 @@ class Car(Entity, TrafficAgent):
             `network_location`. This position is measured in meters from the
             beginning of the location (double buffered).
 
+        traffic_node: TODO: ???
+
+        shadow_location: TODO: ???
+
+        shadow_node: TODO: ???
+
         schedule: The agent's schedule.
     """
 
@@ -140,7 +146,7 @@ class Car(Entity, TrafficAgent):
                  'current_max_speed', 'path', 'path_segment',
                  'path_last_segment', 'path_last_way', 'next_location',
                  'speed', 'network_location', 'network_position',
-                 'traffic_node', 'schedule')
+                 'traffic_node', 'shadow_location', 'shadow_node', 'schedule')
 
     active: bool
     position: Point
@@ -169,6 +175,8 @@ class Car(Entity, TrafficAgent):
     network_location: List[NetworkLocation]
     network_position: List[float]
     traffic_node: LinkedListNode[Car]
+    shadow_location: NetworkLocation
+    shadow_node: LinkedListNode[Car]
     schedule: Schedule
 
     def __init__(self, schedule: Schedule = None):
@@ -198,6 +206,8 @@ class Car(Entity, TrafficAgent):
         self.network_location = [None, None]
         self.network_position = [0.0, 0.0]
         self.traffic_node = None
+        self.shadow_location = None
+        self.shadow_node = None
         self.schedule = schedule
         super().__init__()
         Index.INSTANCE.simulation.add(self)
@@ -217,7 +227,8 @@ class Car(Entity, TrafficAgent):
 
     def is_at(self, location: NetworkLocation, buffer: int) -> bool:
         """Get whether car is at given `location`."""
-        return self.network_location[buffer] is location
+        return (self.network_location[buffer] is location
+                or self.shadow_location is location)
 
     def oriented_way_position(self, ready: int) -> OrientedWayPosition:
         """Get the car's current `OrientedWayPosition`."""
@@ -272,8 +283,7 @@ class Car(Entity, TrafficAgent):
         self.traffic_node = network_position.location.insert_agent(
             self, buffer)
         self.update_lead(buffer)
-        if self.lead is None:
-            self._update_previous(buffer)
+        self._update_previous(buffer)
 
         self.set_active(False)
 
@@ -418,20 +428,24 @@ class Car(Entity, TrafficAgent):
 
     def acquire(self, lock: TrafficLock, buffer: int, terminal: bool):
         """Register acquisition of `lock` by car."""
-        if terminal:
-            self.lock_count[lock] += 1
-            next_index = self.waiting + 1
-            if next_index >= len(self.lead.lock_order):
-                self.lead.lock(self, buffer, False)
+        try:
+            if terminal:
+                self.lock_count[lock] += 1
+                next_index = self.waiting + 1
+                if next_index >= len(self.lead.lock_order):
+                    self.lead.lock(self, buffer, False)
+                else:
+                    self.waiting = next_index
+                    self.lead.lock_order[next_index].lock(self, buffer, True)
             else:
-                self.waiting = next_index
-                self.lead.lock_order[next_index].lock(self, buffer, True)
-        else:
-            self.lock_queue.append(lock)
-            if self.distance_to_release is None:
-                self.distance_to_release = (self.distance_to(lock, buffer)
-                                            + MINIMUM_DISTANCE)
-            self.notify(buffer)
+                self.lock_queue.append(lock)
+                if self.distance_to_release is None:
+                    self.distance_to_release = (self.distance_to(lock, buffer)
+                                                + MINIMUM_DISTANCE)
+                self.notify(buffer)
+        except AttributeError:
+            import tsim.ui.panda3d as p3d
+            p3d.MESSENGER.send('focus', [self])
 
     def add_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Register agent as follower."""
@@ -441,8 +455,9 @@ class Car(Entity, TrafficAgent):
 
     def remove_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Unregister agent as follower."""
-        self.followers.discard(agent)
-        self._update_previous(buffer)
+        if agent in self.followers:
+            self.followers.remove(agent)
+            self._update_previous(buffer)
 
     def update(self,  # pylint: disable=method-hidden
                dt: Duration, ready: int, target: int):
@@ -513,6 +528,7 @@ class Car(Entity, TrafficAgent):
         curve = location.get_curve(target_oriented_way)
         self._calc_next_location(curve)
         self._calc_curve_override(curve)
+        self._end_lane_change(target)
         self.position = curve.evaluate_position(offset, self.curve_override)
         self.network_segment = 0
         self.network_segment_end = curve.length
@@ -658,11 +674,11 @@ class Car(Entity, TrafficAgent):
         self.network_location[target] = new_lane
         self.network_position[target] = new_position.position
         self._calc_next_location(new_lane)
-        self.traffic_node.remove()
+        self.shadow_location = lane
+        self.shadow_node = self.traffic_node
         self.traffic_node = new_lane.insert_agent(self, target)
         self.update_lead(target)
-        if self.lead is None:
-            self._update_previous(target)
+        self._update_previous(target)
         return True
 
     def _lane_movement(self, dt: Duration, ready: int, target: int) -> bool:
@@ -676,10 +692,23 @@ class Car(Entity, TrafficAgent):
         self.side_offset -= side_movement
         self.position += self.side_vector * side_movement
         if self.side_offset <= 0:
-            self.side_offset = None
-            self.side_vector = None
+            self._end_lane_change(target)
             return self._start_lane_change(ready, target)
         return False
+
+    def _end_lane_change(self, buffer: int):
+        self.side_offset = None
+        self.side_vector = None
+        if self.shadow_node is not None:
+            shadow_previous = (self.shadow_node.previous.data
+                               if self.shadow_node.has_previous else None)
+            self.shadow_location = None
+            self.shadow_node.remove()
+            self.shadow_node = None
+            if shadow_previous is not None:
+                shadow_previous.notify(buffer)
+            self.followers.clear()
+            self._update_previous(buffer)
 
     def _calc_curve_override(self, curve: Curve):
         if self.side_offset is None:
@@ -688,7 +717,6 @@ class Car(Entity, TrafficAgent):
             nodes = curve.curve.nodes
             nodes[:, 0] = list(self.position)
             self.curve_override = bezier.Curve(nodes, degree=2)
-            self.side_offset = None
 
     def _calc_next_location(self, location: NetworkLocation):
         if self.path_last_way:

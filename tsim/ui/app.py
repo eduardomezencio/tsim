@@ -83,8 +83,14 @@ class App:
 
         p3d.BASE.accept('entities_changed', self.on_network_entities_changed)
         p3d.BASE.accept('new_agent', self.enqueue_event)
+        p3d.BASE.accept('focus', self.focus)
 
         self.scene.reparent_to(p3d.RENDER)
+
+    def focus(self, *args):
+        self.camera.focus.set_x(args[0].position.x)
+        self.camera.focus.set_y(args[0].position.y)
+        self._simulation_speed = 0
 
     @property
     def simulation_speed(self) -> int:
