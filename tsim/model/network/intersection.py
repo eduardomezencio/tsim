@@ -185,6 +185,9 @@ class ConflictPoint(TrafficLock):
         # some agent got in the way before `agent` could reach the lock.
         self.release(agent, buffer)
 
+    def notify(self, buffer: int):
+        """Notify this agent of lead events."""
+
     def lock(self, agent: TrafficDynamicAgent, buffer: int,
              terminal: bool = False):
         """Lock this traffic lock to `agent`.

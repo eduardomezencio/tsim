@@ -36,6 +36,10 @@ class TrafficAgent(ABC):
     def remove_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Unregister agent as follower."""
 
+    @abstractmethod
+    def notify(self, buffer: int):
+        """Notify this agent of lead events."""
+
 
 class TrafficDynamicAgent(TrafficAgent):
     """Base class for agents that move."""
@@ -48,10 +52,6 @@ class TrafficDynamicAgent(TrafficAgent):
     @abstractmethod
     def acquire(self, lock: TrafficLock, buffer: int, terminal: bool):
         """Register acquisition of `lock` by agent."""
-
-    @abstractmethod
-    def notify(self, buffer: int):
-        """Notify this agent of lead events."""
 
     @abstractmethod
     def distance_to_lead(self, buffer: int) -> float:
