@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging as log
 from collections import deque
 from functools import partial
+from itertools import chain
 from math import floor
+from random import random, seed, shuffle
 from typing import Dict, Tuple
 
 from direct.task import Task
@@ -27,6 +29,7 @@ from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
 from tsim.ui.objects import factory as Factory, world as World
 from tsim.ui.sky import Sky
+from tsim.utils.iterators import window_iter
 
 FRAME_DURATION = 1 / 60
 SPEED_STEPS = 4
@@ -75,7 +78,9 @@ class App:
         INDEX.simulation.time = 6.5 * HOUR
         self.sky.set_time(8.0)
 
-        self._simulation_speed = SPEED_STEPS
+        self._frame_count = 0
+        self._simulation_speed = 0
+
         p3d.BASE.accept('wheel_up',
                         partial(self.change_simulation_speed, 1))
         p3d.BASE.accept('wheel_down',
@@ -87,10 +92,27 @@ class App:
 
         self.scene.reparent_to(p3d.RENDER)
 
+        seed(1)
+        self.generate_random_cars()
+
     def focus(self, *args):
         self.camera.focus.set_x(args[0].position.x)
         self.camera.focus.set_y(args[0].position.y)
         self._simulation_speed = 0
+
+    def generate_random_cars(self, limit=500):
+        lanes = list(chain.from_iterable(w.lanes for w in
+                                         INDEX.get_all(of_type=Way)))[:limit]
+        shuffle(lanes)
+        for lane1, lane2 in window_iter(lanes):
+            distance1 = random() * lane1.length
+            distance2 = random() * lane2.length
+            path = INDEX.path_map.path(lane1.oriented_way_position(distance1),
+                                       lane2.oriented_way_position(distance2))
+            if path is None:
+                continue
+            self.add_car(Car(), LanePosition(lane1, distance1),
+                         lane2.oriented_way_position(distance2))
 
     @property
     def simulation_speed(self) -> int:
@@ -109,14 +131,17 @@ class App:
 
     def update(self, _task: Task):
         """Update task, to run every frame."""
-        if self.simulation_speed > 0:
+        self._frame_count += self._simulation_speed
+
+        while self._frame_count >= SPEED_STEPS:
+            self._frame_count -= SPEED_STEPS
             INDEX.simulation.update(FRAME_DURATION * self.simulation_speed
                                     / SPEED_STEPS)
             self.update_agents()
 
-        while self._event_queue:
-            event = self._event_queue.popleft()
-            App.event_handlers[type(event[0])](self, *event)
+            while self._event_queue:
+                event = self._event_queue.popleft()
+                App.event_handlers[type(event[0])](self, *event)
 
         self.camera.update()
         self.sky.set_time(normalized_hours(INDEX.simulation.time))

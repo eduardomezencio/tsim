@@ -26,6 +26,14 @@
             "args": ["data/custom.osm"]
         },
         {
+            "name": "Python: tsim [custom2]",
+            "type": "python",
+            "request": "launch",
+            "module": "tsim",
+            "console": "integratedTerminal",
+            "args": ["data/custom2.osm"]
+        },
+        {
             "name": "Python: tsim [intersection]",
             "type": "python",
             "request": "launch",

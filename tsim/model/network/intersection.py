@@ -223,7 +223,10 @@ class ConflictPoint(TrafficLock):
 
         if terminal:
             lock_count = agent.lock_count[self]
-            assert lock_count > 0
+            if not lock_count > 0:
+                import tsim.ui.panda3d as p3d
+                p3d.MESSENGER.send('focus', [agent])
+                return
             if lock_count == 1:
                 del agent.lock_count[self]
                 self.owner = None
