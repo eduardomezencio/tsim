@@ -23,7 +23,7 @@ setup(
         'Intended Audience :: End Users/Desktop',
         'Intended Audience :: Science/Research',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Topic :: Games/Entertainment :: Simulation'
     ],
     keywords='traffic simulation agent-based',

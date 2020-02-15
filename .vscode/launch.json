@@ -34,6 +34,14 @@
             "args": ["data/custom2.osm"]
         },
         {
+            "name": "Python: tsim [custom3]",
+            "type": "python",
+            "request": "launch",
+            "module": "tsim",
+            "console": "integratedTerminal",
+            "args": ["data/custom3.osm"]
+        },
+        {
             "name": "Python: tsim [intersection]",
             "type": "python",
             "request": "launch",
@@ -48,7 +56,7 @@
             "program": "${workspaceFolder}/scripts/osm_reader.py",
             "console": "integratedTerminal",
             "args": ["data/${input:mapName}.osm"],
-            "env": {"PYTHONPATH": "${workspaceFolder}"}
+            "env": { "PYTHONPATH": "${workspaceFolder}" }
         },
         {
             "name": "Python: osm_cleaner",
@@ -57,7 +65,13 @@
             "program": "${workspaceFolder}/scripts/osm_cleaner.py",
             "console": "integratedTerminal",
             "args": ["data/${input:mapName}.osm", "data/${input:mapName}.osm"],
-            "env": {"PYTHONPATH": "${workspaceFolder}"}
+            "env": { "PYTHONPATH": "${workspaceFolder}" }
+        },
+        {
+            "name": "Python: Attach using Process Id",
+            "type": "python",
+            "request": "attach",
+            "processId": "${command:pickProcess}"
         }
     ],
     "inputs": [
