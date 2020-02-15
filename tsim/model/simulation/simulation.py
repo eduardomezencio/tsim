@@ -2,29 +2,28 @@
 
 from __future__ import annotations
 
-from typing import Set
+from collections import deque
+from typing import Callable, Deque, Set, Tuple
 
 from tsim.model.network.traffic import TrafficDynamicAgent
-from tsim.model.units import Duration
+from tsim.model.units import Duration, Timestamp
 
 
 class Simulation:
     """Agent-based simulation."""
 
-    time: int
+    time: Timestamp
     agents: Set[TrafficDynamicAgent]
     active: Set[TrafficDynamicAgent]
     ready_buffer: int
-    _active_updates: Set[TrafficDynamicAgent]
-    _in_update: bool
+    _queue: Deque[Tuple[Callable, Tuple]]
 
     def __init__(self):
         self.time = 0
         self.agents = set()
         self.active = set()
         self.ready_buffer = 0
-        self._active_updates = set()
-        self._in_update = False
+        self._queue = deque()
 
     @property
     def target_buffer(self) -> int:
@@ -41,22 +40,19 @@ class Simulation:
         ready = self.ready_buffer
         target = (ready + 1) % 2
 
-        self._in_update = True
         for agent in self.active:
             agent.update(dt, ready, target)
-        self._in_update = False
 
-        if self._active_updates:
-            for agent in self._active_updates:
-                self._activate_or_deactivate(agent)
-            self._active_updates.clear()
+        while self._queue:
+            callable_, args = self._queue.popleft()
+            callable_(*args)
 
         self.time += dt
         self.flip_buffer()
 
     def flip_buffer(self):
         """Flip ready buffer index."""
-        self.ready_buffer = (self.ready_buffer + 1) % 2
+        self.ready_buffer = self.target_buffer
 
     def update_active_set(self, agent: TrafficDynamicAgent):
         """Activate or deactivate agent according to its `active` attribute.
@@ -65,17 +61,18 @@ class Simulation:
         called instead of adding or removing directly from the active set,
         because the set is being iterated and cannot change during iteration.
         """
-        if self._in_update:
-            self._active_updates.add(agent)
-        else:
-            self._activate_or_deactivate(agent)
+        self.enqueue(self.active.add if agent.active else self.active.discard,
+                     (agent,))
 
-    def _activate_or_deactivate(self, agent: TrafficDynamicAgent):
-        """Add or remove agent from `active` set."""
-        if agent.active:
-            self.active.add(agent)
-        else:
-            try:
-                self.active.remove(agent)
-            except KeyError:
-                pass
+    def enqueue(self, callable_: Callable, args: Tuple):
+        """Enqueue function to be called after update loop ends."""
+        self._queue.append((callable_, args))
+
+    # TODO: Remove or rewrite in a way to not mix panda3d in simulation code.
+    def debug_focus(self, agent):
+        """Send panda3d message to focus on agent.
+
+        FOR DEBUG ONLY.
+        """
+        import tsim.ui.panda3d as p3d
+        p3d.MESSENGER.send('focus', [agent])

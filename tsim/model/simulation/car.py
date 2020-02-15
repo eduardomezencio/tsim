@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging as log
 from collections import defaultdict, deque
+from itertools import repeat
 from math import inf as INF
 from typing import TYPE_CHECKING, DefaultDict, Deque, List, Set, Tuple
 
@@ -122,8 +124,7 @@ class Car(Entity, TrafficAgent):
         speed: The car's current speed (double buffered).
 
         network_location: The car's current location. The location is an object
-            where a single line of traffic can happen, like a lane or a curve
-            (double buffered).
+            where a single line of traffic can happen, like a lane or a curve.
 
         network_position: The position inside of the current
             `network_location`. This position is measured in meters from the
@@ -172,7 +173,7 @@ class Car(Entity, TrafficAgent):
     path_last_way: bool
     next_location: NetworkLocation
     speed: List[float]
-    network_location: List[NetworkLocation]
+    network_location: NetworkLocation
     network_position: List[float]
     traffic_node: LinkedListNode[Car]
     shadow_location: NetworkLocation
@@ -203,7 +204,7 @@ class Car(Entity, TrafficAgent):
         self.path_last_way = False
         self.next_location = None
         self.speed = [0.0, 0.0]
-        self.network_location = [None, None]
+        self.network_location = None
         self.network_position = [0.0, 0.0]
         self.traffic_node = None
         self.shadow_location = None
@@ -225,15 +226,15 @@ class Car(Entity, TrafficAgent):
         """
         return self.network_position[buffer]
 
-    def is_at(self, location: NetworkLocation, buffer: int) -> bool:
+    def is_at(self, location: NetworkLocation) -> bool:
         """Get whether car is at given `location`."""
-        return (self.network_location[buffer] is location
-                or self.shadow_location is location)
+        return (self.network_location is location or
+                self.shadow_location is location)
 
     def oriented_way_position(self, ready: int) -> OrientedWayPosition:
         """Get the car's current `OrientedWayPosition`."""
-        location = self.network_location[ready]
-        return location.oriented_way_position(self.network_position[ready])
+        return self.network_location.oriented_way_position(
+            self.network_position[ready])
 
     def set_active(self, active: bool = True):
         """Activate or deactivate the car.
@@ -267,9 +268,9 @@ class Car(Entity, TrafficAgent):
         self.path_segment = 0
         self.path_last_segment = False
         self.path_last_way = False
-        self.speed[buffer] = 0.0
-        self.network_location[buffer] = network_position.location
-        self.network_position[buffer] = network_position.position
+        self.speed[0:2] = 0.0, 0.0
+        self.network_location = network_position.location
+        self.network_position[0:2] = repeat(network_position.position, 2)
 
         lane = network_position.location
         if isinstance(lane, Lane):
@@ -287,13 +288,14 @@ class Car(Entity, TrafficAgent):
 
         self.set_active(False)
 
-    def set_destination(self, destination: OrientedWayPosition, buffer: int):
+    def set_destination(self, destination: OrientedWayPosition,
+                        ready: int, target: int):
         """Set the car's destination.
 
         Tries to find a path from the car location to the given destination. If
         a path is found, it's set as the car's path and the car is activated.
         """
-        oriented_way = self.oriented_way_position(buffer)
+        oriented_way = self.oriented_way_position(ready)
         self.path = Index.INSTANCE.path_map.path(oriented_way, destination)
         self.path_segment = 0
         self.path_last_segment = False
@@ -301,16 +303,16 @@ class Car(Entity, TrafficAgent):
         if self.path is None:
             return
 
-        lane = self.network_location[buffer]
+        lane = self.network_location
         if isinstance(lane, Curve):
             lane = lane.dest
         self.path_last_way = self.path_segment == len(self.path.ways) - 1
         self._calc_segment_end(lane, self.network_segment_end)
         self._calc_next_location(lane)
         if not self.path_last_way:
-            self.update_lead(buffer)
+            self.update_lead(ready)
             self._calc_target_lane(lane)
-            self._start_lane_change(buffer, buffer)
+            self._start_lane_change(lane, ready, target)
         self.set_active()
 
     def find_lead(self) -> Tuple[TrafficAgent, bool]:
@@ -369,10 +371,10 @@ class Car(Entity, TrafficAgent):
         if self.lead is None:
             return INF
 
-        location = self.network_location[buffer]
+        location = self.network_location
         position = self.network_position[buffer]
 
-        if self.lead.is_at(location, buffer):
+        if self.lead.is_at(location):
             lead_position = self.lead.get_network_position(location, buffer)
             return lead_position - position
 
@@ -396,10 +398,10 @@ class Car(Entity, TrafficAgent):
         Checks in current location and next location ahead. Returns 0.0 if
         `other` is not found in this interval.
         """
-        location = self.network_location[buffer]
+        location = self.network_location
         position = self.network_position[buffer]
 
-        if other.is_at(location, buffer):
+        if other.is_at(location):
             other_position = other.get_network_position(location, buffer)
             return other_position - position
 
@@ -419,6 +421,11 @@ class Car(Entity, TrafficAgent):
         self.update_lead(buffer)
         if not self.active:
             self.set_active()
+
+    def notify_followers(self, buffer: int):
+        """Notify followers of events."""
+        for agent in list(self.followers):
+            agent.notify(buffer)
 
     def start_locking_lead(self, buffer: int):
         """Start procedure to acquire the lock right ahead of the car."""
@@ -443,9 +450,9 @@ class Car(Entity, TrafficAgent):
                     self.distance_to_release = (self.distance_to(lock, buffer)
                                                 + MINIMUM_DISTANCE)
                 self.notify(buffer)
-        except AttributeError:
-            import tsim.ui.panda3d as p3d
-            p3d.MESSENGER.send('focus', [self])
+        except AttributeError as error:
+            Index.INSTANCE.simulation.debug_focus(self)
+            log.error('%s', str(error))
 
     def add_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Register agent as follower."""
@@ -459,8 +466,35 @@ class Car(Entity, TrafficAgent):
             self.followers.remove(agent)
             self._update_previous(buffer)
 
-    def update(self,  # pylint: disable=method-hidden
-               dt: Duration, ready: int, target: int):
+    def enqueue_network_location_change(self, location: NetworkLocation,
+                                        target: int, to_curve: bool):
+        """Enqueue location change for the end of the simulation frame."""
+        def _network_location_change():
+            if to_curve:
+                self._end_lane_change(target)
+            self.network_location = location
+            self.traffic_node.remove()
+            self.traffic_node = location.insert_agent(self, target)
+            if to_curve:
+                self.notify_followers(target)
+            else:
+                self.update_lead(target)
+        Index.INSTANCE.simulation.enqueue(_network_location_change, ())
+
+    def enqueue_lane_change(self, location: NetworkLocation, target: int):
+        """Enqueue lane change for the end of the simulation frame."""
+        def _lane_change():
+            old_location = self.network_location
+            self.network_location = location
+            self.shadow_location = old_location
+            self.shadow_node = self.traffic_node
+            self.traffic_node = location.insert_agent(self, target)
+            self.update_lead(target)
+            self._update_previous(target)
+        Index.INSTANCE.simulation.enqueue(_lane_change, ())
+
+    def update(self, dt: Duration,  # pylint: disable=method-hidden
+               ready: int, target: int):
         """Update the car.
 
         This method is a placeholder for the car update method. All update
@@ -477,21 +511,16 @@ class Car(Entity, TrafficAgent):
         self._follow(dt, ready, target)
         speed = self.speed[target] * dt
         position = self.network_position[ready] + speed
+        location = self.network_location
 
-        # TODO: Consider calling this at the end of the method, with the target
-        # buffer instead of ready (here and at _on_curve).
         self._update_distance_to_lock(speed, ready)
 
-        if (self.side_offset is not None
-                and self._lane_movement(dt, ready, target)):
-            location = self.network_location[target]
-        else:
-            location = self.network_location[ready]
+        if self.side_offset is not None:
+            self._lane_movement(dt, ready, target)
 
         if position < self.network_segment_end:
             # Still in same segment.
             self.position = self.position + self.direction * speed
-            self.network_location[target] = location
             self.network_position[target] = position
             return
 
@@ -502,6 +531,7 @@ class Car(Entity, TrafficAgent):
             self.path = None
             self.network_segment_end = segment.end_distance
             self.set_active(False)
+            log.debug('%s reached destination.', str(self))
             return
 
         # Reached end of segment
@@ -517,7 +547,6 @@ class Car(Entity, TrafficAgent):
             if self.side_offset is not None:
                 self.position -= self.side_vector * self.side_offset
             self._calc_segment_end(location, segment.end_distance)
-            self.network_location[target] = location
             self.network_position[target] = position
             return
 
@@ -526,20 +555,15 @@ class Car(Entity, TrafficAgent):
         self.path_last_way = self.path_segment == len(self.path.ways) - 1
         target_oriented_way = self.path.ways[self.path_segment]
         curve = location.get_curve(target_oriented_way)
+        self.current_max_speed = min(MAX_SPEED_MPS,
+                                     target_oriented_way.way.max_speed)
         self._calc_next_location(curve)
         self._calc_curve_override(curve)
-        self._end_lane_change(target)
         self.position = curve.evaluate_position(offset, self.curve_override)
         self.network_segment = 0
         self.network_segment_end = curve.length
-        self.network_location[target] = curve
         self.network_position[target] = offset
-        self.current_max_speed = min(MAX_SPEED_MPS,
-                                     target_oriented_way.way.max_speed)
-        self.traffic_node.remove()
-        self.traffic_node = curve.insert_agent(self, target)
-        for agent in list(self.followers):
-            agent.notify(target)
+        self.enqueue_network_location_change(curve, target, True)
         self.update = self._on_curve
 
     def _on_curve(self, dt: Duration, ready: int, target: int):
@@ -547,7 +571,7 @@ class Car(Entity, TrafficAgent):
         self._follow(dt, ready, target)
         speed = self.speed[target] * dt
         position = self.network_position[ready] + speed
-        location = self.network_location[ready]
+        location = self.network_location
 
         self._update_distance_to_lock(speed, ready)
 
@@ -556,13 +580,12 @@ class Car(Entity, TrafficAgent):
             new_position = location.evaluate_position(position,
                                                       self.curve_override)
             direction = new_position - self.position
-            if abs(direction.x) + abs(direction.y) > 0.001:
+            if abs(direction.x) + abs(direction.y) > 0.005:
                 self.direction = direction
                 self.direction_changed = True
             else:
                 self.direction_changed = False
             self.position = new_position
-            self.network_location[target] = location
             self.network_position[target] = position
             return
 
@@ -576,15 +599,12 @@ class Car(Entity, TrafficAgent):
         self.network_segment = 0
         self.curve_override = None
         self._calc_segment_end(location, segment.end_distance)
-        self.network_location[target] = location
-        self.network_position[target] = offset
         self._calc_next_location(location)
-        self.traffic_node.remove()
-        self.traffic_node = location.insert_agent(self, target)
-        self.update_lead(target)
+        self.network_position[target] = offset
+        self.enqueue_network_location_change(location, target, False)
         if not self.path_last_way:
             self._calc_target_lane(location)
-            self._start_lane_change(target, target)
+            self._start_lane_change(location, target, target)
         self.update = self._on_lane
 
     def _follow(self, dt: Duration, ready: int, target: int):
@@ -645,19 +665,17 @@ class Car(Entity, TrafficAgent):
                                          min(space / time,
                                              self.current_max_speed))
 
-    def _start_lane_change(self, ready: int, target: int) -> bool:
+    def _start_lane_change(self, lane: Lane, ready: int, target: int):
         """Start lane change if needed.
 
         The `target_lane` must be set before calling this method, so the lane
-        change will start if not already in target lane. The return value is
-        whether the location has changed on the target buffer.
+        change will start if not already in target lane.
         """
-        lane = self.network_location[ready]
         lane_index = lane.index
         if lane_index == self.target_lane:
             # No lane change needed.
             self.side_offset = None
-            return False
+            return
 
         # Start lane change.
         position = LanePosition(lane, self.network_position[ready])
@@ -671,44 +689,42 @@ class Car(Entity, TrafficAgent):
             new_position = position.left_neighbor
             self.side_vector = self.direction.rotated_left()
         new_lane = new_position.lane
-        self.network_location[target] = new_lane
         self.network_position[target] = new_position.position
         self._calc_next_location(new_lane)
-        self.shadow_location = lane
-        self.shadow_node = self.traffic_node
-        self.traffic_node = new_lane.insert_agent(self, target)
-        self.update_lead(target)
-        self._update_previous(target)
-        return True
+        self.enqueue_lane_change(new_lane, target)
 
-    def _lane_movement(self, dt: Duration, ready: int, target: int) -> bool:
+    def _lane_movement(self, dt: Duration, ready: int, target: int):
         """Perform sideways movement between lanes.
 
         Assumes `side_offset` is not None and `_start_lane_change` was called
-        before this method. The return value is whether the location has
-        changed on the target buffer.
+        before this method.
         """
         side_movement = min(LANE_CHANGE_SPEED_MPS, self.speed[ready]) * dt
         self.side_offset -= side_movement
         self.position += self.side_vector * side_movement
         if self.side_offset <= 0:
-            self._end_lane_change(target)
-            return self._start_lane_change(ready, target)
-        return False
+            self._end_lane_change(target, True)
+            self._start_lane_change(self.network_location, ready, target)
 
-    def _end_lane_change(self, buffer: int):
-        self.side_offset = None
-        self.side_vector = None
-        if self.shadow_node is not None:
+    def _end_lane_change(self, target: int, enqueue: bool = False):
+        def _update_target():
             shadow_previous = (self.shadow_node.previous.data
                                if self.shadow_node.has_previous else None)
             self.shadow_location = None
             self.shadow_node.remove()
             self.shadow_node = None
             if shadow_previous is not None:
-                shadow_previous.notify(buffer)
+                shadow_previous.notify(target)
             self.followers.clear()
-            self._update_previous(buffer)
+            self._update_previous(target)
+
+        self.side_offset = None
+        self.side_vector = None
+        if self.shadow_node is not None:
+            if enqueue:
+                Index.INSTANCE.simulation.enqueue(_update_target, ())
+            else:
+                _update_target()
 
     def _calc_curve_override(self, curve: Curve):
         if self.side_offset is None:
@@ -758,6 +774,10 @@ class Car(Entity, TrafficAgent):
         if self.traffic_node.has_previous:
             prev = self.traffic_node.previous.data
             if isinstance(prev, Car):
+                # There may be a better way to do this, but the locks here are
+                # released because if the car behind onws a lock, this car
+                # (self) probably got in the way between the car behind and the
+                # lock and now will try to acquire the lock in its place.
                 while prev.lock_queue:
                     lock = prev.lock_queue.popleft()
                     lock.release(prev, buffer)
@@ -776,13 +796,19 @@ class Car(Entity, TrafficAgent):
                    if self.distance_to_lock is not None else 'None')
         to_release = (f'{self.distance_to_release:.2f}'
                       if self.distance_to_release is not None else 'None')
+        try:
+            waiting = self.lead.lock_order[self.waiting]
+            waiting = f'{waiting}, owned by {waiting.owner}'
+        except (AttributeError, IndexError):
+            waiting = 'None'
         return (
-            f'{repr(self)} @ {self.network_location[buffer]} : {position}\n'
+            f'{repr(self)} @ {self.network_location} : {position}\n'
             f'lead: {repr(self.lead)}    followers: {self.followers}\n'
             f'lock_queue: {self.lock_queue}\n'
             f'lock_count: {lock_count}\n'
             f'distance to lock: {to_lock}    '
-            f'distance to release: {to_release}')
+            f'distance to release: {to_release}\n'
+            f'waiting: {waiting}')
 
     def __repr__(self):
         return f'{Car.__name__}(id={self.id})'

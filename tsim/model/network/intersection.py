@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging as log
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum
@@ -16,6 +17,7 @@ import numpy
 from dataslots import with_slots
 from rtree.index import Rtree
 
+import tsim.model.index as Index
 from tsim.model.entity import EntityRef
 from tsim.model.geometry import Point, Vector, angle, line_intersection_safe
 from tsim.model.network.lane import LANE_WIDTH, Lane, LaneRef
@@ -25,7 +27,7 @@ from tsim.model.network.location import (NetworkLocation, NetworkPosition,
 from tsim.model.network.traffic import (Traffic, TrafficAgent,
                                         TrafficDynamicAgent, TrafficLock)
 from tsim.model.network.way import OrientedWay
-from tsim.utils.linkedlist import LinkedList, LinkedListNode
+from tsim.utils.linkedlist import LinkedList
 from tsim.utils.maptovalue import MapToValue
 
 if TYPE_CHECKING:
@@ -130,7 +132,6 @@ class ConflictPoint(TrafficLock):
     owner: Optional[TrafficAgent]
     terminal: bool
     queue: Deque[Tuple[TrafficAgent, bool]]
-    traffic_node: LinkedListNode[ConflictPoint]
 
     def __init__(self, id_: int, point: Point, type_: ConflictPointType):
         self.id = id_
@@ -142,7 +143,6 @@ class ConflictPoint(TrafficLock):
         self.owner = None
         self.terminal = False
         self.queue = deque()
-        self.traffic_node = None
 
     @property
     def lock_queue(self) -> Iterable[TrafficLock]:
@@ -160,7 +160,7 @@ class ConflictPoint(TrafficLock):
             return None
         return location.positions.get(self, None)
 
-    def is_at(self, location: NetworkLocation, buffer: int) -> bool:
+    def is_at(self, location: NetworkLocation) -> bool:
         """Get whether conflict point is at given `location`."""
         return hasattr(location, 'positions') and self in location.positions
 
@@ -187,6 +187,9 @@ class ConflictPoint(TrafficLock):
 
     def notify(self, buffer: int):
         """Notify this agent of lead events."""
+
+    def notify_followers(self, buffer: int):
+        """Notify followers of events."""
 
     def lock(self, agent: TrafficDynamicAgent, buffer: int,
              terminal: bool = False):
@@ -224,8 +227,8 @@ class ConflictPoint(TrafficLock):
         if terminal:
             lock_count = agent.lock_count[self]
             if not lock_count > 0:
-                import tsim.ui.panda3d as p3d
-                p3d.MESSENGER.send('focus', [agent])
+                Index.INSTANCE.simulation.debug_focus(agent)
+                log.error('Releasing %d, lock_count <= 0', self.id)
                 return
             if lock_count == 1:
                 del agent.lock_count[self]
@@ -236,13 +239,14 @@ class ConflictPoint(TrafficLock):
         else:
             for lock in self.lock_order:
                 lock.release(agent, buffer, True)
-            self._pass(agent)
+            Index.INSTANCE.simulation.enqueue(self._pass, (agent, buffer))
 
-    def _pass(self, agent: TrafficAgent):
-        node = self.traffic_node.previous
-        if node.data is agent:
-            node.remove()
-            agent.traffic_node = self.traffic_node.insert_after(agent)
+    def _pass(self, agent: TrafficAgent, buffer: int):
+        node = agent.traffic_node.next
+        if node.data is self:
+            agent.traffic_node.remove()
+            agent.traffic_node = node.insert_after(agent)
+        agent.notify_followers(buffer)
 
     def _dequeue(self, buffer: int):
         """Lock to the next agent in the queue."""
@@ -424,8 +428,6 @@ class Curve(NetworkLocation):
     def init_traffic(self):
         """Initialize traffic containing only the conflict points."""
         self.traffic = LinkedList(p[1] for p in self.conflict_points)
-        for node in self.traffic.iter_nodes():
-            node.data.traffic_node = node
 
     def __repr__(self):
         return f'{Curve.__name__}(source={self.source}, dest={self.dest})'

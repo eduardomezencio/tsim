@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging as log
 from collections import deque
 from functools import partial
-from itertools import chain
+from itertools import chain, cycle, islice
 from math import floor
 from random import random, seed, shuffle
 from typing import Dict, Tuple
@@ -74,10 +74,6 @@ class App:
         for node_path in self.roads.values():
             node_path.node().collect()
 
-        # TODO: Change to set simulation time when loading INDEX from file.
-        INDEX.simulation.time = 6.5 * HOUR
-        self.sky.set_time(8.0)
-
         self._frame_count = 0
         self._simulation_speed = 0
 
@@ -92,19 +88,25 @@ class App:
 
         self.scene.reparent_to(p3d.RENDER)
 
-        seed(1)
-        self.generate_random_cars()
+        seed(2)
+        self.generate_random_cars(200)
+
+        # TODO: Change to set simulation time when loading INDEX from file.
+        INDEX.simulation.time = random() * 24.0 * HOUR
+        self.sky.set_time(normalized_hours(INDEX.simulation.time))
 
     def focus(self, *args):
+        """Focus on given agent and pause simulation."""
         self.camera.focus.set_x(args[0].position.x)
         self.camera.focus.set_y(args[0].position.y)
         self._simulation_speed = 0
 
     def generate_random_cars(self, limit=500):
+        """Generate `limit` random cars."""
         lanes = list(chain.from_iterable(w.lanes for w in
-                                         INDEX.get_all(of_type=Way)))[:limit]
+                                         INDEX.get_all(of_type=Way)))
         shuffle(lanes)
-        for lane1, lane2 in window_iter(lanes):
+        for lane1, lane2 in window_iter(islice(cycle(lanes), limit)):
             distance1 = random() * lane1.length
             distance2 = random() * lane2.length
             path = INDEX.path_map.path(lane1.oriented_way_position(distance1),
@@ -139,9 +141,9 @@ class App:
                                     / SPEED_STEPS)
             self.update_agents()
 
-            while self._event_queue:
-                event = self._event_queue.popleft()
-                App.event_handlers[type(event[0])](self, *event)
+        while self._event_queue:
+            event = self._event_queue.popleft()
+            App.event_handlers[type(event[0])](self, *event)
 
         self.camera.update()
         self.sky.set_time(normalized_hours(INDEX.simulation.time))
@@ -213,9 +215,10 @@ class App:
     def add_car(self, car: Car, position: LanePosition,
                 destination: OrientedWayPosition):
         """Add car with given position and destination."""
-        buffer = INDEX.simulation.ready_buffer
-        car.place_at(position, buffer)
-        car.set_destination(destination, buffer)
+        ready = INDEX.simulation.ready_buffer
+        target = INDEX.simulation.target_buffer
+        car.place_at(position, ready)
+        car.set_destination(destination, ready, target)
         self.agents[car] = Factory.create_car(self.agents_parent, car)
 
     def update_agents(self):

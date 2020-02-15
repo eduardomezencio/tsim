@@ -25,7 +25,7 @@ class TrafficAgent(ABC):
         """
 
     @abstractmethod
-    def is_at(self, location: NetworkLocation, buffer: int) -> bool:
+    def is_at(self, location: NetworkLocation) -> bool:
         """Get whether agent is at given `location`."""
 
     @abstractmethod
@@ -39,6 +39,10 @@ class TrafficAgent(ABC):
     @abstractmethod
     def notify(self, buffer: int):
         """Notify this agent of lead events."""
+
+    @abstractmethod
+    def notify_followers(self, buffer: int):
+        """Notify followers of events."""
 
 
 class TrafficDynamicAgent(TrafficAgent):

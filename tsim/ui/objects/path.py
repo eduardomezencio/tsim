@@ -19,8 +19,8 @@ from tsim.utils.iterators import window_iter
 VERTEX_FORMAT = GeomVertexFormat.get_v3n3c4()
 HEIGHT = LEVEL_HEIGHT + 1.0
 SHIFT = LANE_WIDTH
-START_COLOR = (0.2, 0.2, 1.0, 0.8)
-END_COLOR = (1.0, 0.0, 0.6, 0.8)
+START_COLOR = (0.2, 0.2, 1.0, 0.5)
+END_COLOR = (1.0, 0.0, 0.6, 0.5)
 
 
 def create(parent: NodePath, path: Path) -> NodePath:
@@ -33,6 +33,11 @@ def create(parent: NodePath, path: Path) -> NodePath:
         node.add_geom(geom)
         node.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
         node_path = parent.attach_new_node(node)
+        # Setting depth write to false solves the problem of this big flat
+        # polygon obscuring other semi-transparent things (like the lane
+        # connections card) depending on the camera angle. See:
+        # https://docs.panda3d.org/1.10/python/programming/texturing/transparency-and-blending
+        node_path.set_depth_write(False)
         node_path.set_transparency(TransparencyAttrib.M_alpha)
     else:
         node_path = None
