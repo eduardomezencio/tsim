@@ -230,7 +230,8 @@ class Lane(NetworkLocation):
                                    self.lane_to_oriented_position(position))
 
     def way_to_lane_position(self, position: float,
-                             endpoint: Endpoint = Endpoint.START) -> float:
+                             endpoint: Endpoint = Endpoint.START,
+                             default: float = None) -> float:
         """Get lane position from way position.
 
         The `position` argument is a distance in meters from the given
@@ -255,6 +256,8 @@ class Lane(NetworkLocation):
             return (segment.start_distance +
                     segment.factor * (position - segment.start_way_distance))
 
+        if default is not None:
+            return default
         raise ValueError('Position outside of lane.')
 
     def get_curve(self, dest: OrientedWay,

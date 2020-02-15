@@ -648,7 +648,7 @@ class Car(Entity, TrafficAgent):
         if self.path_last_way:
             endpoint = self.path.ways[self.path_segment].endpoint
             path_end = lane.way_to_lane_position(self.path.offsets[1],
-                                                 endpoint)
+                                                 endpoint, 0.0)
             if path_end <= segment_end:
                 self.path_last_segment = True
                 self.network_segment_end = path_end
