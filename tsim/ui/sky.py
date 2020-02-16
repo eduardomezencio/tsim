@@ -49,7 +49,7 @@ class Sky:
     def _init_sun(self):
         """Initialize sun light."""
         self.sun = DirectionalLight('sun')
-        self.sun.set_shadow_caster(True, 1024, 1024)
+        # self.sun.set_shadow_caster(True, 2048, 2048)
         self.sun.get_lens().set_film_size(1024, 1024)
         self.sun.get_lens().set_near_far(-1024, 1024)
         self.sun.set_camera_mask(0x00010000)
