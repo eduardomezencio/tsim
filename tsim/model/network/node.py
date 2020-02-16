@@ -100,7 +100,8 @@ class Node(NetworkEntity):
 
     def way_connections(self, source: OrientedWay) -> Set[OrientedWay]:
         """Get the outgoing way connections coming from `source`."""
-        return self.intersection.way_connections[source]
+        connections = self.intersection.way_connections.get(source, None)
+        return connections if connections is not None else set()
 
     def sorted_ways(self) -> List[OrientedWay]:
         """Get incident ways sorted in counterclockwise order."""

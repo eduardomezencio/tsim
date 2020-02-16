@@ -59,6 +59,15 @@
             "env": { "PYTHONPATH": "${workspaceFolder}" }
         },
         {
+            "name": "Python: osm_reader (multiprocessing)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/osm_reader.py",
+            "console": "integratedTerminal",
+            "args": ["data/${input:mapName}.osm", "-m"],
+            "env": { "PYTHONPATH": "${workspaceFolder}" }
+        },
+        {
             "name": "Python: osm_cleaner",
             "type": "python",
             "request": "launch",

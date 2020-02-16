@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from itertools import count
-from typing import (Callable, ClassVar, Dict, Iterator, List, Optional, Set,
-                    Tuple, Type, Union)
+from typing import Callable, Dict, Iterator, List, Optional, Set, Type, Union
 import logging as log
 import shelve
 
@@ -26,8 +25,8 @@ class EntityIndex:
     __slots__ = ('name', 'id_count', 'entities', 'bounding_rects', 'rtree',
                  'path_map', 'register_updates', 'simulation', '_updates')
 
-    extension: ClassVar[str] = 'shelf'
-    storage_fields: ClassVar[Tuple[str]] = ('id_count', 'entities')
+    extension = 'shelf'
+    storage_fields = 'id_count', 'entities', 'path_map'
 
     name: str
     id_count: count
@@ -67,7 +66,7 @@ class EntityIndex:
             raise ValueError('Entity already has an id.')
         entity.id = next(self.id_count)
         self.entities[entity.id] = entity
-        log.info('[%s] Added %s', __name__, Entity.__repr__(entity))
+        log.debug('[%s] Added %s', __name__, Entity.__repr__(entity))
 
     def add_static(self, entity: Entity):
         """Add entity as static.
@@ -106,7 +105,7 @@ class EntityIndex:
                 del self.bounding_rects[entity.id]
                 self.updated(entity)
             self.rebuild_path_map()
-            log.info('[%s] Removed %s', __name__, entity)
+            log.debug('[%s] Removed %s', __name__, entity)
 
     def update_bounding_rect(self, entity: Entity,
                              new_rect: Optional[BoundingRect] = None):
@@ -163,16 +162,20 @@ class EntityIndex:
             self.name = name
         with shelve.open(self.filename) as data:
             for key in EntityIndex.storage_fields:
+                log.info('Loading %s', key)
                 value = data.get(key, None)
                 if value:
                     setattr(self, key, value)
+        log.info('Loaded %s', self.name)
         self.generate_rtree_from_entities()
-        self.rebuild_path_map()
+        if not hasattr(self, 'path_map'):
+            self.rebuild_path_map()
 
     def save(self):
         """Save entities to shelf."""
         with shelve.open(self.filename) as data:
             for key in EntityIndex.storage_fields:
+                log.info('Saving %s', key)
                 data[key] = getattr(self, key)
 
     def get_all(self, of_type: Type[Entity] = None,

@@ -15,10 +15,15 @@ from xml.etree import ElementTree
 
 from tsim.model.geometry import Point
 from tsim.model.index import INSTANCE as INDEX
+from tsim.model.network.endpoint import Endpoint
 from tsim.model.network.node import Node
+from tsim.model.network.path import dijkstra
 from tsim.model.network.way import Way
 from tsim.serialization.config import configure_serialization
 from tsim.utils.cachedproperty import touch_cache
+
+FILES = [a for a in sys.argv[1:] if not a.startswith('-')]
+MULTIPROCESSING = '-m' in sys.argv
 
 
 def osm_reader_multiprocess(names: Iterable[str]):
@@ -94,6 +99,7 @@ def osm_reader(name: str):
 
     dissolve_nodes(nodes_inv)
     filter_waypoints()
+    find_paths()
     compute_cached()
 
     INDEX.save()
@@ -156,6 +162,24 @@ def filter_waypoints():
     log.info('Waypoints cleared: %d', cleared)
 
 
+def find_paths():
+    """Find and cache all paths."""
+    def _oriented_ways():
+        for way in INDEX.get_all(of_type=Way):
+            yield way.oriented()
+            if not way.one_way:
+                yield way.oriented(Endpoint.END)
+
+    if MULTIPROCESSING:
+        with ProcessPoolExecutor() as executor:
+            ways = list(_oriented_ways())
+            all_pairs = dict(zip(ways, executor.map(dijkstra, ways)))
+            INDEX.path_map.all_pairs = all_pairs
+    else:
+        for way in _oriented_ways():
+            dijkstra(way)
+
+
 def compute_cached():
     """Compute all cached properties."""
     for entity in INDEX.entities.values():
@@ -170,7 +194,8 @@ def log_config(name: str):
 
 if __name__ == '__main__':
     configure_serialization()
-    if len(sys.argv) > 2:
-        osm_reader_multiprocess(sys.argv[1:])
+    if MULTIPROCESSING and len(FILES) > 1:
+        osm_reader_multiprocess(FILES)
     else:
-        osm_reader(sys.argv[1])
+        for file in FILES:
+            osm_reader(file)
