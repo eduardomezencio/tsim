@@ -67,7 +67,7 @@ class TrafficLock(TrafficAgent):
 
     @abstractmethod
     def lock(self, agent: TrafficDynamicAgent, buffer: int,
-             terminal: bool = False):
+             terminal: bool = False, location: NetworkLocation = None):
         """Lock this traffic lock to `agent`."""
 
     @abstractmethod

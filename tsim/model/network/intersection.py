@@ -6,7 +6,7 @@ import logging as log
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from enum import Enum
-from itertools import chain, combinations, count, islice, product
+from itertools import chain, combinations, count, dropwhile, islice, product
 from math import pi as PI
 from statistics import median_low
 from typing import (TYPE_CHECKING, Callable, DefaultDict, Deque, Dict,
@@ -128,8 +128,9 @@ class ConflictPoint(TrafficLock):
     type: ConflictPointType
     neighbors: Set[ConflictPoint]
     curves: Set[Curve]
-    lock_order: Tuple[ConflictPoint, ...]
+    lock_order: Dict[Curve, Tuple[ConflictPoint, ...]]
     owner: Optional[TrafficAgent]
+    owner_location: Optional[NetworkLocation]
     terminal: bool
     queue: Deque[Tuple[TrafficAgent, bool]]
 
@@ -166,8 +167,17 @@ class ConflictPoint(TrafficLock):
 
     def create_lock_order(self):
         """Create the `lock_order` list after `neighbors` is filled."""
-        self.lock_order = tuple(sorted(chain(self.neighbors, [self]),
-                                       key=lambda cp: cp.id))
+        self.lock_order = {
+            c: tuple(sorted(
+                chain.from_iterable(
+                    chain([p[1]], p[1].neighbors) for p in
+                    dropwhile(lambda q: q[1] is not self, c.conflict_points)),
+                key=lambda p: p.id))
+            for c in self.curves
+        }
+        # Old version, with great chance of deadlocks:
+        # self.lock_order = tuple(sorted(chain(self.neighbors, [self]),
+        #                                key=lambda cp: cp.id))
 
     def add_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Register agent as follower."""
@@ -192,7 +202,7 @@ class ConflictPoint(TrafficLock):
         """Notify followers of events."""
 
     def lock(self, agent: TrafficDynamicAgent, buffer: int,
-             terminal: bool = False):
+             terminal: bool = False, location: NetworkLocation = None):
         """Lock this traffic lock to `agent`.
 
         If the lock is available, start the lock process immediately. If
@@ -206,11 +216,11 @@ class ConflictPoint(TrafficLock):
                          or (self in agent.lock_count
                              and agent.lock_count[self] > 0))
         if already_owned:
-            self.queue.appendleft((agent, terminal))
+            self.queue.appendleft((agent, terminal, location))
             self._dequeue(buffer)
             return
 
-        self.queue.append((agent, terminal))
+        self.queue.append((agent, terminal, location))
         if self.owner is None:
             self._dequeue(buffer)
 
@@ -237,7 +247,7 @@ class ConflictPoint(TrafficLock):
             else:
                 agent.lock_count[self] -= 1
         else:
-            for lock in self.lock_order:
+            for lock in self.lock_order[self.owner_location]:
                 lock.release(agent, buffer, True)
             Index.INSTANCE.simulation.enqueue(self._pass, (agent, buffer))
 
@@ -250,9 +260,11 @@ class ConflictPoint(TrafficLock):
 
     def _dequeue(self, buffer: int):
         """Lock to the next agent in the queue."""
-        agent, terminal = self.queue.popleft() if self.queue else (None, None)
+        agent, terminal, location = (self.queue.popleft() if self.queue
+                                     else (None, None, None))
         if agent is not None:
-            self.owner, self.terminal = agent, terminal
+            self.owner, self.terminal, self.owner_location = (
+                agent, terminal, location)
             agent.acquire(self, buffer, terminal)
 
     def __repr__(self):

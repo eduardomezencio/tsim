@@ -33,6 +33,7 @@ def create(parent: NodePath, path: Path) -> NodePath:
         node.add_geom(geom)
         node.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
         node_path = parent.attach_new_node(node)
+        node_path.set_light_off()
         # Setting depth write to false solves the problem of this big flat
         # polygon obscuring other semi-transparent things (like the lane
         # connections card) depending on the camera angle. See:
