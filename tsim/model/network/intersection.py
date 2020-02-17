@@ -169,9 +169,9 @@ class ConflictPoint(TrafficLock):
         """Create the `lock_order` list after `neighbors` is filled."""
         self.lock_order = {
             c: tuple(sorted(
-                chain.from_iterable(
+                set(chain.from_iterable(
                     chain([p[1]], p[1].neighbors) for p in
-                    dropwhile(lambda q: q[1] is not self, c.conflict_points)),
+                    dropwhile(lambda q: q[1] is not self, c.conflict_points))),
                 key=lambda p: p.id))
             for c in self.curves
         }

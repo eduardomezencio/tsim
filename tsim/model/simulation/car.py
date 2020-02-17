@@ -6,7 +6,8 @@ import logging as log
 from collections import defaultdict, deque
 from itertools import repeat
 from math import inf as INF
-from typing import TYPE_CHECKING, DefaultDict, Deque, List, Set, Tuple
+from typing import (TYPE_CHECKING, Collection, DefaultDict, Deque, List,
+                    Optional, Set, Tuple)
 
 import bezier
 
@@ -470,7 +471,10 @@ class Car(Entity, TrafficAgent):
         """Unregister agent as follower."""
         if agent in self.followers:
             self.followers.remove(agent)
-            self._update_previous(buffer)
+            # Ignoring agent here in `_update_previous` is important because
+            # when cars are swapping lanes the "previous" can be a shadow node
+            # of the same agent, causing problems.
+            self._update_previous(buffer, (agent,))
 
     def enqueue_network_location_change(self, location: NetworkLocation,
                                         target: int, to_curve: bool):
@@ -771,14 +775,19 @@ class Car(Entity, TrafficAgent):
                 else:
                     self.distance_to_release = None
 
-    def _update_previous(self, buffer: int):
+    def _update_previous(
+            self, buffer: int,
+            ignore: Optional[Collection[TrafficDynamicAgent]] = None):
         """Update lead for immediate follower on same location.
 
         To be used when the car is inserted in a location and the agent right
         behind is not yet registered as follower and needs to be updated.
+        Ignores agents in `ignore` optional collection.
         """
         if self.traffic_node.has_previous:
             prev = self.traffic_node.previous.data
+            if ignore is not None and prev in ignore:
+                return
             if isinstance(prev, Car):
                 # There may be a better way to do this, but the locks here are
                 # released because if the car behind onws a lock, this car
