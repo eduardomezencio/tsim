@@ -352,6 +352,7 @@ class Car(Entity, TrafficAgent):
         for lock, count_ in list(self.lock_count.items()):
             for _ in range(count_):
                 lock.release(self, buffer, True)
+        self.lock_queue.clear()
 
     def find_lead(self) -> Tuple[TrafficAgent, NetworkLocation, bool]:
         """Find the first agent ahead of this one.
