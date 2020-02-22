@@ -80,10 +80,6 @@ class App:
 
         self.scene.reparent_to(p3d.RENDER)
 
-        for key, id_ in (('1', 324), ('2', 236)):
-            p3d.BASE.accept(key, partial(p3d.MESSENGER.send, 'follow',
-                                         [INDEX.entities[id_]]))
-
     def generate_random_cars(self, limit=500):
         """Generate `limit` random cars."""
         lanes = list(chain.from_iterable(w.lanes for w in
