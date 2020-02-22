@@ -40,6 +40,7 @@ SPEED_STEPS = 4
 class App:
     """Graphic UI application, using Panda3D."""
 
+    simulation_speed_text: TextNode
     time_text: TextNode
     network_entities: Dict[int, NodePath]
     agents: Dict[Car, NodePath]
@@ -52,6 +53,7 @@ class App:
         self._event_queue = deque()
         self._frame_count = 0
         self._simulation_speed = 0
+        self._number_input_buffer = None
 
         log_config()
         panda3d_config()
@@ -72,13 +74,15 @@ class App:
         self._build_on_screen_text()
 
         seed(2)
-        self.generate_random_cars(500)
+        self.generate_random_cars(250)
 
         # TODO: Change to set simulation time when loading INDEX from file.
         INDEX.simulation.time = random() * 24.0 * HOUR
         self.sky.set_time(normalized_hours(INDEX.simulation.time))
 
         self.scene.reparent_to(p3d.RENDER)
+
+        # p3d.BASE.movie('movie/movie', 31536000, 60, 'jpg')
 
     def generate_random_cars(self, limit=500):
         """Generate `limit` random cars."""
@@ -97,13 +101,16 @@ class App:
 
     @property
     def simulation_speed(self) -> int:
-        """Get simulation speed from 0 to `SPEED_STEPS`."""
+        """Get simulation speed in `1 / SPEED_STEPS` increments."""
         return self._simulation_speed
 
-    def change_simulation_speed(self, value: int):
+    def change_simulation_speed(self, value: int, relative: bool = True,
+                                max_: int = SPEED_STEPS * 4):
         """Add value to the simulation speed."""
-        value = self._simulation_speed + value
-        self._simulation_speed = floor(max(0, min(value, SPEED_STEPS * 4)))
+        if relative:
+            value = self._simulation_speed + value
+        self._simulation_speed = floor(max(0, min(value, max_)))
+        self._update_simulation_speed_text()
 
     def run(self):
         """Start the main loop."""
@@ -130,7 +137,7 @@ class App:
         self.grid.update()
         Input.clear()
 
-        self._update_on_screen_text()
+        self._update_time_text()
 
         return Task.cont
 
@@ -196,10 +203,29 @@ class App:
 
         INDEX.simulation.register_listener(self.simulation_event_listener)
 
+        def _init_buffer():
+            self._number_input_buffer = []
+
+        def _flush_buffer():
+            if self._number_input_buffer:
+                id_ = int(''.join(self._number_input_buffer))
+                car = INDEX.entities.get(id_, None)
+                if isinstance(car, Car):
+                    self.on_follow(car)
+            self._number_input_buffer = None
+
+        def _number_input(key):
+            if self._number_input_buffer is not None:
+                self._number_input_buffer.append(key)
+
+        p3d.BASE.accept('control', _init_buffer)
+        p3d.BASE.accept('control-up', _flush_buffer)
+
         for i in range(10):
-            key, value = str(i), int(2 ** (i - 1))
-            p3d.BASE.accept(key, partial(setattr, self,
-                                         '_simulation_speed', value))
+            key = str(i)
+            p3d.BASE.accept(key, partial(self.change_simulation_speed,
+                                         int(2 ** (i - 1)), False, 256))
+            p3d.BASE.accept(f'control-{key}', partial(_number_input, key))
         for key, value in (('wheel_up', 1), ('wheel_down', -1)):
             p3d.BASE.accept(key, partial(self.change_simulation_speed, value))
 
@@ -252,20 +278,44 @@ class App:
                 node_path.look_at(*(position + agent.direction), 0.0)
 
     def _build_on_screen_text(self):
+        aspect = 1.0 / p3d.ASPECT2D.get_scale()[0]
+
+        simspeed_text = TextNode('simulation_speed_text')
+        simspeed_text.text = ''
+        simspeed_text.slant = 0.3
+        simspeed_text.text_scale = 0.05
+        simspeed_text.shadow = -0.005, 0.0025
+        simspeed_text.shadow_color = 0, 0, 0, 1
+        simspeed_text_np = p3d.ASPECT2D.attach_new_node(simspeed_text)
+        simspeed_text_np.set_pos(-0.95 * aspect, -0.0, -0.91)
+        self.simulation_speed_text = simspeed_text
+
         time_text = TextNode('time_text')
         time_text.text = ''
-        time_text.text_scale = 0.15
-        time_text.shadow = -0.01, 0.01
+        time_text.text_scale = 0.12
+        time_text.shadow = -0.005, 0.005
         time_text.shadow_color = 0, 0, 0, 1
         time_text_np = p3d.ASPECT2D.attach_new_node(time_text)
-        aspect = 1.0 / p3d.ASPECT2D.get_scale()[0]
-        time_text_np.set_pos(-0.9 * aspect, -0.0, -0.8)
+        time_text_np.set_pos(-0.95 * aspect, -0.0, -0.85)
         self.time_text = time_text
 
-    def _update_on_screen_text(self):
+        self._update_simulation_speed_text()
+
+    def _update_time_text(self):
         time_text = time_string(INDEX.simulation.time)
         if self.time_text.text != time_text:
             self.time_text.text = time_text
+
+    def _update_simulation_speed_text(self):
+        simspeed = self.simulation_speed
+        if simspeed == 0:
+            simspeed_text = 'paused'
+        elif simspeed == SPEED_STEPS:
+            simspeed_text = ''
+        else:
+            simspeed_text = f'x{simspeed / SPEED_STEPS}'.strip('.0')
+        if self.simulation_speed_text.text != simspeed_text:
+            self.simulation_speed_text.text = simspeed_text
 
 
 def log_config():
