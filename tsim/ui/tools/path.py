@@ -122,5 +122,5 @@ class PathTool(Tool):
     def _create_agent(self):
         if self.path is None:
             return
-        p3d.MESSENGER.send('new_agent', [Car(), self.source,
-                                         self.dest.oriented_way_position])
+        p3d.MESSENGER.send('add_car', [Car(), self.source,
+                                       self.dest.oriented_way_position])

@@ -9,5 +9,4 @@ want-directtools         false
 want-pstats              false
 want-tk                  false
 
-grid-color               0.3 0.3 0.3 1.0
 use-shaders              false

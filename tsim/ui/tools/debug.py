@@ -98,6 +98,7 @@ class Debug(Tool):
             if agent is not None and hasattr(agent, 'debug_str'):
                 self.selected_agent = agent
                 self._update_path_np()
+                p3d.MESSENGER.send('follow', [agent])
 
         selected = INDEX.get_at(self.cursor.position, of_type=Node)
         if selected and just_pressed:

@@ -1,5 +1,7 @@
 """Camera class implementation."""
 
+from typing import Optional
+
 from panda3d.core import NodePath, PandaNode
 
 from tsim.ui.input import is_down
@@ -26,11 +28,13 @@ class Camera:
         p3d.LENS.set_far(Camera.FAR)
 
         self.focus = NodePath(PandaNode('focus'))
+        self.focus.set_compass()
         self.focus.reparent_to(p3d.RENDER)
         self.focus.set_pos(0.0, 0.0, Camera.FOCUS_HEIGHT)
         self.rotator = NodePath(PandaNode('rotator'))
         self.rotator.reparent_to(self.focus)
         self.rotator.set_pos(0.0, 0.0, 0.0)
+        self.following = None
         p3d.CAMERA.set_pos(0.0, 0.0, Camera.DEFAULT_HEIGHT)
         p3d.CAMERA.look_at(self.rotator)
         p3d.CAMERA.reparent_to(self.rotator)
@@ -49,6 +53,8 @@ class Camera:
         elif is_down('up'):
             move, dy = True, 1.0
         if move:
+            if self.following is not None:
+                self.unfollow()
             scale = (p3d.CAMERA.get_z() + 10.0) * Camera.SPEED
             self.focus.set_pos(self.focus, dx * scale, dy * scale, 0.0)
 
@@ -60,9 +66,9 @@ class Camera:
                                  Camera.DISTANCE_MAX))
 
         if is_down('rot_right'):
-            self.focus.set_h(self.focus, Camera.ROTATION_SPEED)
+            self.focus.set_h(self.focus.get_h() + Camera.ROTATION_SPEED)
         elif is_down('rot_left'):
-            self.focus.set_h(self.focus, -Camera.ROTATION_SPEED)
+            self.focus.set_h(self.focus.get_h() - Camera.ROTATION_SPEED)
 
         if is_down('pitch_down'):
             self.rotator.set_p(
@@ -72,3 +78,19 @@ class Camera:
             self.rotator.set_p(
                 max(self.rotator.get_p() - Camera.ROTATION_SPEED,
                     Camera.PITCH_MIN))
+
+    def follow(self, node_path: NodePath):
+        """Start following given node path."""
+        self.following = node_path
+        self.focus.reparent_to(node_path)
+        self.focus.set_pos(0.0, 0.0, Camera.FOCUS_HEIGHT)
+
+    def unfollow(self, node_path: Optional[NodePath] = None):
+        """Stop following given node path.
+
+        Stops following given node path or any node path if not specified.
+        """
+        if node_path is None or self.focus.parent == node_path:
+            self.following = None
+            self.focus.wrt_reparent_to(p3d.RENDER)
+            self.focus.set_z(Camera.FOCUS_HEIGHT)

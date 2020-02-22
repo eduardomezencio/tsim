@@ -17,4 +17,4 @@ class Bulldozer(Tool):
                         None)
         if selected is not None:
             selected.delete()
-            p3d.MESSENGER.send('entities_changed')
+            p3d.MESSENGER.send('network_entities_changed')

@@ -22,7 +22,7 @@ from tsim.model.network.traffic import (TrafficAgent, TrafficDynamicAgent,
                                         TrafficLock)
 from tsim.model.network.way import LANE_WIDTH, Lane
 from tsim.model.simulation.schedule import Schedule
-from tsim.model.units import Duration, kph_to_mps
+from tsim.model.units import Duration, kph_to_mps, time_string
 from tsim.utils.linkedlist import LinkedListNode
 
 if TYPE_CHECKING:
@@ -320,6 +320,39 @@ class Car(Entity, TrafficAgent):
             self._start_lane_change(lane, ready, target)
         self.set_active()
 
+    def remove(self, target: int):
+        """Remove car from simulation."""
+        def _remove_node():
+            self._release_all_locks(target)
+            if self.traffic_node:
+                self.traffic_node.remove()
+            if self.shadow_node:
+                self.shadow_node.remove()
+            if self.lead is not None:
+                self.lead.remove_follower(self, target)
+            for follower in list(self.followers):
+                follower.notify(target)
+            Index.INSTANCE.simulation.raise_event('removed_car', self)
+
+        segment = self.network_location.segments[self.network_segment]
+        self.speed[target] = 0.0
+        self.path = None
+        self.network_segment_end = segment.end_distance
+        self.set_active(False)
+        Index.INSTANCE.simulation.enqueue(_remove_node)
+
+    def _release_all_locks(self, buffer):
+        """Release all locks acquired by the car.
+
+        This is not the natural way of releasing locks, but a way to force all
+        locks to be released as terminal locks to be used, for example, before
+        removing the car from the simulation, so that no lock stays with this
+        car forever.
+        """
+        for lock, count_ in list(self.lock_count.items()):
+            for _ in range(count_):
+                lock.release(self, buffer, True)
+
     def find_lead(self) -> Tuple[TrafficAgent, NetworkLocation, bool]:
         """Find the first agent ahead of this one.
 
@@ -458,14 +491,17 @@ class Car(Entity, TrafficAgent):
                                                 + MINIMUM_DISTANCE)
                 self.notify(buffer)
         except AttributeError as error:
-            Index.INSTANCE.simulation.debug_focus(self)
-            log.error('%s', str(error))
+            Index.INSTANCE.simulation.raise_event('focus', self)
+            log.exception(error)
 
     def add_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Register agent as follower."""
+        self.followers.add(agent)
+
+    def update_followers(self, buffer: int):
+        """Update current followers as preparation to insert a new follower."""
         for follower in list(self.followers):
             follower.update_lead(buffer)
-        self.followers.add(agent)
 
     def remove_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Unregister agent as follower."""
@@ -536,12 +572,9 @@ class Car(Entity, TrafficAgent):
 
         if self.path_last_segment:
             # Reached end of path.
-            segment = location.segments[self.network_segment]
-            self.speed[target] = 0.0
-            self.path = None
-            self.network_segment_end = segment.end_distance
-            self.set_active(False)
-            log.debug('%s reached destination.', str(self))
+            self.remove(target)
+            log.debug('[%s] %s reached destination.',
+                      time_string(Index.INSTANCE.simulation.time), str(self))
             return
 
         # Reached end of segment
@@ -725,8 +758,11 @@ class Car(Entity, TrafficAgent):
             self.shadow_node = None
             if shadow_previous is not None:
                 shadow_previous.notify(target)
+            followers = list(self.followers)
             self.followers.clear()
-            self._update_previous(target)
+            for follower in followers:
+                follower.update_lead(target)
+            self._update_previous(target, followers)
 
         self.side_offset = None
         self.side_vector = None
@@ -785,7 +821,8 @@ class Car(Entity, TrafficAgent):
         Ignores agents in `ignore` optional collection.
         """
         if self.traffic_node.has_previous:
-            prev = self.traffic_node.previous.data
+            prev_node = self.traffic_node.previous
+            prev = prev_node.data
             if ignore is not None and prev in ignore:
                 return
             if isinstance(prev, Car):
@@ -798,6 +835,8 @@ class Car(Entity, TrafficAgent):
                     lock.release(prev, buffer)
                 prev.distance_to_release = None
                 prev.update_lead(buffer)
+                if not prev_node.is_shadow():
+                    self.followers.add(prev)
 
     def debug_str(self):
         """Get detailed debug string for the car."""
@@ -827,3 +866,14 @@ class Car(Entity, TrafficAgent):
 
     def __repr__(self):
         return f'{Car.__name__}(id={self.id})'
+
+
+def is_shadow(node: LinkedListNode) -> bool:
+    """Check if a traffic node is the shadow node of its agent."""
+    try:
+        return node.data.shadow_node is node
+    except AttributeError:
+        return False
+
+
+LinkedListNode.is_shadow = is_shadow

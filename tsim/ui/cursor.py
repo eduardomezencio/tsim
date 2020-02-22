@@ -101,37 +101,35 @@ class Cursor(DirectObject):
         self.actor.set_scale(p3d.CAMERA.get_z() ** 0.6 / 10)
         self.moved = False
 
-        if not p3d.MOUSE_WATCHER.has_mouse():
-            return
+        if p3d.MOUSE_WATCHER.has_mouse():
+            mouse_x, mouse_y = p3d.MOUSE_WATCHER.get_mouse()
+            self._picker_ray.set_from_lens(p3d.CAM_NODE, mouse_x, mouse_y)
+            self._traverser.traverse(p3d.RENDER)
 
-        mouse_x, mouse_y = p3d.MOUSE_WATCHER.get_mouse()
-        self._picker_ray.set_from_lens(p3d.CAM_NODE, mouse_x, mouse_y)
-        self._traverser.traverse(p3d.RENDER)
-
-        if self._collision_handler.get_num_entries():
-            self._collision_handler.sort_entries()
-            node_path = (self._collision_handler.get_entry(0)
-                         .get_into_node_path())
-            self.position = node_path.get_pos(p3d.RENDER)
-            self.actor.set_z(2.0)
-            self.pointed_at = node_path
-        else:
-            self.pointed_at = None
-            film = p3d.LENS.get_film_size() * 0.5
-            self.mouse_np.set_x(mouse_x * film.x)
-            self.mouse_np.set_y(p3d.LENS.get_focal_length())
-            self.mouse_np.set_z(mouse_y * film.y)
-            self.last_position = self._position
-            mouse_pos = self.mouse_np.get_pos(self.parent)
-            cam_pos = p3d.CAMERA.get_pos(self.parent)
-            mouse_vec = mouse_pos - cam_pos
-            if mouse_vec.z < 0.0:
-                scale = -mouse_pos.z / mouse_vec.z
-                self.actor.set_pos(mouse_pos + mouse_vec * scale)
-                self.position = self.actor.get_pos()
-                if self._position != self.last_position:
-                    self.moved = True
-                    p3d.MESSENGER.send('cursor_move')
+            if self._collision_handler.get_num_entries():
+                self._collision_handler.sort_entries()
+                node_path = (self._collision_handler.get_entry(0)
+                             .get_into_node_path())
+                self.position = node_path.get_pos(p3d.RENDER)
+                self.actor.set_z(2.0)
+                self.pointed_at = node_path
+            else:
+                self.pointed_at = None
+                film = p3d.LENS.get_film_size() * 0.5
+                self.mouse_np.set_x(mouse_x * film.x)
+                self.mouse_np.set_y(p3d.LENS.get_focal_length())
+                self.mouse_np.set_z(mouse_y * film.y)
+                self.last_position = self._position
+                mouse_pos = self.mouse_np.get_pos(self.parent)
+                cam_pos = p3d.CAMERA.get_pos(self.parent)
+                mouse_vec = mouse_pos - cam_pos
+                if mouse_vec.z < 0.0:
+                    scale = -mouse_pos.z / mouse_vec.z
+                    self.actor.set_pos(mouse_pos + mouse_vec * scale)
+                    self.position = self.actor.get_pos()
+                    if self._position != self.last_position:
+                        self.moved = True
+                        p3d.MESSENGER.send('cursor_move')
 
         if self._tool is not None:
             self._tool.on_update()

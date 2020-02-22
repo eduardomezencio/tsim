@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from collections import deque
-from typing import Callable, Deque, Set, Tuple
+from typing import Any, Callable, Deque, List, Set, Tuple
+
+from orderedset import OrderedSet
 
 from tsim.model.network.traffic import TrafficDynamicAgent
 from tsim.model.units import Duration, Timestamp
+
+Listener = Callable[[str, Tuple[Any, ...]], None]
 
 
 class Simulation:
@@ -17,13 +21,15 @@ class Simulation:
     active: Set[TrafficDynamicAgent]
     ready_buffer: int
     _queue: Deque[Tuple[Callable, Tuple]]
+    _listeners = List[Listener]
 
     def __init__(self):
         self.time = 0
-        self.agents = set()
-        self.active = set()
+        self.agents = OrderedSet()
+        self.active = OrderedSet()
         self.ready_buffer = 0
         self._queue = deque()
+        self._listeners = []
 
     @property
     def target_buffer(self) -> int:
@@ -64,15 +70,16 @@ class Simulation:
         self.enqueue(self.active.add if agent.active else self.active.discard,
                      (agent,))
 
-    def enqueue(self, callable_: Callable, args: Tuple):
+    def enqueue(self, callable_: Callable, args: Tuple = ()):
         """Enqueue function to be called after update loop ends."""
         self._queue.append((callable_, args))
 
-    # TODO: Remove or rewrite in a way to not mix panda3d in simulation code.
-    def debug_focus(self, agent):
-        """Send panda3d message to focus on agent.
+    def register_listener(self, listener: Listener):
+        """Register listener to receive raised events."""
+        if listener not in self._listeners:
+            self._listeners.append(listener)
 
-        FOR DEBUG ONLY.
-        """
-        import tsim.ui.panda3d as p3d
-        p3d.MESSENGER.send('focus', [agent])
+    def raise_event(self, name: str, *args):
+        """Raise event to all registered listeners."""
+        for listener in self._listeners:
+            listener(name, *args)

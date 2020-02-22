@@ -14,7 +14,7 @@ from direct.task import Task
 from panda3d.core import (AntialiasAttrib, ConfigVariableBool, NodePath,
                           RigidBodyCombiner, TextNode)
 
-import tsim.ui.input as INPUT
+import tsim.ui.input as Input
 import tsim.ui.panda3d as p3d
 from tsim.model.index import INSTANCE as INDEX
 from tsim.model.geometry import Point, bounding_rect_center
@@ -31,6 +31,8 @@ from tsim.ui.objects import factory as Factory, world as World
 from tsim.ui.sky import Sky
 from tsim.utils.iterators import window_iter
 
+EVENTS = ('add_car', 'focus', 'follow', 'network_entities_changed',
+          'removed_car')
 FRAME_DURATION = 1 / 60
 SPEED_STEPS = 4
 
@@ -44,62 +46,43 @@ class App:
     roads: Dict[Tuple[int, int], NodePath]
 
     def __init__(self, index_name: str):
+        self.network_entities = {}
+        self.agents = {}
+        self.roads = {}
         self._event_queue = deque()
+        self._frame_count = 0
+        self._simulation_speed = 0
 
         log_config()
         panda3d_config()
-
         init_index(index_name)
-
-        INPUT.init()
+        Input.init()
 
         self.scene = NodePath('scene')
         self.agents_parent = NodePath('agents')
         self.agents_parent.reparent_to(self.scene)
-
         self.camera = Camera()
         self.world = World.create(self.scene, 10000, 16)
         self.sky = Sky(self.scene, self.camera)
         self.cursor = Cursor(self.world)
         self.grid = Grid(50.0, 1000.0, self.world, self.cursor.actor)
 
+        self._init_objects()
+        self._init_event_handlers()
         self._build_on_screen_text()
 
-        # self.roads = self.world.attach_new_node(PandaNode('roads'))
-        # self.roads = self.world.attach_new_node(RigidBodyCombiner('roads'))
-        self.network_entities = {}
-        self.agents = {}
-        self.roads = {}
-        self.init_objects()
-        for node_path in self.roads.values():
-            node_path.node().collect()
-
-        self._frame_count = 0
-        self._simulation_speed = 0
-
-        p3d.BASE.accept('wheel_up',
-                        partial(self.change_simulation_speed, 1))
-        p3d.BASE.accept('wheel_down',
-                        partial(self.change_simulation_speed, -1))
-
-        p3d.BASE.accept('entities_changed', self.on_network_entities_changed)
-        p3d.BASE.accept('new_agent', self.enqueue_event)
-        p3d.BASE.accept('focus', self.focus)
-
-        self.scene.reparent_to(p3d.RENDER)
-
         seed(2)
-        self.generate_random_cars(200)
+        self.generate_random_cars(500)
 
         # TODO: Change to set simulation time when loading INDEX from file.
         INDEX.simulation.time = random() * 24.0 * HOUR
         self.sky.set_time(normalized_hours(INDEX.simulation.time))
 
-    def focus(self, *args):
-        """Focus on given agent and pause simulation."""
-        self.camera.focus.set_x(args[0].position.x)
-        self.camera.focus.set_y(args[0].position.y)
-        self._simulation_speed = 0
+        self.scene.reparent_to(p3d.RENDER)
+
+        for key, id_ in (('1', 324), ('2', 236)):
+            p3d.BASE.accept(key, partial(p3d.MESSENGER.send, 'follow',
+                                         [INDEX.entities[id_]]))
 
     def generate_random_cars(self, limit=500):
         """Generate `limit` random cars."""
@@ -113,8 +96,8 @@ class App:
                                        lane2.oriented_way_position(distance2))
             if path is None:
                 continue
-            self.add_car(Car(), LanePosition(lane1, distance1),
-                         lane2.oriented_way_position(distance2))
+            self.on_add_car(Car(), LanePosition(lane1, distance1),
+                            lane2.oriented_way_position(distance2))
 
     @property
     def simulation_speed(self) -> int:
@@ -124,7 +107,7 @@ class App:
     def change_simulation_speed(self, value: int):
         """Add value to the simulation speed."""
         value = self._simulation_speed + value
-        self._simulation_speed = floor(max(0, min(value, SPEED_STEPS)))
+        self._simulation_speed = floor(max(0, min(value, SPEED_STEPS * 4)))
 
     def run(self):
         """Start the main loop."""
@@ -142,15 +125,15 @@ class App:
             self.update_agents()
 
         while self._event_queue:
-            event = self._event_queue.popleft()
-            App.event_handlers[type(event[0])](self, *event)
+            name, args = self._event_queue.popleft()
+            self.event_handlers[name](*args)
 
         self.camera.update()
         self.sky.set_time(normalized_hours(INDEX.simulation.time))
         self.sky.update()
         self.cursor.update()
         self.grid.update()
-        INPUT.clear()
+        Input.clear()
 
         self._update_on_screen_text()
 
@@ -171,11 +154,9 @@ class App:
             parent = self.get_roads_parent(point)
             self.network_entities[id_] = Factory.create(parent, entity)
 
-    def on_network_entities_changed(self):
-        """Update network entities."""
-        self.update_network_entities()
-        for node_path in self.roads.values():
-            node_path.node().collect()
+    def simulation_event_listener(self, name: str, *args):
+        """Handle simulation events."""
+        p3d.MESSENGER.send(name, list(args))
 
     def get_roads_parent(self, point: Point) -> NodePath:
         """Get the correct parent for roads on the given point.
@@ -193,7 +174,7 @@ class App:
             self.roads[key] = parent
         return parent
 
-    def init_objects(self):
+    def _init_objects(self):
         """Create all objects on the index."""
         for node in filter(lambda e: isinstance(e, Node),
                            INDEX.entities.values()):
@@ -208,18 +189,63 @@ class App:
 
         # TODO: load agents
 
-    def enqueue_event(self, *args):
-        """Enqueue event from panda3d messenger."""
-        self._event_queue.append(args)
+        for node_path in self.roads.values():
+            node_path.node().collect()
 
-    def add_car(self, car: Car, position: LanePosition,
-                destination: OrientedWayPosition):
+    def _init_event_handlers(self):
+        """Initialize all event listeners/handlers."""
+        self.event_handlers = {e: getattr(self, f'on_{e}', lambda: None)
+                               for e in EVENTS}
+        for event in EVENTS:
+            p3d.BASE.accept(event, partial(self.enqueue_event, event))
+
+        INDEX.simulation.register_listener(self.simulation_event_listener)
+
+        for i in range(6):
+            key, value = str(i), int(2 ** (i - 1))
+            p3d.BASE.accept(key, partial(setattr, self,
+                                         '_simulation_speed', value))
+        for key, value in (('wheel_up', 1), ('wheel_down', -1)):
+            p3d.BASE.accept(key, partial(self.change_simulation_speed, value))
+
+    def enqueue_event(self, name: str, *args):
+        """Enqueue event from panda3d messenger."""
+        self._event_queue.append((name, args))
+
+    def on_add_car(self, car: Car, position: LanePosition,
+                   destination: OrientedWayPosition):
         """Add car with given position and destination."""
         ready = INDEX.simulation.ready_buffer
         target = INDEX.simulation.target_buffer
         car.place_at(position, ready)
         car.set_destination(destination, ready, target)
         self.agents[car] = Factory.create_car(self.agents_parent, car)
+
+    def on_focus(self, car: Car):
+        """Focus on given agent and pause simulation."""
+        self.camera.unfollow()
+        self.camera.focus.set_x(car.position.x)
+        self.camera.focus.set_y(car.position.y)
+        self._simulation_speed = 0
+
+    def on_follow(self, car: Car):
+        """Follow agent with camera."""
+        car_np = self.agents.get(car, None)
+        if car_np is not None:
+            self.camera.follow(car_np)
+
+    def on_network_entities_changed(self):
+        """Update network entities."""
+        self.update_network_entities()
+        for node_path in self.roads.values():
+            node_path.node().collect()
+
+    def on_removed_car(self, car: Car):
+        """Remove the car actor when car is removed from simulation."""
+        node_path = self.agents.pop(car, None)
+        if node_path is not None:
+            self.camera.unfollow(node_path)
+            node_path.remove_node()
 
     def update_agents(self):
         """Update agent actors."""
@@ -229,8 +255,6 @@ class App:
             node_path.set_pos(position.x, position.y, 0.0)
             if agent.direction_changed:
                 node_path.look_at(*(position + agent.direction), 0.0)
-
-    event_handlers = {Car: add_car}
 
     def _build_on_screen_text(self):
         time_text = TextNode('time_text')

@@ -188,6 +188,9 @@ class ConflictPoint(TrafficLock):
         else:
             agent.distance_to_lock = distance - lock_distance
 
+    def update_followers(self, buffer: int):
+        """Update current followers as preparation to insert a new follower."""
+
     def remove_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Unregister agent as follower."""
         agent.distance_to_lock = None
@@ -237,7 +240,7 @@ class ConflictPoint(TrafficLock):
         if terminal:
             lock_count = agent.lock_count[self]
             if not lock_count > 0:
-                Index.INSTANCE.simulation.debug_focus(agent)
+                Index.INSTANCE.simulation.raise_event('focus', agent)
                 log.error('Releasing %d, lock_count <= 0', self.id)
                 return
             if lock_count == 1:
@@ -247,9 +250,13 @@ class ConflictPoint(TrafficLock):
             else:
                 agent.lock_count[self] -= 1
         else:
-            for lock in self.lock_order[self.owner_location]:
-                lock.release(agent, buffer, True)
-            Index.INSTANCE.simulation.enqueue(self._pass, (agent, buffer))
+            try:
+                for lock in self.lock_order[self.owner_location]:
+                    lock.release(agent, buffer, True)
+                Index.INSTANCE.simulation.enqueue(self._pass, (agent, buffer))
+            except KeyError as error:
+                Index.INSTANCE.simulation.raise_event('focus', agent)
+                log.exception(error)
 
     def _pass(self, agent: TrafficAgent, buffer: int):
         node = agent.traffic_node.next

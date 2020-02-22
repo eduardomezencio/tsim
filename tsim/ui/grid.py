@@ -12,6 +12,7 @@ from panda3d.core import (ConfigVariableColor, Geom, GeomLinestrips, GeomNode,
 from tsim.model.geometry import Vector
 
 DEFAULT_GRID_COLOR = '0.3 0.3 0.3 1.0'
+GRID_ALPHA = 0.125
 
 
 class Grid:
@@ -31,10 +32,10 @@ class Grid:
 
         node = GeomNode('grid')
         node.add_geom(self.geom)
-        node.adjust_draw_mask(0x00000000, 0x00010000, 0xfffeffff)
         self.node_path = parent.attach_new_node(node)
         self.node_path.set_z(0.1)
         self.node_path.set_transparency(TransparencyAttrib.M_alpha)
+        self.node_path.set_light_off()
         self.node_path.set_shader_off()
 
     def update(self):
@@ -59,7 +60,8 @@ class Grid:
         for i, j in product(range(diameter), repeat=2):
             vertex_writer.add_data3f(start + i * self.spacing,
                                      start + j * self.spacing, 0.0)
-            alpha = 0.5 - (Vector(i - radius, j - radius).norm() / radius)
+            alpha = GRID_ALPHA - GRID_ALPHA * (
+                Vector(i - radius, j - radius).norm() / radius)
             color_writer.add_data4f(color[0], color[1], color[2], alpha)
 
         primitive = GeomLinestrips(Geom.UH_static)

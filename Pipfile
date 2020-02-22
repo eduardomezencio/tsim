@@ -20,6 +20,7 @@ fibonacci-heap-mod = "*"
 panda3d = "*"
 pillow = "*"
 rtree = "*"
+orderedset = "*"
 
 [requires]
 python_version = "3.8"
