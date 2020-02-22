@@ -116,8 +116,7 @@ class App:
 
         while self._frame_count >= SPEED_STEPS:
             self._frame_count -= SPEED_STEPS
-            INDEX.simulation.update(FRAME_DURATION * self.simulation_speed
-                                    / SPEED_STEPS)
+            INDEX.simulation.update(FRAME_DURATION)
             self.update_agents()
 
         while self._event_queue:
@@ -197,7 +196,7 @@ class App:
 
         INDEX.simulation.register_listener(self.simulation_event_listener)
 
-        for i in range(6):
+        for i in range(10):
             key, value = str(i), int(2 ** (i - 1))
             p3d.BASE.accept(key, partial(setattr, self,
                                          '_simulation_speed', value))
