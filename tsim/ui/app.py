@@ -247,7 +247,7 @@ class App:
         self.camera.unfollow()
         self.camera.focus.set_x(car.position.x)
         self.camera.focus.set_y(car.position.y)
-        self._simulation_speed = 0
+        self.change_simulation_speed(0, False)
 
     def on_follow(self, car: Car):
         """Follow agent with camera."""
