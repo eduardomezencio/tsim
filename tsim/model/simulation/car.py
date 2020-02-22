@@ -758,11 +758,16 @@ class Car(Entity, TrafficAgent):
             self.shadow_node = None
             if shadow_previous is not None:
                 shadow_previous.notify(target)
-            followers = list(self.followers)
-            self.followers.clear()
-            for follower in followers:
-                follower.update_lead(target)
-            self._update_previous(target, followers)
+            # TODO: The following code caused lead/followers to update
+            # incorrectly sometimes and I don't remember why it even exists in
+            # the first place. To remove completely when I'm sure it's not
+            # needed.
+
+            # followers = list(self.followers)
+            # self.followers.clear()
+            # for follower in followers:
+            #     follower.update_lead(target)
+            # self._update_previous(target, followers)
 
         self.side_offset = None
         self.side_vector = None
