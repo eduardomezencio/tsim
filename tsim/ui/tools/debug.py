@@ -12,6 +12,7 @@ from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network.node import Node
 from tsim.model.network.traffic import TrafficAgent
 from tsim.model.network.way import Way
+from tsim.model.units import mps_to_kph
 from tsim.ui.objects import factory as Factory
 from tsim.ui.objects.node import create_lane_connections_card
 from tsim.ui import panda3d as p3d
@@ -132,7 +133,7 @@ class Debug(Tool):
                 f'oriented_position={oriented_position:.2f},'
                 f'\n    lane_position={lane_position:.2f}, '
                 f'lane={lane_index}, '
-                f'max_speed={selected.max_speed}')
+                f'max_speed={mps_to_kph(selected.max_speed):.1f} kph')
 
     def _clear_selection(self):
         """Clear all seleted objects."""

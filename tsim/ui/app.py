@@ -74,7 +74,7 @@ class App:
         self._build_on_screen_text()
 
         seed(2)
-        self.generate_random_cars(800)
+        self.generate_random_cars(200)
 
         # TODO: Change to set simulation time when loading INDEX from file.
         INDEX.simulation.time = 17.54321 * HOUR

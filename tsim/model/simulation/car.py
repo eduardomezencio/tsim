@@ -274,9 +274,9 @@ class Car(Entity, TrafficAgent):
         self.path_segment = 0
         self.path_last_segment = False
         self.path_last_way = False
-        self.speed[0:2] = 0.0, 0.0
+        self.speed[:] = 0.0, 0.0
         self.network_location = network_position.location
-        self.network_position[0:2] = repeat(network_position.position, 2)
+        self.network_position[:] = repeat(network_position.position, 2)
 
         lane = network_position.location
         if isinstance(lane, Lane):
@@ -336,7 +336,7 @@ class Car(Entity, TrafficAgent):
             Index.INSTANCE.simulation.raise_event('removed_car', self)
 
         segment = self.network_location.segments[self.network_segment]
-        self.speed[target] = 0.0
+        self.speed[:] = 0.0, 0.0
         self.path = None
         self.network_segment_end = segment.end_distance
         self.set_active(False)
