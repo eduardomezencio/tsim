@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections import deque
 from functools import partialmethod
 from itertools import chain
 
@@ -59,7 +58,7 @@ def _conflict_point_setstate(self: ConflictPoint, state):
     self.neighbors = set()
     self.curves = set()
     self.owner = None
-    self.queue = deque()
+    self.queue = LinkedList()
 
 
 def _curve_getstate(self: Curve):

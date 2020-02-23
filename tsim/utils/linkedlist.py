@@ -112,7 +112,7 @@ class LinkedList(MutableSequence, Generic[T]):
 
         return node
 
-    def iter_nodes(self):
+    def iter_nodes(self) -> Iterator[LinkedListNode[T]]:
         """Get iterator to list nodes."""
         node = self._head.next
         while node is not self._head:

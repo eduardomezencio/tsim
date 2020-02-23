@@ -22,7 +22,7 @@ from tsim.model.network.traffic import (TrafficAgent, TrafficDynamicAgent,
                                         TrafficLock)
 from tsim.model.network.way import LANE_WIDTH, Lane
 from tsim.model.simulation.schedule import Schedule
-from tsim.model.units import Duration, kph_to_mps, time_string
+from tsim.model.units import Duration, kph_to_mps, mps_to_kph, time_string
 from tsim.utils.linkedlist import LinkedListNode
 
 if TYPE_CHECKING:
@@ -36,7 +36,7 @@ BREAK_BASE = 75.0
 
 LANE_CHANGE_SPEED_MPS = 1.0
 LANE_CHANGE_MIN_DURATION = LANE_WIDTH / LANE_CHANGE_SPEED_MPS
-MAX_SPEED_KPH = 60.0
+MAX_SPEED_KPH = 100.0
 MAX_SPEED_MPS = kph_to_mps(MAX_SPEED_KPH)
 
 
@@ -169,7 +169,7 @@ class Car(Entity, TrafficAgent):
     distance_to_release: float
     lock_queue: Deque[TrafficLock]
     lock_count: DefaultDict[TrafficLock, int]
-    waiting: int
+    waiting: list
     current_max_speed: float
     path: Path
     path_segment: int
@@ -202,6 +202,7 @@ class Car(Entity, TrafficAgent):
         self.distance_to_release = None
         self.lock_queue = deque()
         self.lock_count = defaultdict(int)
+        self.waiting = [0, None]
         self.current_max_speed = MAX_SPEED_MPS
         self.path = None
         self.path_segment = 0
@@ -323,7 +324,7 @@ class Car(Entity, TrafficAgent):
     def remove(self, target: int):
         """Remove car from simulation."""
         def _remove_node():
-            self._release_all_locks(target)
+            self.release_all_locks(target)
             if self.traffic_node:
                 self.traffic_node.remove()
             if self.shadow_node:
@@ -341,7 +342,7 @@ class Car(Entity, TrafficAgent):
         self.set_active(False)
         Index.INSTANCE.simulation.enqueue(_remove_node)
 
-    def _release_all_locks(self, buffer):
+    def release_all_locks(self, buffer):
         """Release all locks acquired by the car.
 
         This is not the natural way of releasing locks, but a way to force all
@@ -349,10 +350,15 @@ class Car(Entity, TrafficAgent):
         removing the car from the simulation, so that no lock stays with this
         car forever.
         """
+        index, lock_order = self.waiting
+        if lock_order is not None:
+            lock_order[index].drop(self)
+
         for lock, count_ in list(self.lock_count.items()):
             for _ in range(count_):
                 lock.release(self, buffer, True)
         self.lock_queue.clear()
+        self.distance_to_release = None
 
     def find_lead(self) -> Tuple[TrafficAgent, NetworkLocation, bool]:
         """Find the first agent ahead of this one.
@@ -470,26 +476,27 @@ class Car(Entity, TrafficAgent):
     def start_locking_lead(self, buffer: int):
         """Start procedure to acquire the lock right ahead of the car."""
         self.distance_to_lock = None
-        self.waiting = 0
-        self.lead.lock_order[self.lead_location][0].lock(self, buffer, True)
+        lock_order = self.lead.lock_order[self.lead_location]
+        self.waiting[:] = 0, lock_order
+        lock_order[0].lock(self, buffer, True)
 
     def acquire(self, lock: TrafficLock, buffer: int, terminal: bool):
         """Register acquisition of `lock` by car."""
         try:
             if terminal:
                 self.lock_count[lock] += 1
-                next_index = self.waiting + 1
-                if next_index >= len(self.lead.lock_order[self.lead_location]):
+                next_index = self.waiting[0] + 1
+                if next_index >= len(self.waiting[1]):
+                    self.waiting[1] = None
                     self.lead.lock(self, buffer, False, self.lead_location)
                 else:
-                    self.waiting = next_index
-                    self.lead.lock_order[self.lead_location][next_index].lock(
-                        self, buffer, True)
+                    self.waiting[0] = next_index
+                    self.waiting[1][next_index].lock(self, buffer, True)
             else:
                 self.lock_queue.append(lock)
                 if self.distance_to_release is None:
                     self.distance_to_release = (self.distance_to(lock, buffer)
-                                                + MINIMUM_DISTANCE)
+                                                + MINIMUM_DISTANCE / 2)
                 self.notify(buffer)
         except AttributeError as error:
             Index.INSTANCE.simulation.raise_event('focus', self)
@@ -759,16 +766,6 @@ class Car(Entity, TrafficAgent):
             self.shadow_node = None
             if shadow_previous is not None:
                 shadow_previous.notify(target)
-            # TODO: The following code caused lead/followers to update
-            # incorrectly sometimes and I don't remember why it even exists in
-            # the first place. To remove completely when I'm sure it's not
-            # needed.
-
-            # followers = list(self.followers)
-            # self.followers.clear()
-            # for follower in followers:
-            #     follower.update_lead(target)
-            # self._update_previous(target, followers)
 
         self.side_offset = None
         self.side_vector = None
@@ -813,7 +810,7 @@ class Car(Entity, TrafficAgent):
                 if self.lock_queue:
                     self.distance_to_release = (
                         self.distance_to(self.lock_queue[0], buffer)
-                        + MINIMUM_DISTANCE)
+                        + MINIMUM_DISTANCE / 2)
                 else:
                     self.distance_to_release = None
 
@@ -836,10 +833,7 @@ class Car(Entity, TrafficAgent):
                 # released because if the car behind onws a lock, this car
                 # (self) probably got in the way between the car behind and the
                 # lock and now will try to acquire the lock in its place.
-                while prev.lock_queue:
-                    lock = prev.lock_queue.popleft()
-                    lock.release(prev, buffer)
-                prev.distance_to_release = None
+                prev.release_all_locks(buffer)
                 prev.update_lead(buffer)
                 if not prev_node.is_shadow():
                     self.followers.add(prev)
@@ -849,6 +843,8 @@ class Car(Entity, TrafficAgent):
         buffer = Index.INSTANCE.simulation.ready_buffer
         position = self.network_position[buffer]
         position = f'{position:.2f}' if position is not None else ''
+        speed = mps_to_kph(self.speed[buffer])
+        max_speed = mps_to_kph(self.current_max_speed)
         lock_count = ', '.join(f'{k.id}: {v}'
                                for k, v in self.lock_count.items()
                                if v != 0)
@@ -856,13 +852,17 @@ class Car(Entity, TrafficAgent):
                    if self.distance_to_lock is not None else 'None')
         to_release = (f'{self.distance_to_release:.2f}'
                       if self.distance_to_release is not None else 'None')
-        try:
-            waiting = self.lead.lock_order[self.lead_location][self.waiting]
-            waiting = f'{waiting}, owned by {waiting.owner}'
-        except (AttributeError, IndexError):
+
+        index, lock_order = self.waiting
+        if lock_order is not None:
+            lock = lock_order[index]
+            waiting = f'{lock}, owned by {lock.owner}'
+        else:
             waiting = 'None'
+
         return (
             f'{repr(self)} @ {self.network_location} : {position}\n'
+            f'speed: {speed:.1f} / {max_speed:.1f} kph\n'
             f'lead: {repr(self.lead)}    followers: {self.followers}\n'
             f'lock_queue: {self.lock_queue}\n'
             f'lock_count: {lock_count}\n'

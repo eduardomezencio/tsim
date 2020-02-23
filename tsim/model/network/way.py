@@ -51,7 +51,7 @@ class Way(NetworkEntity):
     def __init__(self, start: Union[Node, EntityRef[Node]],
                  end: Union[Node, EntityRef[Node]],
                  lane_count: Tuple[int, int], waypoints: Tuple[Point] = (),
-                 max_speed: float = DEFAULT_MAX_SPEED_KPH):
+                 max_speed: float = DEFAULT_MAX_SPEED_MPS):
         self.id = None
         self.start_ref = EntityRef(start)
         self.end_ref = EntityRef(end)

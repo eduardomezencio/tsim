@@ -26,7 +26,6 @@
   <node id='-115359' action='modify' visible='true' lat='-19.90174524996' lon='-43.96257821306' />
   <node id='-115362' action='modify' visible='true' lat='-19.90395444694' lon='-43.96196529175' />
   <node id='-115364' action='modify' visible='true' lat='-19.90169768998' lon='-43.96080713827' />
-  <node id='-115386' action='modify' visible='true' lat='-19.90149051878' lon='-43.95643564342' />
   <node id='-115411' action='modify' visible='true' lat='-19.92132969563' lon='-43.9619432438' />
   <node id='-115413' action='modify' visible='true' lat='-19.91434013988' lon='-43.96286442712' />
   <node id='-115416' action='modify' visible='true' lat='-19.90794795528' lon='-43.96395393659' />
@@ -34,8 +33,6 @@
   <node id='-115422' action='modify' visible='true' lat='-19.90436939458' lon='-43.96483139678' />
   <node id='-115427' action='modify' visible='true' lat='-19.90611210829' lon='-43.96440408727' />
   <node id='-115431' action='modify' visible='true' lat='-19.90765088951' lon='-43.96122953701' />
-  <node id='-115434' action='modify' visible='true' lat='-19.90945584213' lon='-43.96369693031' />
-  <node id='-115437' action='modify' visible='true' lat='-19.90919596925' lon='-43.96105471938' />
   <node id='-115440' action='modify' visible='true' lat='-19.910613982' lon='-43.96089427722' />
   <node id='-115442' action='modify' visible='true' lat='-19.91062190147' lon='-43.96349818388' />
   <node id='-115445' action='modify' visible='true' lat='-19.91080498333' lon='-43.9657532253' />
@@ -132,12 +129,14 @@
   <node id='-146160' action='modify' visible='true' lat='-19.91968758738' lon='-43.96280566395' />
   <node id='-146163' action='modify' visible='true' lat='-19.91996365932' lon='-43.96212328274' />
   <node id='-146167' action='modify' visible='true' lat='-19.92029871982' lon='-43.96458532388' />
+  <node id='-146402' action='modify' visible='true' lat='-19.9091611181' lon='-43.96105866263' />
+  <node id='-146404' action='modify' visible='true' lat='-19.90929988867' lon='-43.96372351133' />
   <way id='-146170' action='modify' visible='true'>
     <nd ref='-115359' />
     <nd ref='-115362' />
     <nd ref='-102317' />
     <nd ref='-115431' />
-    <nd ref='-115437' />
+    <nd ref='-146402' />
     <nd ref='-115440' />
     <nd ref='-114960' />
     <nd ref='-115470' />
@@ -240,10 +239,9 @@
     <nd ref='-115448' />
     <nd ref='-115445' />
     <nd ref='-114980' />
-    <nd ref='-115434' />
-    <nd ref='-115437' />
     <tag k='highway' v='primary' />
     <tag k='lanes' v='4' />
+    <tag k='maxspeed' v='100' />
   </way>
   <way id='-146221' action='modify' visible='true'>
     <nd ref='-102317' />
@@ -291,7 +289,7 @@
     <nd ref='-115454' />
     <nd ref='-115450' />
     <nd ref='-115442' />
-    <nd ref='-115434' />
+    <nd ref='-146404' />
     <nd ref='-115416' />
     <nd ref='-115427' />
     <nd ref='-115422' />
@@ -431,6 +429,7 @@
     <nd ref='-146038' />
     <nd ref='-115461' />
     <tag k='highway' v='primary' />
+    <tag k='maxspeed' v='40' />
   </way>
   <way id='-146300' action='modify' visible='true'>
     <nd ref='-115543' />
@@ -543,11 +542,13 @@
     <nd ref='-146149' />
     <nd ref='-146151' />
     <tag k='highway' v='primary' />
+    <tag k='maxspeed' v='40' />
   </way>
   <way id='-146313' action='modify' visible='true'>
     <nd ref='-145998' />
     <nd ref='-146070' />
     <tag k='highway' v='primary' />
+    <tag k='maxspeed' v='40' />
   </way>
   <way id='-146314' action='modify' visible='true'>
     <nd ref='-146155' />
@@ -555,15 +556,23 @@
     <nd ref='-146160' />
     <nd ref='-146163' />
     <tag k='highway' v='primary' />
+    <tag k='maxspeed' v='40' />
   </way>
   <way id='-146315' action='modify' visible='true'>
     <nd ref='-146067' />
     <nd ref='-146144' />
     <tag k='highway' v='primary' />
+    <tag k='maxspeed' v='40' />
   </way>
   <way id='-146316' action='modify' visible='true'>
     <nd ref='-146167' />
     <nd ref='-146132' />
+    <tag k='highway' v='primary' />
+  </way>
+  <way id='-146405' action='modify' visible='true'>
+    <nd ref='-146402' />
+    <nd ref='-146404' />
+    <nd ref='-114980' />
     <tag k='highway' v='primary' />
   </way>
 </osm>

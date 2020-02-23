@@ -129,9 +129,10 @@ class Debug(Tool):
 
             self.text_dict['network_position'] += (
                 f'\n    way_position={way_position:.2f}, '
-                f'oriented_position={oriented_position:.2f}, '
-                f'lane_position={lane_position:.2f}, '
-                f'lane={lane_index}')
+                f'oriented_position={oriented_position:.2f},'
+                f'\n    lane_position={lane_position:.2f}, '
+                f'lane={lane_index}, '
+                f'max_speed={selected.max_speed}')
 
     def _clear_selection(self):
         """Clear all seleted objects."""

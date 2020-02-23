@@ -19,6 +19,7 @@ from tsim.model.network.endpoint import Endpoint
 from tsim.model.network.node import Node
 from tsim.model.network.path import dijkstra
 from tsim.model.network.way import Way
+from tsim.model.units import kph_to_mps
 from tsim.serialization.config import configure_serialization
 from tsim.utils.cachedproperty import touch_cache
 
@@ -72,7 +73,7 @@ def osm_reader(name: str):
                                  if t.get('k') == 'lanes'),
                                 None),
                 xid=int(w.get('id')),
-                max_speed=next((float(t.get('v').split()[0])
+                max_speed=next((kph_to_mps(float(t.get('v').split()[0]))
                                 for t in w.iterfind('tag')
                                 if t.get('k') == 'maxspeed'),
                                None))

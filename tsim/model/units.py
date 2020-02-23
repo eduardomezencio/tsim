@@ -37,6 +37,6 @@ def kph_to_mps(speed_kph: float) -> float:
     return 1000.0 * speed_kph / HOUR
 
 
-def mps_tp_kph(speed_mps: float) -> float:
+def mps_to_kph(speed_mps: float) -> float:
     """Convert meters per second to kilometers per hour."""
     return HOUR * speed_mps / 1000.0

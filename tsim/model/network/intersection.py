@@ -132,7 +132,7 @@ class ConflictPoint(TrafficLock):
     owner: Optional[TrafficAgent]
     owner_location: Optional[NetworkLocation]
     terminal: bool
-    queue: Deque[Tuple[TrafficAgent, bool]]
+    queue: LinkedList[Tuple[TrafficAgent, bool]]
 
     def __init__(self, id_: int, point: Point, type_: ConflictPointType):
         self.id = id_
@@ -143,7 +143,7 @@ class ConflictPoint(TrafficLock):
         self.lock_order = ()
         self.owner = None
         self.terminal = False
-        self.queue = deque()
+        self.queue = LinkedList()
 
     @property
     def lock_queue(self) -> Iterable[TrafficLock]:
@@ -253,10 +253,20 @@ class ConflictPoint(TrafficLock):
             try:
                 for lock in self.lock_order[self.owner_location]:
                     lock.release(agent, buffer, True)
-                Index.INSTANCE.simulation.enqueue(self._pass, (agent, buffer))
+                # Passing the agent here directly instead of enqueueing to
+                # avoid problems with lead updates before _pass is called.
+                self._pass(agent, buffer)
             except KeyError as error:
                 Index.INSTANCE.simulation.raise_event('focus', agent)
                 log.exception(error)
+
+    def drop(self, agent: TrafficAgent):
+        """Remove agent from queue without locking."""
+        agent_node = next((n for n in self.queue.iter_nodes()
+                           if n.data[0] is agent),
+                          None)
+        if agent_node is not None:
+            agent_node.remove()
 
     def _pass(self, agent: TrafficAgent, buffer: int):
         node = agent.traffic_node.next

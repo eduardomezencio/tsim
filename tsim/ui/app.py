@@ -74,10 +74,10 @@ class App:
         self._build_on_screen_text()
 
         seed(2)
-        self.generate_random_cars(250)
+        self.generate_random_cars(800)
 
         # TODO: Change to set simulation time when loading INDEX from file.
-        INDEX.simulation.time = random() * 24.0 * HOUR
+        INDEX.simulation.time = 17.54321 * HOUR
         self.sky.set_time(normalized_hours(INDEX.simulation.time))
 
         self.scene.reparent_to(p3d.RENDER)
@@ -121,14 +121,14 @@ class App:
         """Update task, to run every frame."""
         self._frame_count += self._simulation_speed
 
-        while self._frame_count >= SPEED_STEPS:
-            self._frame_count -= SPEED_STEPS
-            INDEX.simulation.update(FRAME_DURATION)
-            self.update_agents()
-
-        while self._event_queue:
-            name, args = self._event_queue.popleft()
-            self.event_handlers[name](*args)
+        if self._frame_count >= SPEED_STEPS:
+            while self._frame_count >= SPEED_STEPS:
+                self._frame_count -= SPEED_STEPS
+                INDEX.simulation.update(FRAME_DURATION)
+                self.update_agents()
+                self._consume_event_queue()
+        else:
+            self._consume_event_queue()
 
         self.camera.update()
         self.sky.set_time(normalized_hours(INDEX.simulation.time))
@@ -140,6 +140,11 @@ class App:
         self._update_time_text()
 
         return Task.cont
+
+    def _consume_event_queue(self):
+        while self._event_queue:
+            name, args = self._event_queue.popleft()
+            self.event_handlers[name](*args)
 
     def update_network_entities(self):
         """Update graphics for changed network entities."""
@@ -248,6 +253,7 @@ class App:
         self.camera.focus.set_x(car.position.x)
         self.camera.focus.set_y(car.position.y)
         self.change_simulation_speed(0, False)
+        self._frame_count = 0
 
     def on_follow(self, car: Car):
         """Follow agent with camera."""
