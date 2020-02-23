@@ -28,6 +28,7 @@ from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
 from tsim.ui.objects import factory as Factory, world as World
+from tsim.ui.screen import Screen
 from tsim.ui.sky import Sky
 from tsim.utils.iterators import window_iter
 
@@ -50,6 +51,7 @@ class App:
         self.network_entities = {}
         self.agents = {}
         self.roads = {}
+        self.screen = Screen()
         self._event_queue = deque()
         self._frame_count = 0
         self._simulation_speed = 0
@@ -74,15 +76,13 @@ class App:
         self._build_on_screen_text()
 
         seed(2)
-        self.generate_random_cars(200)
+        self.generate_random_cars(300)
 
         # TODO: Change to set simulation time when loading INDEX from file.
         INDEX.simulation.time = 17.54321 * HOUR
         self.sky.set_time(normalized_hours(INDEX.simulation.time))
 
         self.scene.reparent_to(p3d.RENDER)
-
-        # p3d.BASE.movie('movie/movie', 31536000, 60, 'jpg')
 
     def generate_random_cars(self, limit=500):
         """Generate `limit` random cars."""
@@ -225,7 +225,6 @@ class App:
 
         p3d.BASE.accept('control', _init_buffer)
         p3d.BASE.accept('control-up', _flush_buffer)
-
         for i in range(10):
             key = str(i)
             p3d.BASE.accept(key, partial(self.change_simulation_speed,
@@ -233,6 +232,8 @@ class App:
             p3d.BASE.accept(f'control-{key}', partial(_number_input, key))
         for key, value in (('wheel_up', 1), ('wheel_down', -1)):
             p3d.BASE.accept(key, partial(self.change_simulation_speed, value))
+        p3d.BASE.accept('f12', self.screen.screenshot)
+        p3d.BASE.accept('control-f12', self.screen.toggle_movie_recording)
 
     def enqueue_event(self, name: str, *args):
         """Enqueue event from panda3d messenger."""
