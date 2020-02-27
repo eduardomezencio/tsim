@@ -12,6 +12,7 @@ from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network.node import Node
 from tsim.model.network.traffic import TrafficAgent
 from tsim.model.network.way import Way
+from tsim.model.simulation.car import Car
 from tsim.model.units import mps_to_kph
 from tsim.ui.objects import factory as Factory
 from tsim.ui.objects.node import create_lane_connections_card
@@ -61,7 +62,7 @@ class Debug(Tool):
     def on_button1_press(self):
         """Button 1 pressed callback."""
         self.pressed = True
-        self._update_selection(True)
+        self._update_selection(just_pressed=True)
         point = self.cursor.position
 
         if self.last_point is not None:
@@ -74,6 +75,16 @@ class Debug(Tool):
     def on_button1_release(self):
         """Button 1 released callback."""
         self.pressed = False
+
+    def on_button2_press(self):
+        """Button 2 pressed callback."""
+        self._clear_agent()
+        self._update_selection(agents_only=True, follow=False,
+                               just_pressed=True, show_path=False)
+        if isinstance(self.selected_agent, Car):
+            self.selected_agent.remove(INDEX.simulation.ready_buffer,
+                                       INDEX.simulation.ready_buffer, False)
+        self._clear_agent()
 
     def on_button3_press(self):
         """Button 3 pressed callback."""
@@ -92,14 +103,20 @@ class Debug(Tool):
         self.hud_text.destroy()
         self._clear_selection()
 
-    def _update_selection(self, just_pressed: bool = False):
+    def _update_selection(self, *, agents_only: bool = False,
+                          follow: bool = True, just_pressed: bool = False,
+                          show_path: bool = True):
         if just_pressed and self.cursor.pointed_at:
             id_ = int(self.cursor.pointed_at.parent.tags['id'])
             agent = INDEX.entities.get(id_, None)
             if agent is not None and hasattr(agent, 'debug_str'):
                 self.selected_agent = agent
-                self._update_path_np()
-                p3d.MESSENGER.send('follow', [agent])
+                if show_path:
+                    self._update_path_np()
+                if follow:
+                    p3d.MESSENGER.send('follow', [agent])
+        if agents_only:
+            return
 
         selected = INDEX.get_at(self.cursor.position, of_type=Node)
         if selected and just_pressed:

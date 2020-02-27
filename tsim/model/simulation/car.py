@@ -335,7 +335,7 @@ class Car(Entity, TrafficAgent):
             self._start_lane_change(lane, ready, target)
         self.set_active()
 
-    def remove(self, ready: int, target: int):
+    def remove(self, ready: int, target: int, enqueue: bool = True):
         """Remove car from simulation."""
         def _remove_node():
             self.release_all_locks(target)
@@ -353,7 +353,10 @@ class Car(Entity, TrafficAgent):
         self.path = None
         self.set_active(False)
         self.state = State.REMOVED
-        Index.INSTANCE.simulation.enqueue(_remove_node)
+        if enqueue:
+            Index.INSTANCE.simulation.enqueue(_remove_node)
+        else:
+            _remove_node()
 
         if isinstance(self.network_location, Lane):
             lane = self.network_location
