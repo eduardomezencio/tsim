@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging as log
 from collections import deque
 from functools import partial
-from itertools import chain, cycle, islice
+from itertools import chain, cycle
 from math import floor
 from random import random, seed, shuffle
 from typing import Dict, Tuple
@@ -76,28 +76,56 @@ class App:
         self._build_on_screen_text()
 
         seed(2)
-        self.generate_random_cars(300)
+        self.generate_random_cars(500)
 
         # TODO: Change to set simulation time when loading INDEX from file.
-        INDEX.simulation.time = 17.54321 * HOUR
+        INDEX.simulation.time = 12.0 * HOUR
         self.sky.set_time(normalized_hours(INDEX.simulation.time))
 
         self.scene.reparent_to(p3d.RENDER)
 
-    def generate_random_cars(self, limit=500):
-        """Generate `limit` random cars."""
+    def generate_random_cars(self, number=500, max_tries=10):
+        """Generate `number` random cars."""
+        if max_tries < number:
+            max_tries *= number
+
         lanes = list(chain.from_iterable(w.lanes for w in
                                          INDEX.get_all(of_type=Way)))
         shuffle(lanes)
-        for lane1, lane2 in window_iter(islice(cycle(lanes), limit)):
+        remaining, tries = number, 0
+        buffer = INDEX.simulation.ready_buffer
+
+        for lane1, lane2 in window_iter(cycle(lanes)):
+            tries += 1
+            if tries > max_tries:
+                break
+
             distance1 = random() * lane1.length
             distance2 = random() * lane2.length
             path = INDEX.path_map.path(lane1.oriented_way_position(distance1),
                                        lane2.oriented_way_position(distance2))
             if path is None:
                 continue
+
+            free_space = lane1.get_free_space(distance1, buffer)
+            if free_space[0] < Car.MINIMUM_DISTANCE:
+                change = Car.MINIMUM_DISTANCE - free_space[0]
+                distance1 += change
+                free_space[0] += change
+                free_space[1] -= change
+            if free_space[1] < Car.MINIMUM_DISTANCE:
+                change = Car.MINIMUM_DISTANCE - free_space[1]
+                distance1 -= change
+                free_space[0] -= change
+                free_space[1] += change
+            if any(s < Car.MINIMUM_DISTANCE for s in free_space):
+                continue
+
             self.on_add_car(Car(), LanePosition(lane1, distance1),
                             lane2.oriented_way_position(distance2))
+            remaining -= 1
+            if remaining <= 0:
+                break
 
     @property
     def simulation_speed(self) -> int:

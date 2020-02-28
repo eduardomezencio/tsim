@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, NamedTuple, Optional, Tuple
+from typing import TYPE_CHECKING, NamedTuple, Optional, Sequence, Tuple
 
 from dataslots import with_slots
 
@@ -268,6 +268,23 @@ class Lane(NetworkLocation):
             return self.end.intersection.curves[connection]
         return None
 
+    def get_free_space(self, distance: float, buffer: int) -> Sequence[float]:
+        """Get space available behind and ahead in given distance.
+
+        The returned sequence contains the free space behind in position 0 and
+        ahead in position 1. Free space is the distance to an agent or to the
+        ends of the lane.
+        """
+        free_space = [distance, self.length - distance]
+        for agent in self.traffic:
+            position = agent.get_network_position(self, buffer)
+            if position < distance:
+                free_space[0] = distance - position
+            else:
+                free_space[1] = position - distance
+                break
+        return free_space
+
     def _build_segments(self):
         distance = 0.0
         segments = []
@@ -361,6 +378,13 @@ class LanePosition(NetworkPosition):
             return LanePosition(lane, lane.way_to_lane_position(way_position))
         except ValueError:
             return LanePosition(lane, self.position)
+
+    def get_free_space(self, buffer: int) -> Sequence[float]:
+        """Get space available behind and ahead in this position.
+
+        See same method in `Lane`.
+        """
+        return self.lane.get_free_space(self.position, buffer)
 
     def world_and_segment_position(self) -> WorldAndSegmentPosition:
         """Get world and segment position at this lane position."""

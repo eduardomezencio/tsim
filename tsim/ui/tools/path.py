@@ -122,5 +122,23 @@ class PathTool(Tool):
     def _create_agent(self):
         if self.path is None:
             return
+
+        buffer = INDEX.simulation.ready_buffer
+        free_space = self.source.get_free_space(buffer)
+        if free_space[0] < Car.MINIMUM_DISTANCE:
+            change = Car.MINIMUM_DISTANCE - free_space[0]
+            self.source = LanePosition(self.source.lane,
+                                       self.source.position + change)
+            free_space[0] += change
+            free_space[1] -= change
+        if free_space[1] < Car.MINIMUM_DISTANCE:
+            change = Car.MINIMUM_DISTANCE - free_space[1]
+            self.source = LanePosition(self.source.lane,
+                                       self.source.position - change)
+            free_space[0] -= change
+            free_space[1] += change
+        if any(s < Car.MINIMUM_DISTANCE for s in free_space):
+            return
+
         p3d.MESSENGER.send('add_car', [Car(), self.source,
                                        self.dest.oriented_way_position])

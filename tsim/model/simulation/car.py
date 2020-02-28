@@ -153,6 +153,8 @@ class Car(Entity, TrafficAgent):
                  'speed', 'network_location', 'network_position',
                  'traffic_node', 'shadow_location', 'shadow_node', 'schedule')
 
+    MINIMUM_DISTANCE = MINIMUM_DISTANCE
+
     active: bool
     position: Point
     direction: Vector
