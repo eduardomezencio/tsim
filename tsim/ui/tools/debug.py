@@ -106,11 +106,13 @@ class Debug(Tool):
     def _update_selection(self, *, agents_only: bool = False,
                           follow: bool = True, just_pressed: bool = False,
                           show_path: bool = True):
+        agent_selected = False
         if just_pressed and self.cursor.pointed_at:
             id_ = int(self.cursor.pointed_at.parent.tags['id'])
             agent = INDEX.entities.get(id_, None)
             if agent is not None and hasattr(agent, 'debug_str'):
                 self.selected_agent = agent
+                agent_selected = True
                 if show_path:
                     self._update_path_np()
                 if follow:
@@ -120,8 +122,10 @@ class Debug(Tool):
 
         selected = INDEX.get_at(self.cursor.position, of_type=Node)
         if selected and just_pressed:
-            self._clear_intersection()
-            self.card = create_lane_connections_card(selected[0], p3d.RENDER)
+            if not agent_selected:
+                self._clear_intersection()
+                self.card = create_lane_connections_card(
+                    selected[0], p3d.RENDER)
         else:
             selected = INDEX.get_at(self.cursor.position, of_type=Way)
 

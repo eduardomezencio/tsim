@@ -520,7 +520,7 @@ class Car(Entity, TrafficAgent):
                 self.lock_queue.append(lock)
                 if self.distance_to_release is None:
                     self.distance_to_release = (self.distance_to(lock, buffer)
-                                                + MINIMUM_DISTANCE / 2)
+                                                + MINIMUM_DISTANCE)
                 self.notify(buffer)
         except AttributeError as error:
             Index.INSTANCE.simulation.raise_event('focus', self)
@@ -555,8 +555,7 @@ class Car(Entity, TrafficAgent):
             self.traffic_node = location.insert_agent(self, target)
             if to_curve:
                 self.notify_followers(target)
-            else:
-                self.update_lead(target)
+            self.update_lead(target)
         Index.INSTANCE.simulation.enqueue(_network_location_change, ())
 
     def update(self, dt: Duration,  # pylint: disable=method-hidden
@@ -861,7 +860,7 @@ class Car(Entity, TrafficAgent):
                 if self.lock_queue:
                     self.distance_to_release = (
                         self.distance_to(self.lock_queue[0], buffer)
-                        + MINIMUM_DISTANCE / 2)
+                        + MINIMUM_DISTANCE)
                 else:
                     self.distance_to_release = None
 
