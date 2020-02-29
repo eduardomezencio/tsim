@@ -334,7 +334,7 @@ class Car(Entity, TrafficAgent):
         if not self.path_last_way:
             self.update_lead(ready)
             self._calc_target_lane(lane)
-            self._start_lane_change(lane, ready, target)
+            self._start_lane_change(lane, ready, target, False)
         self.set_active()
 
     def remove(self, ready: int, target: int, enqueue: bool = True):
@@ -559,19 +559,6 @@ class Car(Entity, TrafficAgent):
                 self.update_lead(target)
         Index.INSTANCE.simulation.enqueue(_network_location_change, ())
 
-    def enqueue_lane_change(self, location: NetworkLocation, target: int):
-        """Enqueue lane change for the end of the simulation frame."""
-        def _lane_change():
-            old_location = self.network_location
-            self.network_location = location
-            self._calc_next_location(location)
-            self.shadow_location = old_location
-            self.shadow_node = self.traffic_node
-            self.traffic_node = location.insert_agent(self, target)
-            self.update_lead(target)
-            self._update_previous(target)
-        Index.INSTANCE.simulation.enqueue(_lane_change, ())
-
     def update(self, dt: Duration,  # pylint: disable=method-hidden
                ready: int, target: int):
         """Update the car.
@@ -588,14 +575,18 @@ class Car(Entity, TrafficAgent):
             self.direction_changed = False
 
         self._follow(dt, ready, target)
-        speed = self.speed[target] * dt
-        position = self.network_position[ready] + speed
-        location = self.network_location
 
+        speed = self.speed[target] * dt
         self._update_distance_to_lock(speed, ready)
 
-        if self.side_offset is not None:
-            self._lane_movement(dt, ready, target)
+        if self.side_offset is not None \
+                and self._lane_movement(dt, ready, target):
+            position_read_buffer = target
+        else:
+            position_read_buffer = ready
+
+        position = self.network_position[position_read_buffer] + speed
+        location = self.network_location
 
         if position < self.network_segment_end:
             # Still in same segment.
@@ -649,11 +640,12 @@ class Car(Entity, TrafficAgent):
     def update_on_curve(self, dt: Duration, ready: int, target: int):
         """Update the car on `on_curve` state."""
         self._follow(dt, ready, target)
+
         speed = self.speed[target] * dt
+        self._update_distance_to_lock(speed, ready)
+
         position = self.network_position[ready] + speed
         location = self.network_location
-
-        self._update_distance_to_lock(speed, ready)
 
         if position < self.network_segment_end:
             # Still in curve.
@@ -753,17 +745,19 @@ class Car(Entity, TrafficAgent):
                                          min(space / time,
                                              self.current_max_speed))
 
-    def _start_lane_change(self, lane: Lane, ready: int, target: int):
+    def _start_lane_change(self, lane: Lane, ready: int, target: int,
+                           enqueue: bool = True) -> bool:
         """Start lane change if needed.
 
         The `target_lane` must be set before calling this method, so the lane
-        change will start if not already in target lane.
+        change will start if not already in target lane. Returns whether the
+        network position was changed in the target buffer.
         """
         lane_index = lane.index
         if lane_index == self.target_lane:
             # No lane change needed.
             self.side_offset = None
-            return
+            return False
 
         # Start lane change.
         position = LanePosition(lane, self.network_position[ready])
@@ -780,20 +774,39 @@ class Car(Entity, TrafficAgent):
         segment = new_lane.segments[self.network_segment]
         self.network_position[target] = new_position.position
         self.network_segment_end = segment.end_distance
-        self.enqueue_lane_change(new_lane, target)
 
-    def _lane_movement(self, dt: Duration, ready: int, target: int):
+        def _lane_change():
+            old_location = self.network_location
+            self.network_location = new_lane
+            self._calc_next_location(new_lane)
+            self.shadow_location = old_location
+            self.shadow_node = self.traffic_node
+            self.traffic_node = new_lane.insert_agent(self, target)
+            self.update_lead(target)
+            self._update_previous(target)
+
+        if enqueue:
+            Index.INSTANCE.simulation.enqueue(_lane_change, ())
+        else:
+            _lane_change()
+
+        return True
+
+    def _lane_movement(self, dt: Duration, ready: int, target: int) -> bool:
         """Perform sideways movement between lanes.
 
         Assumes `side_offset` is not None and `_start_lane_change` was called
-        before this method.
+        before this method. Returns whether the network position was changed in
+        the target buffer.
         """
         side_movement = min(LANE_CHANGE_SPEED_MPS, self.speed[ready]) * dt
         self.side_offset -= side_movement
         self.position += self.side_vector * side_movement
         if self.side_offset <= 0:
             self._end_lane_change(target, True)
-            self._start_lane_change(self.network_location, ready, target)
+            return self._start_lane_change(self.network_location,
+                                           ready, target)
+        return False
 
     def _end_lane_change(self, target: int, enqueue: bool = False):
         def _update_target():

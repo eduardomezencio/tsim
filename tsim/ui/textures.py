@@ -25,10 +25,16 @@ def _mipmap(texture: Texture):
     texture.set_minfilter(SamplerState.FT_linear_mipmap_linear)
 
 
+def _anisotropic(degree: int):
+    def _apply_anisotropic(texture: Texture):
+        texture.set_anisotropic_degree(degree)
+    return _apply_anisotropic
+
+
 TEXTURES = {
-    'ground': TextureInfo('.jpg', (_mipmap,)),
+    'ground': TextureInfo('.jpg', (_mipmap, _anisotropic(4))),
     'intersection': TextureInfo('.png', ()),
-    'road': TextureInfo('.png', (_mipmap,))
+    'road': TextureInfo('.png', (_mipmap, _anisotropic(4)))
 }
 
 

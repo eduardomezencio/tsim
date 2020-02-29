@@ -2,52 +2,20 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: tsim [formiga]",
+            "name": "Python: tsim (select map)",
             "type": "python",
             "request": "launch",
             "module": "tsim",
             "console": "integratedTerminal",
-            "args": ["data/formiga.osm"]
+            "args": ["data/${input:mapName}.osm"]
         },
         {
-            "name": "Python: tsim [bh]",
+            "name": "Python: tsim (last map)",
             "type": "python",
             "request": "launch",
             "module": "tsim",
             "console": "integratedTerminal",
-            "args": ["data/bh.osm"]
-        },
-        {
-            "name": "Python: tsim [custom]",
-            "type": "python",
-            "request": "launch",
-            "module": "tsim",
-            "console": "integratedTerminal",
-            "args": ["data/custom.osm"]
-        },
-        {
-            "name": "Python: tsim [custom2]",
-            "type": "python",
-            "request": "launch",
-            "module": "tsim",
-            "console": "integratedTerminal",
-            "args": ["data/custom2.osm"]
-        },
-        {
-            "name": "Python: tsim [custom3]",
-            "type": "python",
-            "request": "launch",
-            "module": "tsim",
-            "console": "integratedTerminal",
-            "args": ["data/custom3.osm"]
-        },
-        {
-            "name": "Python: tsim [intersection]",
-            "type": "python",
-            "request": "launch",
-            "module": "tsim",
-            "console": "integratedTerminal",
-            "args": ["data/intersection.osm"]
+            "args": []
         },
         {
             "name": "Python: osm_reader",

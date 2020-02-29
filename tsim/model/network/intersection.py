@@ -628,9 +628,15 @@ def _build_bezier_curves(node: Node, connections: LaneConnections) \
     crossings = {}
     for source, dests in connections.items():
         for lane1, lane2 in product((source,), dests):
-            crossings[(lane1, lane2)] = line_intersection_safe(
-                points[lane1], vectors[lane1.oriented_way.flipped()],
-                points[lane2], vectors[lane2.oriented_way])
+            point_vector_1 = (points[lane1],
+                              vectors[lane1.oriented_way.flipped()])
+            point_vector_2 = (points[lane2], vectors[lane2.oriented_way])
+            crossing = line_intersection_safe(*point_vector_1, *point_vector_2)
+            closest = min((point_vector_1, point_vector_2),
+                          key=lambda pv, c=crossing: pv[0].distance(c))
+            if closest[1].dot_product(crossing - closest[0]) >= 0.0:
+                crossing = closest[0] - closest[1]
+            crossings[(lane1, lane2)] = crossing
 
     curves = {}
     node_ref = EntityRef(node)

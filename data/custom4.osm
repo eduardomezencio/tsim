@@ -1,0 +1,54 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<osm version='0.6' generator='JOSM'>
+  <node id='-102529' action='modify' visible='true' lat='-19.91589260341' lon='-43.96260012939' />
+  <node id='-102532' action='modify' visible='true' lat='-19.91552979989' lon='-43.96260130925' />
+  <node id='-102535' action='modify' visible='true' lat='-19.91518064145' lon='-43.96260013327' />
+  <node id='-102545' action='modify' visible='true' lat='-19.91589210478' lon='-43.96216788536' />
+  <node id='-102548' action='modify' visible='true' lat='-19.91552979989' lon='-43.96216906051' />
+  <node id='-102551' action='modify' visible='true' lat='-19.91518015366' lon='-43.96216786948' />
+  <node id='-102561' action='modify' visible='true' lat='-19.91589154569' lon='-43.96174175684' />
+  <node id='-102564' action='modify' visible='true' lat='-19.91553215795' lon='-43.96174363572' />
+  <node id='-102567' action='modify' visible='true' lat='-19.91517960678' lon='-43.96174175681' />
+  <way id='-102505' action='modify' visible='true'>
+    <nd ref='-102529' />
+    <nd ref='-102545' />
+    <nd ref='-102561' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='2' />
+  </way>
+  <way id='-102509' action='modify' visible='true'>
+    <nd ref='-102532' />
+    <nd ref='-102548' />
+    <nd ref='-102564' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='3' />
+  </way>
+  <way id='-102513' action='modify' visible='true'>
+    <nd ref='-102535' />
+    <nd ref='-102551' />
+    <nd ref='-102567' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='4' />
+  </way>
+  <way id='-102530' action='modify' visible='true'>
+    <nd ref='-102529' />
+    <nd ref='-102532' />
+    <nd ref='-102535' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='2' />
+  </way>
+  <way id='-102546' action='modify' visible='true'>
+    <nd ref='-102545' />
+    <nd ref='-102548' />
+    <nd ref='-102551' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='3' />
+  </way>
+  <way id='-102562' action='modify' visible='true'>
+    <nd ref='-102561' />
+    <nd ref='-102564' />
+    <nd ref='-102567' />
+    <tag k='highway' v='primary' />
+    <tag k='lanes' v='4' />
+  </way>
+</osm>
