@@ -21,10 +21,13 @@ def normalized_hours(timestamp: Timestamp) -> float:
 
 def time_string(timestamp: Timestamp) -> str:
     """Get string representation of timestamp."""
-    hours = (timestamp % DAY) / HOUR
-    minutes = (hours - floor(hours)) * 60.0
-    seconds = (minutes - floor(minutes)) * 60.0
-    return str(time(floor(hours), floor(minutes), floor(seconds)))
+    remaining = floor(timestamp)
+    seconds = remaining % 60
+    remaining = (remaining - seconds) // 60
+    minutes = remaining % 60
+    remaining = (remaining - minutes) // 60
+    hours = remaining % 24
+    return str(time(hours, minutes, seconds))
 
 
 def whole_days(timestamp: Timestamp) -> int:
