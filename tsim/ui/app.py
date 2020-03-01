@@ -36,7 +36,7 @@ FONT = p3d.LOADER.load_font('../fonts/caladea-tsim.otf',
                             pointSize=16, pixelsPerUnit=30)
 
 EVENTS = ('add_car', 'focus', 'follow', 'network_entities_changed',
-          'new_agent', 'removed_car')
+          'new_agent', 'removed_agent')
 FRAME_DURATION = 1 / 60
 SPEED_STEPS = 4
 
@@ -305,8 +305,9 @@ class App:
         """Update the agents counter."""
         self._update_cars_text()
 
-    def on_removed_car(self, car: Car):
+    def on_removed_agent(self, car: Car):
         """Remove the car actor when car is removed from simulation."""
+        self._update_cars_text()
         node_path = self.agents.pop(car, None)
         if node_path is not None:
             self.camera.unfollow(node_path)

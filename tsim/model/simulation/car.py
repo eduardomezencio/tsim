@@ -353,7 +353,7 @@ class Car(Entity, TrafficAgent):
                 self.lead.remove_follower(self, target)
             for follower in followers:
                 follower.notify(target)
-            Index.INSTANCE.simulation.raise_event('removed_car', self)
+            Index.INSTANCE.simulation.remove(self)
 
         self.speed[:] = 0.0, 0.0
         self.path = None

@@ -76,6 +76,12 @@ class Simulation:
         self.enqueue(_update_active_set)
         self.raise_event('active_set_updated')
 
+    def remove(self, agent: TrafficDynamicAgent):
+        """Remove agent from simulation."""
+        if agent in self.agents:
+            self.agents.remove(agent)
+            self.raise_event('removed_agent', agent)
+
     def enqueue(self, callable_: Callable, args: Tuple = ()):
         """Enqueue function to be called after update loop ends."""
         self._queue.append((callable_, args))
