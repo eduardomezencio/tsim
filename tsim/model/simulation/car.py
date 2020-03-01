@@ -531,7 +531,7 @@ class Car(Entity, TrafficAgent):
         self.followers.add(agent)
 
     def update_followers(self, buffer: int):
-        """Update current followers as preparation to insert a new follower."""
+        """Update lead of registered followers."""
         for follower in list(self.followers):
             follower.update_lead(buffer)
 
@@ -782,7 +782,10 @@ class Car(Entity, TrafficAgent):
             self.shadow_node = self.traffic_node
             self.traffic_node = new_lane.insert_agent(self, target)
             self.update_lead(target)
-            self._update_previous(target)
+            if self.lead is None:
+                self._update_previous(target)
+            else:
+                self.lead.update_followers(target)
 
         if enqueue:
             Index.INSTANCE.simulation.enqueue(_lane_change, ())
@@ -801,6 +804,20 @@ class Car(Entity, TrafficAgent):
         side_movement = min(LANE_CHANGE_SPEED_MPS, self.speed[ready]) * dt
         self.side_offset -= side_movement
         self.position += self.side_vector * side_movement
+
+        # This block of code solves a problem that happens when `self` passes a
+        # car that is in the source lane while going to the target lane and,
+        # before ending the lane transition, the follower of `self` passes this
+        # same car. The lead of this car would be updated to the passed car, so
+        # the lead would be behind him and this would cause crazy behavior.
+        shadow = self.shadow_node
+        if (shadow is not None and shadow.has_next and
+                shadow.next.data.network_position[ready]
+                < self.network_position[ready]):
+            shadow.remove()
+            self.shadow_node = None
+            self.notify_followers(target)
+
         if self.side_offset <= 0:
             self._end_lane_change(target, True)
             return self._start_lane_change(self.network_location,

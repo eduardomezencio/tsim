@@ -189,7 +189,7 @@ class ConflictPoint(TrafficLock):
             agent.distance_to_lock = distance - lock_distance
 
     def update_followers(self, buffer: int):
-        """Update current followers as preparation to insert a new follower."""
+        """Update lead of registered followers."""
 
     def remove_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Unregister agent as follower."""

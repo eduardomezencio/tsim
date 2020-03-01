@@ -34,7 +34,7 @@ class TrafficAgent(ABC):
 
     @abstractmethod
     def update_followers(self, buffer: int):
-        """Update current followers as preparation to insert a new follower."""
+        """Update lead of registered followers."""
 
     @abstractmethod
     def remove_follower(self, agent: TrafficDynamicAgent, buffer: int):
