@@ -6,21 +6,22 @@ verify_ssl = true
 [dev-packages]
 flake8 = "*"
 ipython = "*"
+matplotlib = "*"
+pmw = "*"
 pydocstyle = "*"
 pylint = "*"
 radon = "*"
 rope = "*"
-matplotlib = "*"
 
 [packages]
 aggdraw = "*"
 bezier = "*"
 dataslots = "*"
 fibonacci-heap-mod = "*"
+orderedset = "*"
 panda3d = "*"
 pillow = "*"
 rtree = "*"
-orderedset = "*"
 
 [requires]
 python_version = "3.8"

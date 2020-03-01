@@ -28,7 +28,7 @@ setup(
     ],
     keywords='traffic simulation agent-based',
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
-    python_requires='>=3.7',
+    python_requires='>=3.8',
 
     # TODO:
     # install_requires=['peppercorn'],
