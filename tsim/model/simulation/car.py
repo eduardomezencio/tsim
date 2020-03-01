@@ -143,19 +143,21 @@ class Car(Entity, TrafficAgent):
         schedule: The agent's schedule.
     """
 
-    __slots__ = ('active', 'position', 'direction', 'direction_changed',
-                 'target_lane', 'side_vector', 'side_offset',
-                 'network_segment', 'network_segment_end', 'curve_override',
-                 'lead', 'lead_location', 'followers', 'distance_to_lock',
-                 'distance_to_release', 'lock_queue', 'lock_count', 'waiting',
-                 'current_max_speed', 'path', 'path_segment',
-                 'path_last_segment', 'path_last_way', 'next_location',
-                 'speed', 'network_location', 'network_position',
-                 'traffic_node', 'shadow_location', 'shadow_node', 'schedule')
+    __slots__ = ('active', 'deactivation_timer', 'position', 'direction',
+                 'direction_changed', 'target_lane', 'side_vector',
+                 'side_offset', 'network_segment', 'network_segment_end',
+                 'curve_override', 'lead', 'lead_location', 'followers',
+                 'distance_to_lock', 'distance_to_release', 'lock_queue',
+                 'lock_count', 'waiting', 'current_max_speed', 'path',
+                 'path_segment', 'path_last_segment', 'path_last_way',
+                 'next_location', 'speed', 'network_location',
+                 'network_position', 'traffic_node', 'shadow_location',
+                 'shadow_node', 'schedule')
 
     MINIMUM_DISTANCE = MINIMUM_DISTANCE
 
     active: bool
+    deactivation_timer: Duration
     position: Point
     direction: Vector
     direction_changed: bool
@@ -189,6 +191,7 @@ class Car(Entity, TrafficAgent):
 
     def __init__(self, schedule: Schedule = None):
         self.active = False
+        self.deactivation_timer = 0.0
         self.position = None
         self.direction = None
         self.direction_changed = False
@@ -340,6 +343,7 @@ class Car(Entity, TrafficAgent):
     def remove(self, ready: int, target: int, enqueue: bool = True):
         """Remove car from simulation."""
         def _remove_node():
+            followers = list(self.followers)
             self.release_all_locks(target)
             if self.traffic_node:
                 self.traffic_node.remove()
@@ -347,7 +351,7 @@ class Car(Entity, TrafficAgent):
                 self.shadow_node.remove()
             if self.lead is not None:
                 self.lead.remove_follower(self, target)
-            for follower in list(self.followers):
+            for follower in followers:
                 follower.notify(target)
             Index.INSTANCE.simulation.raise_event('removed_car', self)
 
@@ -491,6 +495,7 @@ class Car(Entity, TrafficAgent):
         self.update_lead(buffer)
         if not self.active and self.state is not State.REMOVED:
             self.set_active()
+            self.notify_followers(buffer)
 
     def notify_followers(self, buffer: int):
         """Notify followers of events."""
@@ -520,7 +525,7 @@ class Car(Entity, TrafficAgent):
                 self.lock_queue.append(lock)
                 if self.distance_to_release is None:
                     self.distance_to_release = (self.distance_to(lock, buffer)
-                                                + MINIMUM_DISTANCE)
+                                                + MINIMUM_DISTANCE / 2)
                 self.notify(buffer)
         except AttributeError as error:
             Index.INSTANCE.simulation.raise_event('focus', self)
@@ -548,6 +553,7 @@ class Car(Entity, TrafficAgent):
                                         target: int, to_curve: bool):
         """Enqueue location change for the end of the simulation frame."""
         def _network_location_change():
+            self._calc_next_location(location)
             if to_curve:
                 self._end_lane_change(target)
             self.network_location = location
@@ -623,7 +629,6 @@ class Car(Entity, TrafficAgent):
         curve = location.get_curve(target_oriented_way)
         self.current_max_speed = min(MAX_SPEED_MPS,
                                      target_oriented_way.way.max_speed)
-        self._calc_next_location(curve)
         self._calc_curve_override(curve)
         self.position = curve.evaluate_position(offset, self.curve_override)
         self.network_segment = 0
@@ -670,7 +675,6 @@ class Car(Entity, TrafficAgent):
         self.network_segment = 0
         self.curve_override = None
         self._calc_segment_end(location, segment.end_distance)
-        self._calc_next_location(location)
         self.network_position[target] = offset
         self.enqueue_network_location_change(location, target, False)
         if not self.path_last_way:
@@ -700,9 +704,18 @@ class Car(Entity, TrafficAgent):
             acceleration *= (ACCELERATION_BASE
                              if acceleration > 0.0 else
                              BREAK_BASE)
-            self.speed[target] = min(max(self.speed[ready] + acceleration,
-                                         0.0),
-                                     self.current_max_speed)
+            new_speed = min(max(self.speed[ready] + acceleration, 0.0),
+                            self.current_max_speed)
+            self.speed[target] = new_speed
+            if new_speed < 0.001:
+                self.deactivation_timer += dt
+                if self.deactivation_timer > 0.5:
+                    if self.lead is not None and not self.lead.active:
+                        self.set_active(False)
+                    else:
+                        self.deactivation_timer = 0.0
+            else:
+                self.deactivation_timer = 0.0
         else:
             self.speed[target] = self.speed[ready]
 
@@ -782,10 +795,9 @@ class Car(Entity, TrafficAgent):
             self.shadow_node = self.traffic_node
             self.traffic_node = new_lane.insert_agent(self, target)
             self.update_lead(target)
-            if self.lead is None:
-                self._update_previous(target)
-            else:
+            if self.lead is not None:
                 self.lead.update_followers(target)
+            self._update_previous(target)
 
         if enqueue:
             Index.INSTANCE.simulation.enqueue(_lane_change, ())
@@ -877,7 +889,7 @@ class Car(Entity, TrafficAgent):
                 if self.lock_queue:
                     self.distance_to_release = (
                         self.distance_to(self.lock_queue[0], buffer)
-                        + MINIMUM_DISTANCE)
+                        + MINIMUM_DISTANCE / 2)
                 else:
                     self.distance_to_release = None
 

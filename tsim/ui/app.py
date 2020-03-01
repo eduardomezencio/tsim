@@ -32,8 +32,11 @@ from tsim.ui.screen import Screen
 from tsim.ui.sky import Sky
 from tsim.utils.iterators import window_iter
 
+FONT = p3d.LOADER.load_font('../fonts/caladea-tsim.otf',
+                            pointSize=16, pixelsPerUnit=30)
+
 EVENTS = ('add_car', 'focus', 'follow', 'network_entities_changed',
-          'removed_car')
+          'new_agent', 'removed_car')
 FRAME_DURATION = 1 / 60
 SPEED_STEPS = 4
 
@@ -41,6 +44,7 @@ SPEED_STEPS = 4
 class App:
     """Graphic UI application, using Panda3D."""
 
+    cars_text: TextNode
     simulation_speed_text: TextNode
     time_text: TextNode
     network_entities: Dict[int, NodePath]
@@ -56,6 +60,7 @@ class App:
         self._frame_count = 0
         self._simulation_speed = 0
         self._number_input_buffer = None
+        self._last_time = 0
 
         log_config()
         panda3d_config()
@@ -296,6 +301,10 @@ class App:
         for node_path in self.roads.values():
             node_path.node().collect()
 
+    def on_new_agent(self):
+        """Update the agents counter."""
+        self._update_cars_text()
+
     def on_removed_car(self, car: Car):
         """Remove the car actor when car is removed from simulation."""
         node_path = self.agents.pop(car, None)
@@ -315,31 +324,43 @@ class App:
     def _build_on_screen_text(self):
         aspect = 1.0 / p3d.ASPECT2D.get_scale()[0]
 
-        simspeed_text = TextNode('simulation_speed_text')
-        simspeed_text.text = ''
-        simspeed_text.slant = 0.3
-        simspeed_text.text_scale = 0.05
-        simspeed_text.shadow = -0.005, 0.0025
-        simspeed_text.shadow_color = 0, 0, 0, 1
-        simspeed_text_np = p3d.ASPECT2D.attach_new_node(simspeed_text)
-        simspeed_text_np.set_pos(-0.95 * aspect, -0.0, -0.91)
-        self.simulation_speed_text = simspeed_text
-
         time_text = TextNode('time_text')
+        time_text.font = FONT
         time_text.text = ''
-        time_text.text_scale = 0.12
+        time_text.text_scale = 0.08
         time_text.shadow = -0.005, 0.005
         time_text.shadow_color = 0, 0, 0, 1
         time_text_np = p3d.ASPECT2D.attach_new_node(time_text)
         time_text_np.set_pos(-0.95 * aspect, -0.0, -0.85)
         self.time_text = time_text
 
+        cars_text = TextNode('cars_text')
+        cars_text.font = FONT
+        cars_text.text = ''
+        cars_text.align = TextNode.A_right
+        cars_text.text_scale = 0.034
+        cars_text.shadow = -0.0025, 0.0025
+        cars_text.shadow_color = 0, 0, 0, 1
+        cars_text_np = p3d.ASPECT2D.attach_new_node(cars_text)
+        cars_text_np.set_pos(-0.95 * aspect + time_text.calc_width('00:00:00'),
+                             -0.0, -0.91)
+        self.cars_text = cars_text
+
+        simspeed_text = TextNode('simulation_speed_text')
+        simspeed_text.font = FONT
+        simspeed_text.text = ''
+        simspeed_text.slant = 0.3
+        simspeed_text.text_scale = 0.034
+        simspeed_text.shadow = -0.0025, 0.0025
+        simspeed_text.shadow_color = 0, 0, 0, 1
+        simspeed_text_np = p3d.ASPECT2D.attach_new_node(simspeed_text)
+        simspeed_text_np.set_pos(-0.95 * aspect, -0.0, -0.91)
+        self.simulation_speed_text = simspeed_text
+
         self._update_simulation_speed_text()
 
-    def _update_time_text(self):
-        time_text = time_string(INDEX.simulation.time)
-        if self.time_text.text != time_text:
-            self.time_text.text = time_text
+    def _update_cars_text(self):
+        self.cars_text.text = (f'{len(INDEX.simulation.agents)} \xa9\n')
 
     def _update_simulation_speed_text(self):
         simspeed = self.simulation_speed
@@ -351,6 +372,12 @@ class App:
             simspeed_text = f'x{simspeed / SPEED_STEPS}'.strip('.0')
         if self.simulation_speed_text.text != simspeed_text:
             self.simulation_speed_text.text = simspeed_text
+
+    def _update_time_text(self):
+        time = floor(INDEX.simulation.time)
+        if time != self._last_time:
+            self.time_text.text = time_string(time)
+            self._last_time = time
 
 
 def log_config():

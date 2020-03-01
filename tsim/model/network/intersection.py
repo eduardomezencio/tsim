@@ -146,6 +146,15 @@ class ConflictPoint(TrafficLock):
         self.queue = LinkedList()
 
     @property
+    def active(self) -> bool:
+        """Get whether agent is active in the simulation.
+
+        Always false for conflict points, so that inactivating agents stopped
+        in traffic works correctly.
+        """
+        return False
+
+    @property
     def lock_queue(self) -> Iterable[TrafficLock]:
         """Get owned lock queue, always empty for conflict points."""
         return ()

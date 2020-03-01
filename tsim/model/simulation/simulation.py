@@ -40,6 +40,7 @@ class Simulation:
         """Add agent to the simulation."""
         self.agents.add(agent)
         self.update_active_set(agent)
+        self.raise_event('new_agent')
 
     def update(self, dt: Duration):
         """Update the simulation with time step of `dt`."""
@@ -67,8 +68,13 @@ class Simulation:
         called instead of adding or removing directly from the active set,
         because the set is being iterated and cannot change during iteration.
         """
-        self.enqueue(self.active.add if agent.active else self.active.discard,
-                     (agent,))
+        def _update_active_set():
+            if agent.active:
+                self.active.add(agent)
+            else:
+                self.active.discard(agent)
+        self.enqueue(_update_active_set)
+        self.raise_event('active_set_updated')
 
     def enqueue(self, callable_: Callable, args: Tuple = ()):
         """Enqueue function to be called after update loop ends."""

@@ -12,6 +12,7 @@ from tsim.utils.linkedlist import LinkedList, LinkedListNode
 class TrafficAgent(ABC):
     """Base for classes that can be part of the traffic."""
 
+    active: bool
     owner: Optional[TrafficAgent]
     speed: Sequence[float]
     traffic_node: LinkedListNode[TrafficAgent]
