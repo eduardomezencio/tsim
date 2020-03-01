@@ -32,7 +32,7 @@ from tsim.ui.screen import Screen
 from tsim.ui.sky import Sky
 from tsim.utils.iterators import window_iter
 
-FONT = p3d.LOADER.load_font('../fonts/caladea-tsim.otf',
+FONT = p3d.LOADER.load_font('fonts/caladea-tsim.otf',
                             pointSize=16, pixelsPerUnit=30)
 
 EVENTS = ('add_car', 'focus', 'follow', 'network_entities_changed',
@@ -263,7 +263,8 @@ class App:
             p3d.BASE.accept(key, partial(self.change_simulation_speed,
                                          int(2 ** (i - 1)), False, 256))
             p3d.BASE.accept(f'control-{key}', partial(_number_input, key))
-        for key, value in (('wheel_up', 1), ('wheel_down', -1)):
+        for key, value in (('control-wheel_up', 1),
+                           ('control-wheel_down', -1)):
             p3d.BASE.accept(key, partial(self.change_simulation_speed, value))
         p3d.BASE.accept('f12', self.screen.screenshot)
         p3d.BASE.accept('control-f12', self.screen.toggle_movie_recording)

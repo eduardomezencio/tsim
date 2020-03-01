@@ -9,4 +9,5 @@ _test*
 .vscode/tags
 *.egg-info
 *.shelf
+profile
 screen
