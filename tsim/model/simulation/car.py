@@ -40,6 +40,8 @@ LANE_CHANGE_MIN_DURATION = LANE_WIDTH / LANE_CHANGE_SPEED_MPS
 MAX_SPEED_KPH = 100.0
 MAX_SPEED_MPS = kph_to_mps(MAX_SPEED_KPH)
 
+LOCK_ALL = True
+
 
 class Car(Entity, TrafficAgent):
     """The simulated dynamic entity of the simulator.
@@ -502,14 +504,16 @@ class Car(Entity, TrafficAgent):
         for agent in list(self.followers):
             agent.notify(buffer)
 
-    def start_locking_lead(self, buffer: int):
+    def start_locking_lead(self, buffer: int, lock_all: bool = LOCK_ALL):
         """Start procedure to acquire the lock right ahead of the car."""
         self.distance_to_lock = None
-        lock_order = self.lead.lock_order[self.lead_location]
+        location = self.lead_location if lock_all else None
+        lock_order = self.lead.lock_order[location]
         self.waiting[:] = 0, lock_order
-        lock_order[0].lock(self, buffer, True)
+        lock_order[0].lock(self, buffer, True, location)
 
-    def acquire(self, lock: TrafficLock, buffer: int, terminal: bool):
+    def acquire(self, lock: TrafficLock, buffer: int, terminal: bool,
+                location: Optional[NetworkLocation] = None):
         """Register acquisition of `lock` by car."""
         try:
             if terminal:
@@ -517,10 +521,11 @@ class Car(Entity, TrafficAgent):
                 next_index = self.waiting[0] + 1
                 if next_index >= len(self.waiting[1]):
                     self.waiting[1] = None
-                    self.lead.lock(self, buffer, False, self.lead_location)
+                    self.lead.lock(self, buffer, False, location)
                 else:
                     self.waiting[0] = next_index
-                    self.waiting[1][next_index].lock(self, buffer, True)
+                    self.waiting[1][next_index].lock(self, buffer,
+                                                     True, location)
             else:
                 self.lock_queue.append(lock)
                 if self.distance_to_release is None:

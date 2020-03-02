@@ -184,9 +184,13 @@ class ConflictPoint(TrafficLock):
                 key=lambda p: p.id))
             for c in self.curves
         }
-        # Old version, with great chance of deadlocks:
-        # self.lock_order = tuple(sorted(chain(self.neighbors, [self]),
-        #                                key=lambda cp: cp.id))
+        # Add lock order that is not related to a curve, but only to this
+        # conflict point. By locking each conflict point separately, the cars
+        # can move to each individual conflict point without locking all the
+        # others on the curve. This raises the chance of deadlocks
+        # drastically.
+        self.lock_order[None] = tuple(sorted(chain(self.neighbors, [self]),
+                                             key=lambda cp: cp.id))
 
     def add_follower(self, agent: TrafficDynamicAgent, buffer: int):
         """Register agent as follower."""
@@ -291,7 +295,7 @@ class ConflictPoint(TrafficLock):
         if agent is not None:
             self.owner, self.terminal, self.owner_location = (
                 agent, terminal, location)
-            agent.acquire(self, buffer, terminal)
+            agent.acquire(self, buffer, terminal, location)
 
     def __repr__(self):
         return f'{ConflictPoint.__name__}(id={self.id})'
