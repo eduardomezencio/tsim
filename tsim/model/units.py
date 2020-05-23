@@ -12,6 +12,10 @@ SECOND = 1.0
 MINUTE = 60.0 * SECOND
 HOUR = 60.0 * MINUTE
 DAY = 24.0 * HOUR
+INT_SECOND = int(SECOND)
+INT_MINUTE = int(MINUTE)
+INT_HOUR = int(HOUR)
+INT_DAY = int(DAY)
 
 
 def normalized_hours(timestamp: Timestamp) -> float:

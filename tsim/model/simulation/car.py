@@ -301,7 +301,7 @@ class Car(Entity, TrafficAgent):
         if isinstance(lane, Lane):
             self.state = State.ON_LANE
             Index.INSTANCE.simulation.raise_event(
-                'car_entered_way', self, Index.INSTANCE.simulation.time,
+                'entered_way', self, Index.INSTANCE.simulation.time,
                 lane.oriented_way_position(network_position.position))
         else:
             lane = lane.dest
@@ -369,7 +369,7 @@ class Car(Entity, TrafficAgent):
         if isinstance(self.network_location, Lane):
             lane = self.network_location
             Index.INSTANCE.simulation.raise_event(
-                'car_left_way', self, Index.INSTANCE.simulation.time,
+                'left_way', self, Index.INSTANCE.simulation.time,
                 lane.oriented_way_position(self.network_position[ready]))
 
     def release_all_locks(self, buffer):
@@ -643,7 +643,7 @@ class Car(Entity, TrafficAgent):
         self.state = State.ON_CURVE
 
         Index.INSTANCE.simulation.raise_event(
-            'car_left_way', self, Index.INSTANCE.simulation.time,
+            'left_way', self, Index.INSTANCE.simulation.time,
             location.oriented_way_position(self.network_position[ready]))
 
     def update_on_curve(self, dt: Duration, ready: int, target: int):
@@ -688,7 +688,7 @@ class Car(Entity, TrafficAgent):
         self.state = State.ON_LANE
 
         Index.INSTANCE.simulation.raise_event(
-            'car_entered_way', self, Index.INSTANCE.simulation.time,
+            'entered_way', self, Index.INSTANCE.simulation.time,
             location.oriented_way_position(offset))
 
     def update_removed(self, _dt: Duration, _ready: int, _target: int):

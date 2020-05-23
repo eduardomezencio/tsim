@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from itertools import count
-from typing import Callable, Dict, Iterator, List, Optional, Set, Type, Union
+from typing import (Any, Callable, Dict, Iterator, List, Optional, Set, Type,
+                    Union)
 import logging as log
 import shelve
 
@@ -23,7 +25,8 @@ class EntityIndex:
     """
 
     __slots__ = ('name', 'id_count', 'entities', 'bounding_rects', 'rtree',
-                 'path_map', 'register_updates', 'simulation', '_updates')
+                 'path_map', 'register_updates', 'simulation', 'stats',
+                 '_updates')
 
     extension = 'shelf'
     storage_fields = 'id_count', 'entities', 'path_map'
@@ -36,6 +39,8 @@ class EntityIndex:
     path_map: PathMap
     register_updates: bool
     simulation: Simulation
+    # TODO: Define type for stats instead of Any.
+    stats: Dict[Type, Dict[Any, Any]]
     _updates: Set[int]
 
     def __init__(self, name: Optional[str] = None):
@@ -58,6 +63,7 @@ class EntityIndex:
         self.path_map = PathMap()
         self.register_updates = False
         self.simulation = Simulation()
+        self.stats = defaultdict(dict)
         self._updates = set()
 
     def add(self, entity: Entity):

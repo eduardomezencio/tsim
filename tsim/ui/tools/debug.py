@@ -10,15 +10,18 @@ from panda3d.core import NodePath, TextNode
 from tsim.model.geometry import Point
 from tsim.model.index import INSTANCE as INDEX
 from tsim.model.network.node import Node
+from tsim.model.network.orientedway import OrientedWay
 from tsim.model.network.traffic import TrafficAgent
 from tsim.model.network.way import Way
 from tsim.model.simulation.car import Car
 from tsim.model.units import mps_to_kph
+from tsim.stats.way import WayStats
 from tsim.ui.objects import factory as Factory
 from tsim.ui.objects.node import create_lane_connections_card
 from tsim.ui import panda3d as p3d
 from tsim.ui.tools.tool import Tool
 
+EMPTY_STATS = WayStats()
 FONT = p3d.LOADER.load_font('cmtt12.egg')
 
 
@@ -149,12 +152,18 @@ class Debug(Tool):
             oriented_position = (lane.lane_to_oriented_position(lane_position)
                                  if lane_position is not None else 0.0)
 
+            stats = (INDEX.stats[OrientedWay].get(lane.oriented_way, None)
+                     or EMPTY_STATS)
+
             self.text_dict['network_position'] += (
                 f'\n    way_position={way_position:.2f}, '
                 f'oriented_position={oriented_position:.2f},'
                 f'\n    lane_position={lane_position:.2f}, '
                 f'lane={lane_index}, '
-                f'max_speed={mps_to_kph(selected.max_speed):.1f} kph')
+                f'max_speed={mps_to_kph(selected.max_speed):.1f} kph'
+                f'\n    average_speed_kph={stats.average_speed_kph}, '
+                f'throughput_cars_per_minute='
+                f'{stats.throughput_cars_per_minute}')
 
     def _clear_selection(self):
         """Clear all seleted objects."""

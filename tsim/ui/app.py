@@ -8,6 +8,7 @@ from functools import partial
 from itertools import chain, cycle
 from math import floor
 from random import random, seed, shuffle
+from threading import Thread
 from typing import Dict, Tuple
 
 from direct.task import Task
@@ -20,10 +21,11 @@ from tsim.model.index import INSTANCE as INDEX
 from tsim.model.geometry import Point, bounding_rect_center
 from tsim.model.network.node import Node
 from tsim.model.network.lane import LanePosition
-from tsim.model.network.orientedway import OrientedWayPosition
+from tsim.model.network.orientedway import OrientedWay, OrientedWayPosition
 from tsim.model.network.way import Way
 from tsim.model.simulation.car import Car
-from tsim.model.units import HOUR, normalized_hours, time_string
+from tsim.model.units import HOUR, Timestamp, normalized_hours, time_string
+from tsim.stats.way import WayStatsCollector
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
 from tsim.ui.grid import Grid
@@ -35,8 +37,11 @@ from tsim.utils.iterators import window_iter
 FONT = p3d.LOADER.load_font('fonts/caladea-tsim.otf',
                             pointSize=16, pixelsPerUnit=30)
 
-EVENTS = ('add_car', 'focus', 'follow', 'network_entities_changed',
-          'new_agent', 'removed_agent')
+EVENTS = (
+    'add_car', 'focus', 'follow', 'network_entities_changed',
+    'new_agent', 'removed_agent',
+    # 'entered_way', 'left_way', 'passed_second'
+)
 FRAME_DURATION = 1 / 60
 SPEED_STEPS = 4
 
@@ -61,6 +66,7 @@ class App:
         self._simulation_speed = 0
         self._number_input_buffer = None
         self._last_time = 0
+        self._way_stats_collector = WayStatsCollector()
 
         log_config()
         panda3d_config()
@@ -79,9 +85,6 @@ class App:
         self._init_objects()
         self._init_event_handlers()
         self._build_on_screen_text()
-
-        seed(2)
-        self.generate_random_cars(500)
 
         # TODO: Change to set simulation time when loading INDEX from file.
         INDEX.simulation.time = 12.0 * HOUR
@@ -228,6 +231,8 @@ class App:
             self.network_entities[way.id] = Factory.create_way(parent, way)
 
         # TODO: load agents
+        seed(2)
+        self.generate_random_cars(750)
 
         for node_path in self.roads.values():
             node_path.node().collect()
@@ -282,6 +287,12 @@ class App:
         car.set_destination(destination, ready, target)
         self.agents[car] = Factory.create_car(self.agents_parent, car)
 
+    def on_entered_way(self, car: Car, timestamp: Timestamp,
+                       oriented_way_position: OrientedWayPosition):
+        """Register information from `entered_way` event."""
+        self._way_stats_collector.on_entered_way(car, timestamp,
+                                                 oriented_way_position)
+
     def on_focus(self, car: Car):
         """Focus on given agent and pause simulation."""
         self.camera.unfollow()
@@ -296,6 +307,12 @@ class App:
         if car_np is not None:
             self.camera.follow(car_np)
 
+    def on_left_way(self, car: Car, timestamp: Timestamp,
+                    oriented_way_position: OrientedWayPosition):
+        """Register information from `left_way` event."""
+        self._way_stats_collector.on_left_way(car, timestamp,
+                                              oriented_way_position)
+
     def on_network_entities_changed(self):
         """Update network entities."""
         self.update_network_entities()
@@ -305,6 +322,14 @@ class App:
     def on_new_agent(self):
         """Update the agents counter."""
         self._update_cars_text()
+
+    def on_passed_second(self):
+        """Calculate statistics on `passed_second` event."""
+        def target():
+            time = INDEX.simulation.time
+            INDEX.stats[OrientedWay] = self._way_stats_collector \
+                .collect(time - 60, time, True)
+        Thread(target=target).start()
 
     def on_removed_agent(self, car: Car):
         """Remove the car actor when car is removed from simulation."""
@@ -359,6 +384,7 @@ class App:
         simspeed_text_np.set_pos(-0.95 * aspect, -0.0, -0.91)
         self.simulation_speed_text = simspeed_text
 
+        self._update_cars_text()
         self._update_simulation_speed_text()
 
     def _update_cars_text(self):

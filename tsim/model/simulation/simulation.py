@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 from collections import deque
+from math import floor
 from typing import Any, Callable, Deque, List, Set, Tuple
 
 from orderedset import OrderedSet
 
 from tsim.model.network.traffic import TrafficDynamicAgent
-from tsim.model.units import Duration, Timestamp
+from tsim.model.units import Duration, Timestamp, INT_MINUTE, INT_HOUR, INT_DAY
 
 Listener = Callable[[str, Tuple[Any, ...]], None]
+
+# Event 'passed_second' is checked separately.
+TIME_EVENTS = ((INT_MINUTE, 'passed_minute'),
+               (INT_HOUR, 'passed_hour'),
+               (INT_DAY, 'passed_day'))
 
 
 class Simulation:
@@ -54,8 +60,22 @@ class Simulation:
             callable_, args = self._queue.popleft()
             callable_(*args)
 
+        old_time = self.time
         self.time += dt
         self.flip_buffer()
+        self._check_time_events(old_time)
+
+    def _check_time_events(self, old_time: Timestamp):
+        """Raise time events when appropriate."""
+        old_time, time = floor(old_time), floor(self.time)
+        if old_time == time:
+            return
+        self.raise_event('passed_second')
+
+        for timespan, event in TIME_EVENTS:
+            if old_time // timespan == time // timespan:
+                return
+            self.raise_event(event)
 
     def flip_buffer(self):
         """Flip ready buffer index."""
