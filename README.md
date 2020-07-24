@@ -2,6 +2,7 @@
 
 Agent-based traffic simulator in python.
 
+![tsim](https://imgur.com/TYhLXrY.png)
 
 ## Setup development environment
 
