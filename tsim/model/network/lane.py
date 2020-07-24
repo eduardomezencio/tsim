@@ -386,6 +386,33 @@ class LanePosition(NetworkPosition):
         """
         return self.lane.get_free_space(self.position, buffer)
 
+    def with_free_space(self, buffer: int, length: float) -> LanePosition:
+        """Get a nearby lane position with `length` free space around it.
+
+        If there is free space around this position, `self` is returned.
+        Otherwise, a new `LanePosition` or `None` is returned depending on
+        whether a free position was found nearby.
+        """
+        result = self
+        free_space = result.get_free_space(buffer)
+
+        if free_space[0] < length:
+            change = length - free_space[0]
+            result = LanePosition(result.lane, result.position + change)
+            free_space[0] += change
+            free_space[1] -= change
+
+        if free_space[1] < length:
+            change = length - free_space[1]
+            result = LanePosition(result.lane, result.position - change)
+            free_space[0] -= change
+            free_space[1] += change
+
+        if any(s < length for s in free_space):
+            result = None
+
+        return result
+
     def world_and_segment_position(self) -> WorldAndSegmentPosition:
         """Get world and segment position at this lane position."""
         return self.lane.world_and_segment_position(self.position)

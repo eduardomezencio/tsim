@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 from io import BytesIO
 from typing import Callable, NamedTuple, Sequence
 
@@ -47,6 +48,11 @@ def get(texture_name: str) -> Texture:
     extension, filters = TEXTURES.get(texture_name, ('', ()))
     texture = p3d.LOADER.load_texture(''.join((PATH, texture_name, extension)),
                                       okMissing=True)
+
+    if texture is None:
+        factory = import_module(f'.{texture_name}', 'tsim.ui.textures')
+        texture = create_texture(factory.create())
+
     if texture is not None:
         for filter_ in filters:
             filter_(texture)
@@ -55,7 +61,7 @@ def get(texture_name: str) -> Texture:
     return texture
 
 
-def create_texture(image: Image):
+def create_texture(image: Image) -> Texture:
     """Create a Panda3D Texture from a PIL Image."""
     bytes_io = BytesIO()
     image.save(bytes_io, format='PNG')
