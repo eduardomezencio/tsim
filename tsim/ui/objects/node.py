@@ -28,7 +28,7 @@ RESOLUTION = 2048
 MIDDLE = Vector(RESOLUTION // 2, -RESOLUTION // 2)
 PPM = RESOLUTION // 32
 VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
-FONT = aggdraw.Font('black', 'fonts/freemono-numbers.otf', 15)
+FONT = aggdraw.Font('black', 'fonts/caladea-tsim.otf', 15)
 
 
 def create(parent: NodePath, node: Node) -> NodePath:
