@@ -171,14 +171,15 @@ def find_paths():
             if not way.one_way:
                 yield way.oriented(Endpoint.END)
 
+    ways = list(_oriented_ways())
+
     if MULTIPROCESSING:
         with ProcessPoolExecutor() as executor:
-            ways = list(_oriented_ways())
             all_pairs = dict(zip(ways, executor.map(dijkstra, ways)))
-            INDEX.path_map.all_pairs = all_pairs
     else:
-        for way in _oriented_ways():
-            dijkstra(way)
+        all_pairs = dict(zip(ways, map(dijkstra, ways)))
+
+    INDEX.path_map.all_pairs = all_pairs
 
 
 def compute_cached():

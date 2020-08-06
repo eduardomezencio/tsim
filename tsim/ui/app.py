@@ -37,11 +37,10 @@ from tsim.utils.iterators import window_iter
 FONT = p3d.LOADER.load_font('fonts/caladea-tsim.otf',
                             pointSize=16, pixelsPerUnit=30)
 
-EVENTS = (
-    'add_car', 'focus', 'follow', 'network_entities_changed',
-    'new_agent', 'removed_agent',
-    # 'entered_way', 'left_way', 'passed_second'
-)
+EVENTS = ('add_car', 'focus', 'follow', 'network_entities_changed',
+          'new_agent', 'removed_agent')
+# 'entered_way', 'left_way', 'passed_second'
+
 FRAME_DURATION = 1 / 60
 SPEED_STEPS = 4
 
@@ -232,7 +231,7 @@ class App:
 
         # TODO: load agents
         seed(2)
-        self.generate_random_cars(750)
+        self.generate_random_cars()
 
         for node_path in self.roads.values():
             node_path.node().collect()
