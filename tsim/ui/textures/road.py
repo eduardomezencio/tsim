@@ -1,3 +1,5 @@
+"""Road texture generator."""
+
 import aggdraw
 from PIL import Image
 
@@ -9,7 +11,7 @@ def create() -> Image:
     image = Image.new('RGBA', (SIZE, SIZE))
     draw = aggdraw.Draw(image)
     draw.rectangle((0, 0, SIZE, SIZE), None, aggdraw.Brush((122, 122, 122)))
-    for x in (0, SIZE - 1):
+    for x in (0, SIZE):
         path = aggdraw.Path()
         path.moveto(x, 0)
         path.lineto(x, SIZE)

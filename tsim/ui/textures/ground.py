@@ -1,3 +1,5 @@
+"""Ground texture generator."""
+
 import aggdraw
 from PIL import Image
 
