@@ -14,6 +14,7 @@ from panda3d.core import (CollisionHandlerQueue, CollisionNode, CollisionRay,
                           CollisionTraverser, NodePath, PandaNode)
 
 from tsim.model.geometry import Point
+from tsim.model.units import Duration
 from tsim.ui.tools import Tool, TOOLS
 import tsim.ui.input as INPUT
 import tsim.ui.panda3d as p3d
@@ -57,7 +58,7 @@ class Cursor(DirectObject):
         self.pointed_at = None
 
         self._tool: Optional[Tool] = None
-        self._register_tool_change_events()
+        self._register_events()
 
     @property
     def position(self) -> Point:
@@ -82,7 +83,7 @@ class Cursor(DirectObject):
         if self._tool is not None:
             self._tool.cleanup()
         self.ignore_all()
-        self._register_tool_change_events()
+        self._register_events()
         self._tool = value
         if value is not None:
             for key in INPUT.keys_for('tool_1'):
@@ -134,7 +135,11 @@ class Cursor(DirectObject):
         if self._tool is not None:
             self._tool.on_update()
 
-    def _register_tool_change_events(self):
+    def _on_simulation_step(self, dt: Duration):
+        if self._tool is not None:
+            self._tool.on_simulation_step(dt)
+
+    def _register_events(self):
         def set_tool(tool: Type[Tool]):
             self.tool = tool(self)
             log.info('[%s] Changing tool to %s',
@@ -145,3 +150,4 @@ class Cursor(DirectObject):
             except AttributeError:
                 log.warning('[%s] No KEY set for tool %s',
                             __name__, tool.__name__)
+        self.accept('simulation_step', self._on_simulation_step)

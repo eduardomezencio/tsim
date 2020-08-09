@@ -63,6 +63,7 @@ class Simulation:
         old_time = self.time
         self.time += dt
         self.flip_buffer()
+        self.raise_event('simulation_step', dt)
         self._check_time_events(old_time)
 
     def _check_time_events(self, old_time: Timestamp):

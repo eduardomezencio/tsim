@@ -40,7 +40,7 @@ LANE_CHANGE_MIN_DURATION = LANE_WIDTH / LANE_CHANGE_SPEED_MPS
 MAX_SPEED_KPH = 100.0
 MAX_SPEED_MPS = kph_to_mps(MAX_SPEED_KPH)
 
-LOCK_ALL = True
+LOCK_ALL = False
 
 
 class Car(Entity, TrafficAgent):
@@ -191,7 +191,8 @@ class Car(Entity, TrafficAgent):
     shadow_node: LinkedListNode[Car]
     schedule: Schedule
 
-    def __init__(self, schedule: Schedule = None):
+    def __init__(self, max_speed_mps: float = MAX_SPEED_MPS,
+                 schedule: Schedule = None):
         self.active = False
         self.deactivation_timer = 0.0
         self.position = None
@@ -211,7 +212,8 @@ class Car(Entity, TrafficAgent):
         self.lock_queue = deque()
         self.lock_count = defaultdict(int)
         self.waiting = [0, None]
-        self.current_max_speed = MAX_SPEED_MPS
+        self.max_speed = max_speed_mps
+        self.current_max_speed = max_speed_mps
         self.path = None
         self.path_segment = 0
         self.path_last_segment = False
@@ -306,7 +308,7 @@ class Car(Entity, TrafficAgent):
         else:
             lane = lane.dest
             self.state = State.ON_CURVE
-        self.current_max_speed = min(MAX_SPEED_MPS, lane.way.max_speed)
+        self.current_max_speed = min(self.max_speed, lane.way.max_speed)
 
         self.traffic_node = network_position.location.insert_agent(
             self, buffer)
@@ -384,9 +386,12 @@ class Car(Entity, TrafficAgent):
         if lock_order is not None:
             lock_order[index].drop(self)
 
+        self.waiting[:] = 0, None
+
         for lock, count_ in list(self.lock_count.items()):
             for _ in range(count_):
                 lock.release(self, buffer, True)
+
         self.lock_queue.clear()
         self.distance_to_release = None
 
@@ -632,7 +637,7 @@ class Car(Entity, TrafficAgent):
         self.path_last_way = self.path_segment == len(self.path.ways) - 1
         target_oriented_way = self.path.ways[self.path_segment]
         curve = location.get_curve(target_oriented_way)
-        self.current_max_speed = min(MAX_SPEED_MPS,
+        self.current_max_speed = min(self.max_speed,
                                      target_oriented_way.way.max_speed)
         self._calc_curve_override(curve)
         self.position = curve.evaluate_position(offset, self.curve_override)

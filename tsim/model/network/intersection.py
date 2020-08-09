@@ -236,6 +236,15 @@ class ConflictPoint(TrafficLock):
             self._dequeue(buffer)
             return
 
+        if self.owner is not None and self.owner.waiting[1] is not None:
+            waiting = self.owner.waiting
+            if waiting[1][waiting[0]].owner == agent:
+                log.debug('[%s] Deadlock contingcy for %s',
+                          __name__, repr(agent))
+                agent.release_all_locks(buffer)
+                agent.update_lead(buffer)
+                return
+
         self.queue.append((agent, terminal, location))
         if self.owner is None:
             self._dequeue(buffer)
@@ -770,7 +779,8 @@ def _merge_points(points: Dict[int, ConflictPoint], rtree: Rtree):
         curve.remove_conflict_point_duplicates()
 
 
-def _fill_neighbors(points: Dict[int, ConflictPoint], rtree: Rtree):
+def _fill_neighbors(points: Dict[int, ConflictPoint], rtree: Rtree,
+                    skip_in_same_curve: bool = True):
     """Add conflict points closer than NEIGHBOR_RADIUS as neighbors."""
     for id_, point in points.items():
         for other_id in rtree.intersection(
@@ -778,6 +788,8 @@ def _fill_neighbors(points: Dict[int, ConflictPoint], rtree: Rtree):
             if other_id == id_:
                 continue
             other = points[other_id]
+            if skip_in_same_curve and (point.curves & other.curves):
+                continue
             distance_squared = point.point.distance_squared(other.point)
             if distance_squared <= NEIGHBOR_RADIUS_SQUARED:
                 point.neighbors.add(other)

@@ -24,7 +24,8 @@ from tsim.model.network.lane import LanePosition
 from tsim.model.network.orientedway import OrientedWay, OrientedWayPosition
 from tsim.model.network.way import Way
 from tsim.model.simulation.car import Car
-from tsim.model.units import HOUR, Timestamp, normalized_hours, time_string
+from tsim.model.units import (HOUR, Timestamp, kph_to_mps, normalized_hours,
+                              time_string)
 from tsim.stats.way import WayStatsCollector
 from tsim.ui.camera import Camera
 from tsim.ui.cursor import Cursor
@@ -128,7 +129,8 @@ class App:
             if any(s < Car.MINIMUM_DISTANCE for s in free_space):
                 continue
 
-            self.on_add_car(Car(), LanePosition(lane1, distance1),
+            self.on_add_car(Car(kph_to_mps(40.0 + random() * 20.0)),
+                            LanePosition(lane1, distance1),
                             lane2.oriented_way_position(distance2))
             remaining -= 1
             if remaining <= 0:
@@ -230,7 +232,7 @@ class App:
             self.network_entities[way.id] = Factory.create_way(parent, way)
 
         # TODO: load agents
-        seed(2)
+        seed(1)
         self.generate_random_cars()
 
         for node_path in self.roads.values():

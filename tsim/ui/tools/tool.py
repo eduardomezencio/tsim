@@ -24,6 +24,9 @@ class Tool(ABC):
     def on_update(self):
         """Update callback called every frame."""
 
+    def on_simulation_step(self, dt):
+        """Process simulation step."""
+
     def on_button1_press(self):
         """Button 1 pressed callback."""
 
