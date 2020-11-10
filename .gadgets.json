@@ -1,0 +1,15 @@
+{
+  "adapters": {
+    "debugpy": {
+      "command": [
+        "python",
+        "${gadgetDir}/debugpy/build/lib/debugpy/adapter"
+      ],
+      "configuration": {
+        "python": "python",
+        "subProcess": false
+      },
+      "name": "debugpy"
+    }
+  }
+}
