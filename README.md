@@ -8,12 +8,12 @@ Agent-based traffic simulator in python.
 
 * Create virtual environment, e.g.:
 
-        python -m venv .venv
+      python -m venv .venv
 
 * Activate virtual environment:
 
-        . .venv/bin/activate
+      . .venv/bin/activate
 
 * Install with dev dependencies:
 
-        pip install -e .[dev]
+      pip install -e .[dev]
