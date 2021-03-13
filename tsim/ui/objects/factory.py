@@ -6,17 +6,17 @@ from typing import TYPE_CHECKING
 
 from panda3d.core import NodePath
 
-from tsim.model.network.node import Node
-from tsim.model.network.path import Path
-from tsim.model.network.way import Way
-from tsim.model.simulation.car import Car
+from tsim.core.network.node import Node
+from tsim.core.network.path import Path
+from tsim.core.network.way import Way
+from tsim.core.simulation.car import Car
 from tsim.ui.objects.car import create as create_car
 from tsim.ui.objects.node import create as create_node
 from tsim.ui.objects.path import create as create_path
 from tsim.ui.objects.way import create as create_way
 
 if TYPE_CHECKING:
-    from tsim.model.network.entity import Entity
+    from tsim.core.network.entity import Entity
 
 MAP = {Car: create_car,
        Node: create_node,

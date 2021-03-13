@@ -1,6 +1,4 @@
-import sys
-
-from tsim.main import main
+from . import main
 
 
-main(*sys.argv[1:])
+main()

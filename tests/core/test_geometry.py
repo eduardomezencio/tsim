@@ -2,7 +2,7 @@
 from math import sqrt
 import unittest
 
-from tsim.model.geometry import line_intersection, midpoint, Point, Vector
+from tsim.core.geometry import line_intersection, midpoint, Point, Vector
 
 
 class GeometryTest(unittest.TestCase):

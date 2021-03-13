@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from math import pi
-
 from itertools import chain, cycle
 
 import aggdraw
@@ -11,11 +10,12 @@ from panda3d.core import (CardMaker, Geom, GeomNode, GeomTriangles,
                           GeomTristrips, GeomVertexData, GeomVertexFormat,
                           GeomVertexWriter, NodePath, TransparencyAttrib)
 from PIL import Image
+from pkg_resources import resource_filename
 
-from tsim.model.geometry import Vector
-from tsim.model.network.intersection import ConflictPointType
-from tsim.model.network.lane import LANE_WIDTH
-from tsim.model.network.node import Node
+from tsim.core.geometry import Vector
+from tsim.core.network.intersection import ConflictPointType
+from tsim.core.network.lane import LANE_WIDTH
+from tsim.core.network.node import Node
 from tsim.ui import textures
 from tsim.ui.objects.way import LEVEL_HEIGHT
 from tsim.ui.textures import create_texture
@@ -28,7 +28,9 @@ RESOLUTION = 2048
 MIDDLE = Vector(RESOLUTION // 2, -RESOLUTION // 2)
 PPM = RESOLUTION // 32
 VERTEX_FORMAT = GeomVertexFormat.get_v3n3t2()
-FONT = aggdraw.Font('black', 'fonts/caladea-tsim.otf', 15)
+FONT = aggdraw.Font('black',
+                    resource_filename('tsim', 'data/fonts/caladea-tsim.otf'),
+                    15)
 
 
 def create(parent: NodePath, node: Node) -> NodePath:

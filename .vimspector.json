@@ -9,9 +9,7 @@
         "cwd": "${workspaceRoot}",
         "module": "tsim",
         "console": "integratedTerminal",
-        "args": [
-                "data/${Scenario}.osm"
-        ]
+        "args": ["${Scenario}"]
       },
       "breakpoints": {
         "exception": {

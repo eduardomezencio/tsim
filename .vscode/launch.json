@@ -7,7 +7,7 @@
             "request": "launch",
             "module": "tsim",
             "console": "integratedTerminal",
-            "args": ["data/${input:mapName}.osm"]
+            "args": ["${input:mapFile}"]
         },
         {
             "name": "Python: tsim (last map)",
@@ -21,10 +21,9 @@
             "name": "Python: osm_reader",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/osm_reader.py",
+            "program": "${workspaceFolder}/tsim/scripts/osm_reader.py",
             "console": "integratedTerminal",
-            "args": ["data/${input:mapName}.osm"],
-            "env": { "PYTHONPATH": "${workspaceFolder}" }
+            "args": ["${input:mapFile}"]
         },
         {
             "name": "Python: osm_reader (multiprocessing)",
@@ -32,8 +31,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/scripts/osm_reader.py",
             "console": "integratedTerminal",
-            "args": ["data/${input:mapName}.osm", "-m"],
-            "env": { "PYTHONPATH": "${workspaceFolder}" }
+            "args": ["${input:mapFile}", "-m"]
         },
         {
             "name": "Python: osm_cleaner",
@@ -41,8 +39,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/scripts/osm_cleaner.py",
             "console": "integratedTerminal",
-            "args": ["data/${input:mapName}.osm", "data/${input:mapName}.osm"],
-            "env": { "PYTHONPATH": "${workspaceFolder}" }
+            "args": ["${input:mapFile}", "${input:mapFile}"]
         },
         {
             "name": "Python: Attach using Process Id",
@@ -53,10 +50,10 @@
     ],
     "inputs": [
         {
-            "id": "mapName",
+            "id": "mapFile",
             "type": "promptString",
             "default": "",
-            "description": "Name of the map to load"
+            "description": "Path of the map to load"
         }
     ]
 }

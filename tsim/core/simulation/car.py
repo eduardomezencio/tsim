@@ -12,22 +12,22 @@ from typing import (TYPE_CHECKING, Collection, DefaultDict, Deque, List,
 
 import bezier
 
-import tsim.model.index as Index
-from tsim.model.entity import Entity
-from tsim.model.geometry import Point, Vector
-from tsim.model.network.intersection import Curve
-from tsim.model.network.lane import LanePosition
-from tsim.model.network.orientedway import OrientedWayPosition
-from tsim.model.network.path import Path
-from tsim.model.network.traffic import (TrafficAgent, TrafficDynamicAgent,
+import tsim.core.index as Index
+from tsim.core.entity import Entity
+from tsim.core.geometry import Point, Vector
+from tsim.core.network.intersection import Curve
+from tsim.core.network.lane import LanePosition
+from tsim.core.network.orientedway import OrientedWayPosition
+from tsim.core.network.path import Path
+from tsim.core.network.traffic import (TrafficAgent, TrafficDynamicAgent,
                                         TrafficLock)
-from tsim.model.network.way import LANE_WIDTH, Lane
-from tsim.model.simulation.schedule import Schedule
-from tsim.model.units import Duration, kph_to_mps, mps_to_kph, time_string
+from tsim.core.network.way import LANE_WIDTH, Lane
+from tsim.core.simulation.schedule import Schedule
+from tsim.core.units import Duration, kph_to_mps, mps_to_kph, time_string
 from tsim.utils.linkedlist import LinkedListNode
 
 if TYPE_CHECKING:
-    from tsim.model.network.location import NetworkLocation, NetworkPosition
+    from tsim.core.network.location import NetworkLocation, NetworkPosition
 
 MINIMUM_DISTANCE = 5.0
 SPEED_DISTANCE_FACTOR = 0.5

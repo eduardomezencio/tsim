@@ -7,19 +7,19 @@ from typing import TYPE_CHECKING, NamedTuple, Optional, Sequence, Tuple
 
 from dataslots import with_slots
 
-from tsim.model.entity import EntityRef
-from tsim.model.geometry import Point, Vector, line_intersection
-from tsim.model.network.endpoint import Endpoint
-from tsim.model.network.orientedway import OrientedWay, OrientedWayPosition
-from tsim.model.network.location import (NetworkLocation, NetworkPosition,
+from tsim.core.entity import EntityRef
+from tsim.core.geometry import Point, Vector, line_intersection
+from tsim.core.network.endpoint import Endpoint
+from tsim.core.network.orientedway import OrientedWay, OrientedWayPosition
+from tsim.core.network.location import (NetworkLocation, NetworkPosition,
                                          WorldAndSegmentPosition)
-from tsim.model.network.traffic import Traffic
+from tsim.core.network.traffic import Traffic
 from tsim.utils.linkedlist import LinkedList
 
 if TYPE_CHECKING:
-    from tsim.model.network.intersection import Curve
-    from tsim.model.network.node import Node
-    from tsim.model.network.way import Way
+    from tsim.core.network.intersection import Curve
+    from tsim.core.network.node import Node
+    from tsim.core.network.way import Way
 
 LANE_WIDTH = 3.0
 HALF_LANE_WIDTH = 0.5 * LANE_WIDTH

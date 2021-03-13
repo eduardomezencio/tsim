@@ -6,7 +6,7 @@ from abc import ABC
 from typing import Generic, Iterable, NamedTuple, Optional, TypeVar, Union
 from weakref import ref, ReferenceType
 
-import tsim.model.index as Index
+import tsim.core.index as Index
 
 
 class Entity(ABC):

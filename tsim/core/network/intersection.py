@@ -17,21 +17,21 @@ import numpy
 from dataslots import with_slots
 from rtree.index import Rtree
 
-import tsim.model.index as Index
-from tsim.model.entity import EntityRef
-from tsim.model.geometry import Point, Vector, angle, line_intersection_safe
-from tsim.model.network.lane import LANE_WIDTH, Lane, LaneRef
-from tsim.model.network.orientedway import OrientedWayPosition
-from tsim.model.network.location import (NetworkLocation, NetworkPosition,
+import tsim.core.index as Index
+from tsim.core.entity import EntityRef
+from tsim.core.geometry import Point, Vector, angle, line_intersection_safe
+from tsim.core.network.lane import LANE_WIDTH, Lane, LaneRef
+from tsim.core.network.orientedway import OrientedWayPosition
+from tsim.core.network.location import (NetworkLocation, NetworkPosition,
                                          WorldAndSegmentPosition)
-from tsim.model.network.traffic import (Traffic, TrafficAgent,
+from tsim.core.network.traffic import (Traffic, TrafficAgent,
                                         TrafficDynamicAgent, TrafficLock)
-from tsim.model.network.way import OrientedWay
+from tsim.core.network.way import OrientedWay
 from tsim.utils.linkedlist import LinkedList
 from tsim.utils.maptovalue import MapToValue
 
 if TYPE_CHECKING:
-    from tsim.model.network.node import Node
+    from tsim.core.network.node import Node
 
 LaneConnection = Tuple[LaneRef, LaneRef]
 LaneConnections = Dict[LaneRef, Set[LaneRef]]

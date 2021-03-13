@@ -66,13 +66,13 @@ def init():
         else:
             RELEASED.add(key)
 
-    p3d.BASE.disable_mouse()
+    p3d.base.disable_mouse()
 
     # base.messenger.toggleVerbose()  # to print all events
-    p3d.BASE.accept('escape', sys.exit)
+    p3d.base.accept('escape', sys.exit)
     for suffix, is_pressed in (('', True), ('-up', False)):
         for key, action in MAPPING.items():
-            p3d.BASE.accept(f'{key}{suffix}', set_key, [action, is_pressed])
+            p3d.base.accept(f'{key}{suffix}', set_key, [action, is_pressed])
 
 
 def _fill_inv_mapping():

@@ -11,22 +11,22 @@ from typing import (TYPE_CHECKING, Iterable, Iterator, List, Optional, Tuple,
 
 from dataslots import with_slots
 
-import tsim.model.index as Index
-from tsim.model.entity import DeleteResult, EntityRef
-from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
+import tsim.core.index as Index
+from tsim.core.entity import DeleteResult, EntityRef
+from tsim.core.geometry import (BoundingRect, Point, Polygon, Vector,
                                  calc_bounding_rect, line_intersection,
                                  point_in_polygon, sec)
-from tsim.model.network.endpoint import Endpoint
-from tsim.model.network.entity import NetworkEntity
-from tsim.model.network.lane import (HALF_LANE_WIDTH, LANE_WIDTH, Lane,
+from tsim.core.network.endpoint import Endpoint
+from tsim.core.network.entity import NetworkEntity
+from tsim.core.network.lane import (HALF_LANE_WIDTH, LANE_WIDTH, Lane,
                                      LanePosition, LaneRef)
-from tsim.model.network.orientedway import OrientedWay, OrientedWayPosition
-from tsim.model.units import kph_to_mps
+from tsim.core.network.orientedway import OrientedWay, OrientedWayPosition
+from tsim.core.units import kph_to_mps
 from tsim.utils.cachedproperty import add_cached, cached_property
 from tsim.utils.iterators import drop_duplicates, window_iter
 
 if TYPE_CHECKING:
-    from tsim.model.network.node import Node
+    from tsim.core.network.node import Node
 
 DEFAULT_MAX_SPEED_KPH = 60.0
 DEFAULT_MAX_SPEED_MPS = kph_to_mps(DEFAULT_MAX_SPEED_KPH)

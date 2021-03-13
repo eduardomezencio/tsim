@@ -9,9 +9,9 @@ from typing import Callable, Dict
 from dataslots import with_slots
 from intervaltree import Interval, IntervalTree
 
-from tsim.model.network.orientedway import OrientedWay, OrientedWayPosition
-from tsim.model.network.traffic import TrafficDynamicAgent
-from tsim.model.units import Timestamp, mps_to_kph, MINUTE
+from tsim.core.network.orientedway import OrientedWay, OrientedWayPosition
+from tsim.core.network.traffic import TrafficDynamicAgent
+from tsim.core.units import Timestamp, mps_to_kph, MINUTE
 
 
 @with_slots

@@ -13,18 +13,27 @@ from textwrap import wrap
 from typing import Dict, Iterable, Tuple
 from xml.etree import ElementTree
 
-from tsim.model.geometry import Point
-from tsim.model.index import INSTANCE as INDEX
-from tsim.model.network.endpoint import Endpoint
-from tsim.model.network.node import Node
-from tsim.model.network.path import dijkstra
-from tsim.model.network.way import Way
-from tsim.model.units import kph_to_mps
-from tsim.serialization.config import configure_serialization
+from tsim.core.geometry import Point
+from tsim.core.index import INSTANCE as INDEX
+from tsim.core.network.endpoint import Endpoint
+from tsim.core.network.node import Node
+from tsim.core.network.path import dijkstra
+from tsim.core.network.way import Way
+from tsim.core.units import kph_to_mps
+from tsim.serialization import configure_serialization
 from tsim.utils.cachedproperty import touch_cache
 
 FILES = [a for a in sys.argv[1:] if not a.startswith('-')]
 MULTIPROCESSING = '-m' in sys.argv
+
+
+def main():
+    configure_serialization()
+    if MULTIPROCESSING and len(FILES) > 1:
+        osm_reader_multiprocess(FILES)
+    else:
+        for file in FILES:
+            osm_reader(file)
 
 
 def osm_reader_multiprocess(names: Iterable[str]):
@@ -195,9 +204,4 @@ def log_config(name: str):
 
 
 if __name__ == '__main__':
-    configure_serialization()
-    if MULTIPROCESSING and len(FILES) > 1:
-        osm_reader_multiprocess(FILES)
-    else:
-        for file in FILES:
-            osm_reader(file)
+    main()

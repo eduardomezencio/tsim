@@ -5,9 +5,9 @@ from __future__ import annotations
 from functools import partialmethod
 from itertools import chain
 
-from tsim.model.entity import EntityRef
-from tsim.model.network.intersection import ConflictPoint, Curve, Intersection
-from tsim.model.network.lane import Lane, LaneSegment
+from tsim.core.entity import EntityRef
+from tsim.core.network.intersection import ConflictPoint, Curve, Intersection
+from tsim.core.network.lane import Lane, LaneSegment
 from tsim.utils import pickling
 from tsim.utils.linkedlist import LinkedList
 

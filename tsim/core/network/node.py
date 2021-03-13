@@ -8,15 +8,15 @@ from typing import Dict, Iterable, Iterator, List, Optional, Set, Tuple
 
 from dataslots import with_slots
 
-import tsim.model.index as Index
-from tsim.model.entity import DeleteResult, EntityRef
-from tsim.model.geometry import (BoundingRect, Point, Polygon, Vector,
+import tsim.core.index as Index
+from tsim.core.entity import DeleteResult, EntityRef
+from tsim.core.geometry import (BoundingRect, Point, Polygon, Vector,
                                  calc_bounding_rect, line_intersection,
                                  midpoint, point_in_polygon)
-from tsim.model.network.entity import NetworkEntity
-from tsim.model.network.intersection import Intersection, LaneConnection
-from tsim.model.network.lane import LANE_WIDTH, LaneRef
-from tsim.model.network.way import Endpoint, OrientedWay, Way
+from tsim.core.network.entity import NetworkEntity
+from tsim.core.network.intersection import Intersection, LaneConnection
+from tsim.core.network.lane import LANE_WIDTH, LaneRef
+from tsim.core.network.way import Endpoint, OrientedWay, Way
 from tsim.utils.cachedproperty import add_cached, cached_property
 
 

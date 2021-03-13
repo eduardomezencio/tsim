@@ -30,19 +30,19 @@ class Camera:
     """Camera wrapper and logic implementation."""
 
     def __init__(self):
-        p3d.LENS.set_far(FAR)
+        p3d.lens.set_far(FAR)
 
         self.focus = NodePath(PandaNode('focus'))
         self.focus.set_compass()
-        self.focus.reparent_to(p3d.RENDER)
+        self.focus.reparent_to(p3d.render)
         self.focus.set_pos(0.0, 0.0, FOCUS_HEIGHT)
         self.rotator = NodePath(PandaNode('rotator'))
         self.rotator.reparent_to(self.focus)
         self.rotator.set_pos(0.0, 0.0, 0.0)
         self.following = None
-        p3d.CAMERA.set_pos(0.0, 0.0, DEFAULT_HEIGHT)
-        p3d.CAMERA.look_at(self.rotator)
-        p3d.CAMERA.reparent_to(self.rotator)
+        p3d.camera.set_pos(0.0, 0.0, DEFAULT_HEIGHT)
+        p3d.camera.look_at(self.rotator)
+        p3d.camera.reparent_to(self.rotator)
         self.focus.set_h(DEFAULT_ROTATION)
         self.rotator.set_p(DEFAULT_PITCH)
 
@@ -58,9 +58,9 @@ class Camera:
         def _zoom(amount):
             self.zoom_speed += amount * self._zoom_accel
 
-        p3d.BASE.accept('f8', _toggle_cinematic)
-        p3d.BASE.accept('wheel_up', partial(_zoom, -10.0))
-        p3d.BASE.accept('wheel_down', partial(_zoom, 10.0))
+        p3d.base.accept('f8', _toggle_cinematic)
+        p3d.base.accept('wheel_up', partial(_zoom, -10.0))
+        p3d.base.accept('wheel_down', partial(_zoom, 10.0))
 
     def set_cinematic_mode(self, cinematic: bool = True):
         """Activate or deactivate camera cinematic mode."""
@@ -95,7 +95,7 @@ class Camera:
         if move:
             if self.following is not None:
                 self.unfollow()
-            scale = (p3d.CAMERA.get_z() + 10.0) * self._accel
+            scale = (p3d.camera.get_z() + 10.0) * self._accel
             self.speed[0] += dx * scale
             self.speed[1] += dy * scale
         if any(self.speed):
@@ -134,13 +134,13 @@ class Camera:
         if self.zoom_speed != 0.0:
             speed = self.zoom_speed
             speed, negative = min(abs(speed), 0.02), speed < 0.0
-            cam_z = p3d.CAMERA.get_z()
+            cam_z = p3d.camera.get_z()
             if negative:
-                p3d.CAMERA.set_z(max(
+                p3d.camera.set_z(max(
                     (cam_z + 1.0) * (1.0 - ZOOM_RATIO * speed) - 1.0,
                     DISTANCE_MIN))
             else:
-                p3d.CAMERA.set_z(min(
+                p3d.camera.set_z(min(
                     (cam_z + 1.0) * (1.0 + ZOOM_RATIO * speed) - 1.0,
                     DISTANCE_MAX))
             new_speed = self.zoom_speed * self._deccel
@@ -159,5 +159,5 @@ class Camera:
         """
         if node_path is None or self.focus.parent == node_path:
             self.following = None
-            self.focus.wrt_reparent_to(p3d.RENDER)
+            self.focus.wrt_reparent_to(p3d.render)
             self.focus.set_z(FOCUS_HEIGHT)

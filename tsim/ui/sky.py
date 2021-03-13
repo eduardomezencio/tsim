@@ -31,7 +31,7 @@ class Sky:
     def update(self):
         """Update lights."""
         self.sun_np.set_pos(self._camera.focus, 0.0, 0.0, 0.0)
-        film = p3d.CAMERA.get_z() + self._camera.rotator.get_p() ** 2.0 * 0.01
+        film = p3d.camera.get_z() + self._camera.rotator.get_p() ** 2.0 * 0.01
         self.sun.get_lens().set_film_size(film, film)
         self.sun.get_lens().set_near_far(-film, film)
 
@@ -44,7 +44,7 @@ class Sky:
         self.sun.set_color((5.0 * color[0], 5.0 * color[1],
                             5.0 * color[2], color[3]))
         self.fog.set_color(color)
-        p3d.WIN.set_clear_color(color)
+        p3d.win.set_clear_color(color)
 
     def _init_sun(self):
         """Initialize sun light."""

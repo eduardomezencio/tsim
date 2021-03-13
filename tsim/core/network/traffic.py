@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Deque, Optional, Mapping, Sequence
 
-from tsim.model.network.location import NetworkLocation
+from tsim.core.network.location import NetworkLocation
 from tsim.utils.linkedlist import LinkedList, LinkedListNode
 
 

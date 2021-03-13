@@ -8,8 +8,8 @@ from typing import Any, Callable, Deque, List, Set, Tuple
 
 from orderedset import OrderedSet
 
-from tsim.model.network.traffic import TrafficDynamicAgent
-from tsim.model.units import Duration, Timestamp, INT_MINUTE, INT_HOUR, INT_DAY
+from tsim.core.network.traffic import TrafficDynamicAgent
+from tsim.core.units import Duration, Timestamp, INT_MINUTE, INT_HOUR, INT_DAY
 
 Listener = Callable[[str, Tuple[Any, ...]], None]
 

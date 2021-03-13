@@ -46,7 +46,7 @@ def get(texture_name: str) -> Texture:
         return texture
 
     extension, filters = TEXTURES.get(texture_name, ('', ()))
-    texture = p3d.LOADER.load_texture(''.join((PATH, texture_name, extension)),
+    texture = p3d.loader.load_texture(''.join((PATH, texture_name, extension)),
                                       okMissing=True)
 
     if texture is None:

@@ -8,14 +8,14 @@ from typing import (TYPE_CHECKING, Iterable, Iterator, NamedTuple, Optional,
 
 from dataslots import with_slots
 
-from tsim.model.entity import EntityRef
-from tsim.model.network.endpoint import Endpoint
+from tsim.core.entity import EntityRef
+from tsim.core.network.endpoint import Endpoint
 
 if TYPE_CHECKING:
-    from tsim.model.geometry import Point, Vector
-    from tsim.model.network.lane import Lane, LaneRef
-    from tsim.model.network.node import Node
-    from tsim.model.network.way import Way
+    from tsim.core.geometry import Point, Vector
+    from tsim.core.network.lane import Lane, LaneRef
+    from tsim.core.network.node import Node
+    from tsim.core.network.way import Way
 
 
 class OrientedWay(NamedTuple):

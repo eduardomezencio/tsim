@@ -1,8 +1,8 @@
 """Bulldozer tool."""
 
 import tsim.ui.panda3d as p3d
-from tsim.model.index import INSTANCE as INDEX
-from tsim.model.network.way import Way
+from tsim.core.index import INSTANCE as INDEX
+from tsim.core.network.way import Way
 from tsim.ui.tools.tool import Tool
 
 
@@ -17,4 +17,4 @@ class Bulldozer(Tool):
                         None)
         if selected is not None:
             selected.delete()
-            p3d.MESSENGER.send('network_entities_changed')
+            p3d.messenger.send('network_entities_changed')

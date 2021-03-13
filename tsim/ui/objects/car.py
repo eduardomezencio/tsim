@@ -2,19 +2,20 @@
 
 from __future__ import annotations
 
-import os
 from random import random
 
 from panda3d.core import CollisionBox, CollisionNode, NodePath  # , PointLight
+from pkg_resources import resource_filename
 
 import tsim.ui.panda3d as p3d
-from tsim.model.simulation.car import Car
+from tsim.core.simulation.car import Car
 from tsim.utils.color import hsv_to_rgb
 
 
 def create(parent: NodePath, car: Car) -> NodePath:
     """Create actor for given `car` and reparent it to `parent`."""
-    node_path: NodePath = p3d.LOADER.load_model(f'{os.getcwd()}/models/car')
+    model_filename = resource_filename('tsim', 'data/models/car')
+    node_path = p3d.loader.load_model(model_filename)
     node_path.name = f'car-{car.id}'
     node_path.tags['id'] = str(car.id)
 
@@ -34,6 +35,6 @@ def create(parent: NodePath, car: Car) -> NodePath:
     # light.set_attenuation((1.0, 0.5, 0.0))
     # light_np = node_path.attach_new_node(light)
     # light_np.set_pos((0.0, 3.0, 1.0))
-    # p3d.RENDER.set_light(light_np)
+    # p3d.render.set_light(light_np)
 
     return node_path

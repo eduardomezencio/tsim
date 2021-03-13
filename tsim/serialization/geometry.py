@@ -2,7 +2,7 @@
 
 from functools import partialmethod
 
-from tsim.model.geometry import Vector
+from tsim.core.geometry import Vector
 from tsim.utils import pickling
 
 

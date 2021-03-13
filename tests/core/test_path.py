@@ -2,11 +2,11 @@
 import unittest
 from itertools import product
 
-from tsim.model.geometry import Point
-from tsim.model.index import INSTANCE as INDEX
-from tsim.model.network.node import Node
-from tsim.model.network.path import dijkstra
-from tsim.model.network.way import Endpoint, Way
+from tsim.core.geometry import Point
+from tsim.core.index import INSTANCE as INDEX
+from tsim.core.network.node import Node
+from tsim.core.network.path import dijkstra
+from tsim.core.network.way import Endpoint, Way
 
 INDEX.name = 'test'
 

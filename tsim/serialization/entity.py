@@ -1,6 +1,6 @@
 """Entity serialization configuration."""
 
-from tsim.model.entity import Entity, EntityRef
+from tsim.core.entity import Entity, EntityRef
 from tsim.utils import pickling
 
 

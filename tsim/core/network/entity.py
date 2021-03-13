@@ -5,11 +5,11 @@ from __future__ import annotations
 from abc import abstractmethod, abstractproperty
 from typing import Iterable
 
-from tsim.model.entity import Entity
-from tsim.model.geometry import BoundingRect, Point, Polygon
+from tsim.core.entity import Entity
+from tsim.core.geometry import BoundingRect, Point, Polygon
 from tsim.utils import osm as xurl_provider
 from tsim.utils.cachedproperty import add_cached, cached_property, clear_cache
-import tsim.model.index as Index
+import tsim.core.index as Index
 
 
 @add_cached

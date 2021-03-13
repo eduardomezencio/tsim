@@ -6,15 +6,15 @@ from functools import partial
 from itertools import islice
 from typing import Iterable, Optional, Type, Union
 import logging as log
-import os
 
 from direct.showbase.DirectObject import DirectObject
 from direct.actor.Actor import Actor
 from panda3d.core import (CollisionHandlerQueue, CollisionNode, CollisionRay,
                           CollisionTraverser, NodePath, PandaNode)
+from pkg_resources import resource_filename
 
-from tsim.model.geometry import Point
-from tsim.model.units import Duration
+from tsim.core.geometry import Point
+from tsim.core.units import Duration
 from tsim.ui.tools import Tool, TOOLS
 import tsim.ui.input as INPUT
 import tsim.ui.panda3d as p3d
@@ -34,19 +34,20 @@ class Cursor(DirectObject):
         super().__init__()
         self.parent = parent
 
-        self.mouse_np = p3d.CAMERA.attach_new_node(PandaNode('mouse'))
-        self.mouse_np.set_y(p3d.LENS.get_near())
+        self.mouse_np = p3d.camera.attach_new_node(PandaNode('mouse'))
+        self.mouse_np.set_y(p3d.lens.get_near())
 
         picker_node = CollisionNode('mouse_ray')
-        picker_np = p3d.CAMERA.attach_new_node(picker_node)
+        picker_np = p3d.camera.attach_new_node(picker_node)
         self._picker_ray = CollisionRay()
         picker_node.add_solid(self._picker_ray)
         self._collision_handler = CollisionHandlerQueue()
         self._traverser = CollisionTraverser('mouse_traverser')
         self._traverser.add_collider(picker_np, self._collision_handler)
 
-        self.actor = Actor(f'{os.getcwd()}/models/cursor',
-                           {'spin': f'{os.getcwd()}/models/cursor-spin'})
+        self.actor = Actor(
+            resource_filename('tsim', 'data/models/cursor'),
+            {'spin': resource_filename('tsim', 'data/models/cursor-spin')})
         self.actor.loop('spin')
         self.actor.reparent_to(parent)
         self.actor.set_pos(0.0, 0.0, 0.0)
@@ -99,30 +100,30 @@ class Cursor(DirectObject):
 
     def update(self):
         """Update callback."""
-        self.actor.set_scale(p3d.CAMERA.get_z() ** 0.6 / 10)
+        self.actor.set_scale(p3d.camera.get_z() ** 0.6 / 10)
         self.moved = False
 
-        if p3d.MOUSE_WATCHER.has_mouse():
-            mouse_x, mouse_y = p3d.MOUSE_WATCHER.get_mouse()
-            self._picker_ray.set_from_lens(p3d.CAM_NODE, mouse_x, mouse_y)
-            self._traverser.traverse(p3d.RENDER)
+        if p3d.mouse_watcher.has_mouse():
+            mouse_x, mouse_y = p3d.mouse_watcher.get_mouse()
+            self._picker_ray.set_from_lens(p3d.cam_node, mouse_x, mouse_y)
+            self._traverser.traverse(p3d.render)
 
             if self._collision_handler.get_num_entries():
                 self._collision_handler.sort_entries()
                 node_path = (self._collision_handler.get_entry(0)
                              .get_into_node_path())
-                self.position = node_path.get_pos(p3d.RENDER)
+                self.position = node_path.get_pos(p3d.render)
                 self.actor.set_z(2.0)
                 self.pointed_at = node_path
             else:
                 self.pointed_at = None
-                film = p3d.LENS.get_film_size() * 0.5
+                film = p3d.lens.get_film_size() * 0.5
                 self.mouse_np.set_x(mouse_x * film.x)
-                self.mouse_np.set_y(p3d.LENS.get_focal_length())
+                self.mouse_np.set_y(p3d.lens.get_focal_length())
                 self.mouse_np.set_z(mouse_y * film.y)
                 self.last_position = self._position
                 mouse_pos = self.mouse_np.get_pos(self.parent)
-                cam_pos = p3d.CAMERA.get_pos(self.parent)
+                cam_pos = p3d.camera.get_pos(self.parent)
                 mouse_vec = mouse_pos - cam_pos
                 if mouse_vec.z < 0.0:
                     scale = -mouse_pos.z / mouse_vec.z
@@ -130,7 +131,7 @@ class Cursor(DirectObject):
                     self.position = self.actor.get_pos()
                     if self._position != self.last_position:
                         self.moved = True
-                        p3d.MESSENGER.send('cursor_move')
+                        p3d.messenger.send('cursor_move')
 
         if self._tool is not None:
             self._tool.on_update()

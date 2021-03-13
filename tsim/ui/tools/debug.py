@@ -7,14 +7,14 @@ from typing import Dict, Optional
 from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import NodePath, TextNode
 
-from tsim.model.geometry import Point
-from tsim.model.index import INSTANCE as INDEX
-from tsim.model.network.node import Node
-from tsim.model.network.orientedway import OrientedWay
-from tsim.model.network.traffic import TrafficAgent
-from tsim.model.network.way import Way
-from tsim.model.simulation.car import Car
-from tsim.model.units import mps_to_kph
+from tsim.core.geometry import Point
+from tsim.core.index import INSTANCE as INDEX
+from tsim.core.network.node import Node
+from tsim.core.network.orientedway import OrientedWay
+from tsim.core.network.traffic import TrafficAgent
+from tsim.core.network.way import Way
+from tsim.core.simulation.car import Car
+from tsim.core.units import mps_to_kph
 from tsim.stats.way import WayStats
 from tsim.ui.objects import factory as Factory
 from tsim.ui.objects.node import create_lane_connections_card
@@ -22,7 +22,6 @@ from tsim.ui import panda3d as p3d
 from tsim.ui.tools.tool import Tool
 
 EMPTY_STATS = WayStats()
-FONT = p3d.LOADER.load_font('cmtt12.egg')
 
 
 class Debug(Tool):
@@ -45,8 +44,8 @@ class Debug(Tool):
         self.hud_text = OnscreenText(text='', pos=(5, -20), scale=22.0,
                                      fg=(1.0, 1.0, 1.0, 0.9),
                                      shadow=(0.0, 0.0, 0.0, 0.9),
-                                     align=TextNode.A_left, font=FONT,
-                                     parent=p3d.PIXEL2D, mayChange=True)
+                                     align=TextNode.A_left, font=p3d.ttf,
+                                     parent=p3d.pixel2d, mayChange=True)
         self.card = None
         self.text_dict = {'position': None, 'network_position': None,
                           'distance': None, 'agent': None}
@@ -119,7 +118,7 @@ class Debug(Tool):
                 if show_path:
                     self._update_path_np()
                 if follow:
-                    p3d.MESSENGER.send('follow', [agent])
+                    p3d.messenger.send('follow', [agent])
         if agents_only:
             return
 
@@ -128,7 +127,7 @@ class Debug(Tool):
             if not agent_selected:
                 self._clear_intersection()
                 self.card = create_lane_connections_card(
-                    selected[0], p3d.RENDER)
+                    selected[0], p3d.render)
         else:
             selected = INDEX.get_at(self.cursor.position, of_type=Way)
 
@@ -199,7 +198,7 @@ class Debug(Tool):
         self._clear_path_np()
         try:
             path = self.selected_agent.path
-            self.path_np = Factory.create_path(p3d.RENDER, path)
+            self.path_np = Factory.create_path(p3d.render, path)
         except AttributeError:
             pass
 

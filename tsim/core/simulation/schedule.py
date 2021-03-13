@@ -5,8 +5,8 @@ from __future__ import annotations
 from bisect import bisect_right
 from typing import List, NamedTuple, Tuple
 
-from tsim.model.network.orientedway import OrientedWayPosition
-from tsim.model.units import Timestamp
+from tsim.core.network.orientedway import OrientedWayPosition
+from tsim.core.units import Timestamp
 
 
 class ScheduleEntry(NamedTuple):

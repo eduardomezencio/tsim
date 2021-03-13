@@ -9,7 +9,7 @@ from panda3d.core import (ConfigVariableColor, Geom, GeomLinestrips, GeomNode,
                           GeomVertexData, GeomVertexFormat, GeomVertexWriter,
                           NodePath, TransparencyAttrib)
 
-from tsim.model.geometry import Vector
+from tsim.core.geometry import Vector
 
 DEFAULT_GRID_COLOR = '0.3 0.3 0.3 1.0'
 GRID_ALPHA = 0.125

@@ -2,20 +2,18 @@
 import logging as log
 import os
 from datetime import datetime
+from pathlib import Path
 
 from tsim.ui import panda3d as p3d
 
-BASE_DIR = 'screen'
+PATH = Path.home().joinpath('.tsim', 'screen')
 
 
 class Screen:
     """Screen capturing tools."""
 
     def __init__(self):
-        try:
-            os.mkdir(BASE_DIR)
-        except FileExistsError:
-            pass
+        PATH.mkdir(parents=True, exist_ok=True)
         self._movie_task = None
 
     def start_movie_recording(self, stop_current: bool = True):
@@ -29,9 +27,9 @@ class Screen:
         elif self._movie_task is not None:
             return
 
-        dir_ = f'{BASE_DIR}/{_timestamp_str()}'
+        dir_ = str(PATH.joinpath(_timestamp_str()))
         os.mkdir(dir_)
-        self._movie_task = p3d.BASE.movie(f'{dir_}/', 31536000, 60, 'jpg')
+        self._movie_task = p3d.base.movie(f'{dir_}/', 31536000, 60, 'jpg')
         log.info('Started recording movie to %s.', dir_)
 
     def stop_movie_recording(self):
@@ -50,7 +48,7 @@ class Screen:
 
     def screenshot(self, format_: str = 'png'):
         """Take screenshot."""
-        p3d.BASE.screenshot(f'{BASE_DIR}/{_timestamp_str()}.{format_}', False)
+        p3d.base.screenshot(str(PATH.joinpath(f'{_timestamp_str()}.{format_}')), False)
 
 
 def _timestamp_str() -> str:

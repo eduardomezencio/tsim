@@ -11,9 +11,9 @@ from dataslots import with_slots
 from tsim.utils.linkedlist import LinkedListNode
 
 if TYPE_CHECKING:
-    from tsim.model.geometry import Point, Vector
-    from tsim.model.network.orientedway import OrientedWayPosition
-    from tsim.model.network.traffic import Traffic, TrafficAgent
+    from tsim.core.geometry import Point, Vector
+    from tsim.core.network.orientedway import OrientedWayPosition
+    from tsim.core.network.traffic import Traffic, TrafficAgent
 
 
 class NetworkLocation(ABC):

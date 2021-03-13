@@ -15,16 +15,16 @@ NODE_GOOD_TAGS = {'highway'}
 RELATION_GOOD_TAGS = {'restriction', 'type'}
 
 
-def main(*argv):
+def main():
     """Run the osm cleaner."""
-    tree = ElementTree.parse(argv[1])
+    tree = ElementTree.parse(sys.argv[1])
     root = tree.getroot()
     used_nodes = set()
     clean_ways(root, used_nodes)
     clean_relations(root, used_nodes)
     clean_nodes(root, used_nodes)
     remove_invalid_nodes(root)
-    tree.write(argv[2], 'UTF-8', xml_declaration=True)
+    tree.write(sys.argv[2], 'UTF-8', xml_declaration=True)
 
 
 def clean_ways(root: ElementTree.Element, used_nodes: set):
@@ -94,4 +94,4 @@ def remove_invalid_nodes(root: ElementTree.Element):
 
 
 if __name__ == '__main__':
-    main(*sys.argv)
+    main()

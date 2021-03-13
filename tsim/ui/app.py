@@ -13,18 +13,19 @@ from typing import Dict, Tuple
 
 from direct.task import Task
 from panda3d.core import (AntialiasAttrib, ConfigVariableBool, NodePath,
-                          RigidBodyCombiner, TextNode)
+                          RigidBodyCombiner, TextFont, TextNode)
+from pkg_resources import resource_filename
 
 import tsim.ui.input as Input
 import tsim.ui.panda3d as p3d
-from tsim.model.index import INSTANCE as INDEX
-from tsim.model.geometry import Point, bounding_rect_center
-from tsim.model.network.node import Node
-from tsim.model.network.lane import LanePosition
-from tsim.model.network.orientedway import OrientedWay, OrientedWayPosition
-from tsim.model.network.way import Way
-from tsim.model.simulation.car import Car
-from tsim.model.units import (HOUR, Timestamp, kph_to_mps, normalized_hours,
+from tsim.core.index import INSTANCE as INDEX
+from tsim.core.geometry import Point, bounding_rect_center
+from tsim.core.network.node import Node
+from tsim.core.network.lane import LanePosition
+from tsim.core.network.orientedway import OrientedWay, OrientedWayPosition
+from tsim.core.network.way import Way
+from tsim.core.simulation.car import Car
+from tsim.core.units import (HOUR, Timestamp, kph_to_mps, normalized_hours,
                               time_string)
 from tsim.stats.way import WayStatsCollector
 from tsim.ui.camera import Camera
@@ -34,9 +35,6 @@ from tsim.ui.objects import factory as Factory, world as World
 from tsim.ui.screen import Screen
 from tsim.ui.sky import Sky
 from tsim.utils.iterators import window_iter
-
-FONT = p3d.LOADER.load_font('fonts/caladea-tsim.otf',
-                            pointSize=16, pixelsPerUnit=30)
 
 EVENTS = ('add_car', 'focus', 'follow', 'network_entities_changed',
           'new_agent', 'removed_agent')
@@ -49,6 +47,7 @@ SPEED_STEPS = 4
 class App:
     """Graphic UI application, using Panda3D."""
 
+    font: TextFont
     cars_text: TextNode
     simulation_speed_text: TextNode
     time_text: TextNode
@@ -73,6 +72,10 @@ class App:
         init_index(index_name)
         Input.init()
 
+        self.font = p3d.loader.load_font(
+            resource_filename('tsim', 'data/fonts/caladea-tsim.otf'),
+            pointSize=16, pixelsPerUnit=30)
+
         self.scene = NodePath('scene')
         self.agents_parent = NodePath('agents')
         self.agents_parent.reparent_to(self.scene)
@@ -90,7 +93,7 @@ class App:
         INDEX.simulation.time = 12.0 * HOUR
         self.sky.set_time(normalized_hours(INDEX.simulation.time))
 
-        self.scene.reparent_to(p3d.RENDER)
+        self.scene.reparent_to(p3d.render)
 
     def generate_random_cars(self, number=500, max_tries=10):
         """Generate `number` random cars."""
@@ -151,8 +154,8 @@ class App:
 
     def run(self):
         """Start the main loop."""
-        p3d.TASK_MGR.add(self.update)
-        p3d.BASE.run()
+        p3d.task_mgr.add(self.update)
+        p3d.base.run()
 
     def update(self, _task: Task):
         """Update task, to run every frame."""
@@ -200,7 +203,7 @@ class App:
 
     def simulation_event_listener(self, name: str, *args):
         """Handle simulation events."""
-        p3d.MESSENGER.send(name, list(args))
+        p3d.messenger.send(name, list(args))
 
     def get_roads_parent(self, point: Point) -> NodePath:
         """Get the correct parent for roads on the given point.
@@ -243,7 +246,7 @@ class App:
         self.event_handlers = {e: getattr(self, f'on_{e}', lambda: None)
                                for e in EVENTS}
         for event in EVENTS:
-            p3d.BASE.accept(event, partial(self.enqueue_event, event))
+            p3d.base.accept(event, partial(self.enqueue_event, event))
 
         INDEX.simulation.register_listener(self.simulation_event_listener)
 
@@ -262,18 +265,18 @@ class App:
             if self._number_input_buffer is not None:
                 self._number_input_buffer.append(key)
 
-        p3d.BASE.accept('control', _init_buffer)
-        p3d.BASE.accept('control-up', _flush_buffer)
+        p3d.base.accept('control', _init_buffer)
+        p3d.base.accept('control-up', _flush_buffer)
         for i in range(10):
             key = str(i)
-            p3d.BASE.accept(key, partial(self.change_simulation_speed,
+            p3d.base.accept(key, partial(self.change_simulation_speed,
                                          int(2 ** (i - 1)), False, 256))
-            p3d.BASE.accept(f'control-{key}', partial(_number_input, key))
+            p3d.base.accept(f'control-{key}', partial(_number_input, key))
         for key, value in (('control-wheel_up', 1),
                            ('control-wheel_down', -1)):
-            p3d.BASE.accept(key, partial(self.change_simulation_speed, value))
-        p3d.BASE.accept('f12', self.screen.screenshot)
-        p3d.BASE.accept('control-f12', self.screen.toggle_movie_recording)
+            p3d.base.accept(key, partial(self.change_simulation_speed, value))
+        p3d.base.accept('f12', self.screen.screenshot)
+        p3d.base.accept('control-f12', self.screen.toggle_movie_recording)
 
     def enqueue_event(self, name: str, *args):
         """Enqueue event from panda3d messenger."""
@@ -350,38 +353,38 @@ class App:
                 node_path.look_at(*(position + agent.direction), 0.0)
 
     def _build_on_screen_text(self):
-        aspect = 1.0 / p3d.ASPECT2D.get_scale()[0]
+        aspect = 1.0 / p3d.aspect2d.get_scale()[0]
 
         time_text = TextNode('time_text')
-        time_text.font = FONT
+        time_text.font = self.font
         time_text.text = ''
         time_text.text_scale = 0.08
         time_text.shadow = -0.005, 0.005
         time_text.shadow_color = 0, 0, 0, 1
-        time_text_np = p3d.ASPECT2D.attach_new_node(time_text)
+        time_text_np = p3d.aspect2d.attach_new_node(time_text)
         time_text_np.set_pos(-0.95 * aspect, -0.0, -0.85)
         self.time_text = time_text
 
         cars_text = TextNode('cars_text')
-        cars_text.font = FONT
+        cars_text.font = self.font
         cars_text.text = ''
         cars_text.align = TextNode.A_right
         cars_text.text_scale = 0.034
         cars_text.shadow = -0.0025, 0.0025
         cars_text.shadow_color = 0, 0, 0, 1
-        cars_text_np = p3d.ASPECT2D.attach_new_node(cars_text)
+        cars_text_np = p3d.aspect2d.attach_new_node(cars_text)
         cars_text_np.set_pos(-0.95 * aspect + time_text.calc_width('00:00:00'),
                              -0.0, -0.91)
         self.cars_text = cars_text
 
         simspeed_text = TextNode('simulation_speed_text')
-        simspeed_text.font = FONT
+        simspeed_text.font = self.font
         simspeed_text.text = ''
         simspeed_text.slant = 0.3
         simspeed_text.text_scale = 0.034
         simspeed_text.shadow = -0.0025, 0.0025
         simspeed_text.shadow_color = 0, 0, 0, 1
-        simspeed_text_np = p3d.ASPECT2D.attach_new_node(simspeed_text)
+        simspeed_text_np = p3d.aspect2d.attach_new_node(simspeed_text)
         simspeed_text_np.set_pos(-0.95 * aspect, -0.0, -0.91)
         self.simulation_speed_text = simspeed_text
 
@@ -417,13 +420,14 @@ def log_config():
 
 def panda3d_config():
     """Initialize Panda3D global configurations."""
-    p3d.TASK_MGR.remove('audioLoop')
-    p3d.TASK_MGR.remove('collisionLoop')
+    p3d.init()
+    p3d.task_mgr.remove('audioLoop')
+    p3d.task_mgr.remove('collisionLoop')
     # print(task_mgr)  # to print all tasks
 
-    p3d.RENDER.set_antialias(AntialiasAttrib.M_auto)
+    p3d.render.set_antialias(AntialiasAttrib.M_auto)
     if ConfigVariableBool('use-shaders', False):
-        p3d.RENDER.set_shader_auto()
+        p3d.render.set_shader_auto()
 
 
 def init_index(name: str):

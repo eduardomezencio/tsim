@@ -9,17 +9,15 @@ from direct.gui.OnscreenText import OnscreenText
 from panda3d.core import NodePath, TextNode
 
 import tsim.ui.panda3d as p3d
-from tsim.model.index import INSTANCE as INDEX
-from tsim.model.network.lane import LanePosition
-from tsim.model.network.way import Way
-from tsim.model.simulation.car import Car
+from tsim.core.index import INSTANCE as INDEX
+from tsim.core.network.lane import LanePosition
+from tsim.core.network.way import Way
+from tsim.core.simulation.car import Car
 from tsim.ui.objects import factory as Factory
 from tsim.ui.tools.tool import Tool
 
 if TYPE_CHECKING:
-    from tsim.model.network.path import Path
-
-FONT = p3d.LOADER.load_font('cmtt12.egg')
+    from tsim.core.network.path import Path
 
 
 class PathTool(Tool):
@@ -43,8 +41,8 @@ class PathTool(Tool):
         self.hud_text = OnscreenText(text='', pos=(5, -20), scale=22.0,
                                      fg=(1.0, 1.0, 1.0, 0.9),
                                      shadow=(0.0, 0.0, 0.0, 0.9),
-                                     align=TextNode.A_left, font=FONT,
-                                     parent=p3d.PIXEL2D, mayChange=True)
+                                     align=TextNode.A_left, font=p3d.ttf,
+                                     parent=p3d.pixel2d, mayChange=True)
         self.path_np = None
         self._update_hud_text()
 
@@ -95,7 +93,7 @@ class PathTool(Tool):
     def _update_path_np(self):
         self._clear_path_np()
         if self.path is not None:
-            self.path_np = Factory.create_path(p3d.RENDER, self.path)
+            self.path_np = Factory.create_path(p3d.render, self.path)
 
     def _clear_path_np(self):
         if self.path_np is not None:
@@ -126,5 +124,5 @@ class PathTool(Tool):
         buffer = INDEX.simulation.ready_buffer
         self.source = self.source.with_free_space(buffer, Car.MINIMUM_DISTANCE)
         if self.source is not None:
-            p3d.MESSENGER.send('add_car', [Car(), self.source,
+            p3d.messenger.send('add_car', [Car(), self.source,
                                            self.dest.oriented_way_position])
